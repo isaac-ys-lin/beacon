@@ -32,11 +32,12 @@ final class BatteryHubMacApp: NSObject, NSApplicationDelegate {
 }
 
 @MainActor
-final class BatteryHubStatusController: NSObject {
+final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
     private let model: BatteryHubModel
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let popover = NSPopover()
     private var storeObserver: AnyCancellable?
+    private var outsideClickMonitor: Any?
 
     init(model: BatteryHubModel) {
         self.model = model
@@ -45,12 +46,16 @@ final class BatteryHubStatusController: NSObject {
         popover.behavior = .transient
         popover.animates = true
         popover.contentSize = NSSize(width: 378, height: 260)
+        popover.delegate = self
         updatePopoverContent()
 
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(togglePopover(_:))
-            button.imagePosition = .imageLeading
+            button.imagePosition = .imageOnly
+            button.imageScaling = .scaleProportionallyDown
+            button.imageHugsTitle = true
+            button.toolTip = "BatteryHub"
         }
 
         storeObserver = model.$store.sink { [weak self] _ in
@@ -65,9 +70,20 @@ final class BatteryHubStatusController: NSObject {
             popover.performClose(sender)
         } else {
             updatePopoverContent()
-            popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+            let anchor = NSRect(
+                x: sender.bounds.midX - 1,
+                y: sender.bounds.minY,
+                width: 2,
+                height: sender.bounds.height
+            )
+            popover.show(relativeTo: anchor, of: sender, preferredEdge: .minY)
+            startOutsideClickMonitor()
             NSApp.activate(ignoringOtherApps: false)
         }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        stopOutsideClickMonitor()
     }
 
     private func updatePopoverContent() {
@@ -83,24 +99,60 @@ final class BatteryHubStatusController: NSObject {
 
     private func updateStatusButton() {
         guard let button = statusItem.button else { return }
-        button.title = " \(summaryText)"
-        button.image = NSImage(systemSymbolName: summarySymbol, accessibilityDescription: "BatteryHub")
+        button.title = ""
+        button.image = BluetoothStatusIconImage.make()
     }
 
-    private var summaryText: String {
-        let percents = model.store.externalBatterySnapshots.compactMap(\.percent)
-        guard let lowest = percents.min() else { return "Hub" }
-        return "Hub \(lowest)%"
-    }
-
-    private var summarySymbol: String {
-        let lowest = model.store.externalBatterySnapshots.compactMap(\.percent).min() ?? 100
-        switch lowest {
-        case 0...20: return "battery.25percent"
-        case 21...60: return "battery.50percent"
-        case 61...85: return "battery.75percent"
-        default: return "battery.100percent"
+    private func startOutsideClickMonitor() {
+        stopOutsideClickMonitor()
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) {
+            [weak self] _ in
+            Task { @MainActor in
+                self?.popover.performClose(nil)
+            }
         }
+    }
+
+    private func stopOutsideClickMonitor() {
+        guard let outsideClickMonitor else { return }
+        NSEvent.removeMonitor(outsideClickMonitor)
+        self.outsideClickMonitor = nil
+    }
+}
+
+private enum BluetoothStatusIconImage {
+    static func make() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            let path = NSBezierPath()
+            path.lineWidth = 2.2
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+
+            let midX = rect.midX - 0.1
+            let top = rect.maxY - 1.45
+            let bottom = rect.minY + 1.45
+            let upper = rect.midY + 3.45
+            let lower = rect.midY - 3.45
+            let right = rect.maxX - 2.65
+            let left = rect.minX + 3.75
+
+            path.move(to: NSPoint(x: midX, y: top))
+            path.line(to: NSPoint(x: right, y: upper))
+            path.line(to: NSPoint(x: midX, y: rect.midY))
+            path.line(to: NSPoint(x: right, y: lower))
+            path.line(to: NSPoint(x: midX, y: bottom))
+            path.line(to: NSPoint(x: midX, y: top))
+            path.move(to: NSPoint(x: left, y: upper))
+            path.line(to: NSPoint(x: midX, y: rect.midY))
+            path.line(to: NSPoint(x: left, y: lower))
+
+            NSColor.black.setStroke()
+            path.stroke()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "BatteryHub"
+        return image
     }
 }
 

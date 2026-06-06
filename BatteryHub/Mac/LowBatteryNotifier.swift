@@ -2,7 +2,23 @@ import Foundation
 import UserNotifications
 
 enum LowBatteryNotifier {
-    static let threshold = 20
+    static let defaultThreshold = 20
+    static let thresholdDefaultsKey = "BatteryHub.lowBatteryThreshold"
+    static let notificationsEnabledDefaultsKey = "BatteryHub.lowBatteryNotificationsEnabled"
+
+    static var threshold: Int {
+        let value = UserDefaults.standard.integer(forKey: thresholdDefaultsKey)
+        guard value > 0 else { return defaultThreshold }
+        return Swift.max(5, Swift.min(50, value))
+    }
+
+    static var notificationsEnabled: Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: notificationsEnabledDefaultsKey) != nil else {
+            return true
+        }
+        return defaults.bool(forKey: notificationsEnabledDefaultsKey)
+    }
 
     private static let defaultsPrefix = "BatteryHub.lowBatteryAlerted."
 
@@ -11,6 +27,7 @@ enum LowBatteryNotifier {
     }
 
     static func notifyIfNeeded(for snapshots: [BatterySnapshot]) {
+        guard notificationsEnabled else { return }
         let defaults = UserDefaults.standard
 
         for snapshot in snapshots {

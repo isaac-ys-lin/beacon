@@ -32,7 +32,6 @@ app_path() {
 open_app() {
   local bundle="$1"
   /usr/bin/xattr -dr com.apple.quarantine "$bundle" 2>/dev/null || true
-  /usr/bin/codesign --force --deep --sign - "$bundle" >/dev/null 2>&1 || true
   /usr/bin/open -n "$bundle"
 }
 

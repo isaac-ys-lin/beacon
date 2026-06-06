@@ -4,11 +4,17 @@ struct StatusMenuView: View {
     let snapshots: [DecoratedBatterySnapshot]
     let onRefresh: () -> Void
 
+    @AppStorage(LowBatteryNotifier.thresholdDefaultsKey) private var lowBatteryThreshold = LowBatteryNotifier.defaultThreshold
+    @AppStorage(LowBatteryNotifier.notificationsEnabledDefaultsKey) private var lowBatteryAlertsEnabled = true
+    @State private var isShowingSettings = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.lg) {
             header
 
-            if snapshots.isEmpty {
+            if isShowingSettings {
+                settingsPanel
+            } else if snapshots.isEmpty {
                 emptyState
             } else {
                 ScrollView(showsIndicators: false) {
@@ -51,8 +57,12 @@ struct StatusMenuView: View {
                 .contentShape(Circle())
                 .help("Refresh")
 
-                Button(action: {}) {
-                    Image(systemName: "gearshape")
+                Button {
+                    withAnimation(.easeInOut(duration: DesignTokens.Motion.quick)) {
+                        isShowingSettings.toggle()
+                    }
+                } label: {
+                    Image(systemName: isShowingSettings ? "xmark.circle" : "gearshape")
                         .font(.system(size: 20, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                         .frame(width: 30, height: 30)
@@ -60,7 +70,7 @@ struct StatusMenuView: View {
                 .buttonStyle(.plain)
                 .contentShape(Circle())
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
-                .help("Settings")
+                .help(isShowingSettings ? "Close Settings" : "Settings")
             }
         }
     }
@@ -81,7 +91,7 @@ struct StatusMenuView: View {
 
     private var footer: some View {
         HStack {
-            Label("Alerts below \(LowBatteryNotifier.threshold)%", systemImage: "bell.badge")
+            Label(footerAlertText, systemImage: lowBatteryAlertsEnabled ? "bell.badge" : "bell.slash")
                 .font(.system(size: 11))
                 .foregroundStyle(DesignTokens.Palette.tertiaryText)
             Spacer()
@@ -89,6 +99,46 @@ struct StatusMenuView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(DesignTokens.Palette.tertiaryText)
         }
+    }
+
+    private var settingsPanel: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+            Toggle("Low battery alerts", isOn: $lowBatteryAlertsEnabled)
+                .toggleStyle(.switch)
+
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                HStack {
+                    Text("Alert threshold")
+                        .font(.system(size: 13, weight: .medium))
+                    Spacer()
+                    Text("\(clampedLowBatteryThreshold)%")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(DesignTokens.Palette.accent)
+                }
+
+                Slider(value: thresholdSliderValue, in: 5...50, step: 5)
+                    .disabled(!lowBatteryAlertsEnabled)
+            }
+            .opacity(lowBatteryAlertsEnabled ? 1 : 0.45)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground)
+    }
+
+    private var clampedLowBatteryThreshold: Int {
+        Swift.max(5, Swift.min(50, lowBatteryThreshold))
+    }
+
+    private var thresholdSliderValue: Binding<Double> {
+        Binding(
+            get: { Double(clampedLowBatteryThreshold) },
+            set: { lowBatteryThreshold = Int($0.rounded()) }
+        )
+    }
+
+    private var footerAlertText: String {
+        lowBatteryAlertsEnabled ? "Alerts below \(clampedLowBatteryThreshold)%" : "Alerts off"
     }
 
     private var deviceGroups: [[DecoratedBatterySnapshot]] {
