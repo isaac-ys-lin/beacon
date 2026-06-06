@@ -1,0 +1,120 @@
+name: BatteryHub
+options:
+  bundleIdPrefix: com.isaacyslin
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+    watchOS: "10.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ENABLE_DEBUG_DYLIB: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGN_STYLE: Manual
+targets:
+  BatteryHubMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: BatteryHub/Shared
+      - path: BatteryHub/Mac
+    info:
+      path: BatteryHub/Mac/Info.plist
+      properties:
+        CFBundleDisplayName: BatteryHub
+        LSUIElement: true
+        NSBluetoothAlwaysUsageDescription: BatteryHub reads connected Bluetooth device battery reports when available.
+    entitlements:
+      path: BatteryHub/Mac/BatteryHubMac.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.device.bluetooth: true
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.isaacyslin.BatteryHub
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.isaacyslin.BatteryHub
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.BatteryHub.mac
+        PRODUCT_MODULE_NAME: BatteryHub
+  BatteryHubiOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: BatteryHub/Shared
+      - path: BatteryHub/iOS
+    info:
+      path: BatteryHub/iOS/Info.plist
+      properties:
+        CFBundleDisplayName: BatteryHub
+        UIRequiresFullScreen: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    entitlements:
+      path: BatteryHub/iOS/BatteryHubiOS.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.isaacyslin.BatteryHub
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.isaacyslin.BatteryHub
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.BatteryHub.ios
+        PRODUCT_MODULE_NAME: BatteryHubiOS
+  BatteryHubWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: BatteryHub/Shared
+      - path: BatteryHub/Watch
+    info:
+      path: BatteryHub/Watch/Info.plist
+      properties:
+        CFBundleDisplayName: BatteryHub
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.isaacyslin.BatteryHub.ios
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.BatteryHub.watch
+        PRODUCT_MODULE_NAME: BatteryHubWatch
+  BatteryHubTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: BatteryHubTests
+    dependencies:
+      - target: BatteryHubMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.BatteryHub.tests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/BatteryHubMac.app/Contents/MacOS/BatteryHubMac
+        BUNDLE_LOADER: $(TEST_HOST)
+  BatteryHubUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: BatteryHubUITests
+    dependencies:
+      - target: BatteryHubMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.BatteryHub.uitests
+        TEST_TARGET_NAME: BatteryHubMac
+schemes:
+  BatteryHubMac:
+    build:
+      targets:
+        BatteryHubMac: all
+    test:
+      targets:
+        - BatteryHubTests
+      gatherCoverageData: false
+  BatteryHubiOS:
+    build:
+      targets:
+        BatteryHubiOS: all
+  BatteryHubWatch:
+    build:
+      targets:
+        BatteryHubWatch: all

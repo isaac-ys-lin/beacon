@@ -1,0 +1,758 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07DB1584A760AE080C17CB52 /* DeviceBatteryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 668D7469010F9F52672D0768 /* DeviceBatteryRow.swift */; };
+		1383251E66154E3EEBAC52C6 /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */; };
+		176743D6BAAD897908EDDE84 /* BluetoothBatteryResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */; };
+		18446EFEADF906083A88A048 /* iPhoneBatteryReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1144D6D0BE686608C1787E33 /* iPhoneBatteryReporter.swift */; };
+		21BF229FC1379A98B647A82E /* MacPowerSourceReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E7ECC1AA68CD0E74B08E1BA /* MacPowerSourceReaderTests.swift */; };
+		28C0D03517925A8486D769B9 /* BatteryHubWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88CAEC15F975B4A92952C49 /* BatteryHubWatchApp.swift */; };
+		32FA20A2BF036886CCAFFD31 /* LowBatteryNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */; };
+		3E35364E3690DA8E20556AFA /* MacPowerSourceReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */; };
+		43C97E6D66524B9AAF63DF46 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1CB66F60CA615057985048 /* DesignTokens.swift */; };
+		5F62A044EEE106CB6ACDE695 /* BatterySnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */; };
+		6CCD9B510711CE1E0F36828C /* CloudBatterySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAD8EE9FAD476F00A523218 /* CloudBatterySync.swift */; };
+		726982F048F05B614FCD8C47 /* WatchBatteryRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22DE5D558C9E54FA6435DF1 /* WatchBatteryRelay.swift */; };
+		782801FDEA2CCDE36533BA6E /* BluetoothDeviceScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */; };
+		942FE4611CC7E0C6850F6065 /* BluetoothBatteryResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3F20615717ABC149F0CE39 /* BluetoothBatteryResolver.swift */; };
+		98C96F7E9FA25DB0D45FA1E1 /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C254213BB0D5DADF9F1F5FD /* StatusMenuView.swift */; };
+		A2BA350B57FACA9D5C264272 /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */; };
+		A2F311CF66BE5F52F4C17DA3 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1CB66F60CA615057985048 /* DesignTokens.swift */; };
+		A5FC0F75FDFA828F4A95DB53 /* WatchBatteryReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D7DE4584BC2BBFE8BF22459 /* WatchBatteryReporter.swift */; };
+		B798AD9CA5A6D7071891035B /* BatteryHubiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ED787121B38AFC4AFD42AA /* BatteryHubiOSApp.swift */; };
+		BDC58F706E30806CCD030046 /* CloudBatterySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAD8EE9FAD476F00A523218 /* CloudBatterySync.swift */; };
+		BDF61E5A2AE7158894FCBE6B /* BatteryHubMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1343648981A02CD9D854CEE7 /* BatteryHubMacApp.swift */; };
+		C1669D9406E67FD6232BB5DB /* StatusMenuSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EDBB2E81DFB38D0D14D8485 /* StatusMenuSnapshotTests.swift */; };
+		CD35FB78B215C978A0464AD2 /* BatterySnapshotStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CBBFCBDA160193064A02179 /* BatterySnapshotStoreTests.swift */; };
+		CFDF5EADE3731BA8A03B20A7 /* BatterySnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */; };
+		EB9686598B1C318A007C4057 /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */; };
+		EE18FC894C574D186ECE8106 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1CB66F60CA615057985048 /* DesignTokens.swift */; };
+		EF0DAAC2B4EFAEE57DB2E022 /* CloudBatterySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAD8EE9FAD476F00A523218 /* CloudBatterySync.swift */; };
+		FBC9B541E797D671D6B40E04 /* BatterySnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */; };
+		FC2C3F6C10748A0820A9A04D /* CloudBatterySyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA38D00E2FD0EED376308ED /* CloudBatterySyncTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		15B59720232588C5B2692BB2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 45C328C8416135D15329479F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8FE3A089DEDFACC3C20459FA;
+			remoteInfo = BatteryHubMac;
+		};
+		27611F2940FC7620B5933676 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 45C328C8416135D15329479F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8FE3A089DEDFACC3C20459FA;
+			remoteInfo = BatteryHubMac;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0C254213BB0D5DADF9F1F5FD /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
+		0EDBB2E81DFB38D0D14D8485 /* StatusMenuSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuSnapshotTests.swift; sourceTree = "<group>"; };
+		1144D6D0BE686608C1787E33 /* iPhoneBatteryReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPhoneBatteryReporter.swift; sourceTree = "<group>"; };
+		1343648981A02CD9D854CEE7 /* BatteryHubMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryHubMacApp.swift; sourceTree = "<group>"; };
+		1E7ECC1AA68CD0E74B08E1BA /* MacPowerSourceReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPowerSourceReaderTests.swift; sourceTree = "<group>"; };
+		20C940CE61834B35B25A743C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2CBBFCBDA160193064A02179 /* BatterySnapshotStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStoreTests.swift; sourceTree = "<group>"; };
+		32CDA0F767C9BF310917A8DE /* BatteryHubTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BatteryHubTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D7DE4584BC2BBFE8BF22459 /* WatchBatteryReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBatteryReporter.swift; sourceTree = "<group>"; };
+		520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowBatteryNotifier.swift; sourceTree = "<group>"; };
+		578A3275B1217A573073E2BD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5C3F20615717ABC149F0CE39 /* BluetoothBatteryResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolver.swift; sourceTree = "<group>"; };
+		668D7469010F9F52672D0768 /* DeviceBatteryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceBatteryRow.swift; sourceTree = "<group>"; };
+		668E2DA35CD366B6E678909C /* BatteryHubMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BatteryHubMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6B00AD3E1F4EF43274A4551F /* BatteryHubUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BatteryHubUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		755488B9E5D2FB2B1F6A9C5A /* BatteryHubiOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BatteryHubiOS.entitlements; sourceTree = "<group>"; };
+		75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothDeviceScanner.swift; sourceTree = "<group>"; };
+		7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshot.swift; sourceTree = "<group>"; };
+		90ED787121B38AFC4AFD42AA /* BatteryHubiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryHubiOSApp.swift; sourceTree = "<group>"; };
+		A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolverTests.swift; sourceTree = "<group>"; };
+		A774E28BA04474F8D42979ED /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B77F6834053833133C0D2110 /* BatteryHubWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BatteryHubWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPowerSourceReader.swift; sourceTree = "<group>"; };
+		C88CAEC15F975B4A92952C49 /* BatteryHubWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryHubWatchApp.swift; sourceTree = "<group>"; };
+		CC1CB66F60CA615057985048 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		D0E89888FA0DB1DD37830547 /* BatteryHubiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BatteryHubiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6D524F32ABC5FD0DA0B5410 /* BatteryHubMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BatteryHubMac.entitlements; sourceTree = "<group>"; };
+		EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStore.swift; sourceTree = "<group>"; };
+		EBAD8EE9FAD476F00A523218 /* CloudBatterySync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudBatterySync.swift; sourceTree = "<group>"; };
+		EDA38D00E2FD0EED376308ED /* CloudBatterySyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudBatterySyncTests.swift; sourceTree = "<group>"; };
+		F22DE5D558C9E54FA6435DF1 /* WatchBatteryRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBatteryRelay.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		002DB446C47AEBFC67BC451D = {
+			isa = PBXGroup;
+			children = (
+				A25D63E858AC942BE4051AEF /* BatteryHubTests */,
+				328521B4309C71949BD3ACAF /* BatteryHubUITests */,
+				9C887E18F821BF0C60AE6E11 /* iOS */,
+				9B84D13D5425442172270129 /* Mac */,
+				2F8F90AF62AB6A7A80AAE6CC /* Shared */,
+				3D1C10090AE361B78337B7E2 /* Watch */,
+				65F597F12CEF68259C141AC9 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		2F8F90AF62AB6A7A80AAE6CC /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */,
+				EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */,
+				EBAD8EE9FAD476F00A523218 /* CloudBatterySync.swift */,
+				CC1CB66F60CA615057985048 /* DesignTokens.swift */,
+			);
+			name = Shared;
+			path = BatteryHub/Shared;
+			sourceTree = "<group>";
+		};
+		328521B4309C71949BD3ACAF /* BatteryHubUITests */ = {
+			isa = PBXGroup;
+			children = (
+				0EDBB2E81DFB38D0D14D8485 /* StatusMenuSnapshotTests.swift */,
+			);
+			path = BatteryHubUITests;
+			sourceTree = "<group>";
+		};
+		3D1C10090AE361B78337B7E2 /* Watch */ = {
+			isa = PBXGroup;
+			children = (
+				C88CAEC15F975B4A92952C49 /* BatteryHubWatchApp.swift */,
+				A774E28BA04474F8D42979ED /* Info.plist */,
+				4D7DE4584BC2BBFE8BF22459 /* WatchBatteryReporter.swift */,
+			);
+			name = Watch;
+			path = BatteryHub/Watch;
+			sourceTree = "<group>";
+		};
+		65F597F12CEF68259C141AC9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D0E89888FA0DB1DD37830547 /* BatteryHubiOS.app */,
+				668E2DA35CD366B6E678909C /* BatteryHubMac.app */,
+				32CDA0F767C9BF310917A8DE /* BatteryHubTests.xctest */,
+				6B00AD3E1F4EF43274A4551F /* BatteryHubUITests.xctest */,
+				B77F6834053833133C0D2110 /* BatteryHubWatch.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		9B84D13D5425442172270129 /* Mac */ = {
+			isa = PBXGroup;
+			children = (
+				D6D524F32ABC5FD0DA0B5410 /* BatteryHubMac.entitlements */,
+				1343648981A02CD9D854CEE7 /* BatteryHubMacApp.swift */,
+				5C3F20615717ABC149F0CE39 /* BluetoothBatteryResolver.swift */,
+				75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */,
+				668D7469010F9F52672D0768 /* DeviceBatteryRow.swift */,
+				20C940CE61834B35B25A743C /* Info.plist */,
+				520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */,
+				BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */,
+				0C254213BB0D5DADF9F1F5FD /* StatusMenuView.swift */,
+			);
+			name = Mac;
+			path = BatteryHub/Mac;
+			sourceTree = "<group>";
+		};
+		9C887E18F821BF0C60AE6E11 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				755488B9E5D2FB2B1F6A9C5A /* BatteryHubiOS.entitlements */,
+				90ED787121B38AFC4AFD42AA /* BatteryHubiOSApp.swift */,
+				578A3275B1217A573073E2BD /* Info.plist */,
+				1144D6D0BE686608C1787E33 /* iPhoneBatteryReporter.swift */,
+				F22DE5D558C9E54FA6435DF1 /* WatchBatteryRelay.swift */,
+			);
+			name = iOS;
+			path = BatteryHub/iOS;
+			sourceTree = "<group>";
+		};
+		A25D63E858AC942BE4051AEF /* BatteryHubTests */ = {
+			isa = PBXGroup;
+			children = (
+				2CBBFCBDA160193064A02179 /* BatterySnapshotStoreTests.swift */,
+				A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */,
+				EDA38D00E2FD0EED376308ED /* CloudBatterySyncTests.swift */,
+				1E7ECC1AA68CD0E74B08E1BA /* MacPowerSourceReaderTests.swift */,
+			);
+			path = BatteryHubTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2ED45C12699FA61223385B50 /* BatteryHubWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 811E2D9244B4226D8D2E22DA /* Build configuration list for PBXNativeTarget "BatteryHubWatch" */;
+			buildPhases = (
+				29DA968516713C52EDCDE084 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BatteryHubWatch;
+			packageProductDependencies = (
+			);
+			productName = BatteryHubWatch;
+			productReference = B77F6834053833133C0D2110 /* BatteryHubWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4AF45F0A628F86C8C5C7497A /* BatteryHubiOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A26D6493AAAB268682870C67 /* Build configuration list for PBXNativeTarget "BatteryHubiOS" */;
+			buildPhases = (
+				A56F8A934C6FC9E7FA975D89 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BatteryHubiOS;
+			packageProductDependencies = (
+			);
+			productName = BatteryHubiOS;
+			productReference = D0E89888FA0DB1DD37830547 /* BatteryHubiOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		538BC0F47517CB9FFC3CA37B /* BatteryHubTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F22C3B8D4C8E03444263CFAB /* Build configuration list for PBXNativeTarget "BatteryHubTests" */;
+			buildPhases = (
+				880BE8200FC3A6C748F6C387 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				349060F518100472C1DA3FBB /* PBXTargetDependency */,
+			);
+			name = BatteryHubTests;
+			packageProductDependencies = (
+			);
+			productName = BatteryHubTests;
+			productReference = 32CDA0F767C9BF310917A8DE /* BatteryHubTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		8FE3A089DEDFACC3C20459FA /* BatteryHubMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 541AAC8F4C20DED83E811B89 /* Build configuration list for PBXNativeTarget "BatteryHubMac" */;
+			buildPhases = (
+				5D6B88301E66B5D6B6608DF1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BatteryHubMac;
+			packageProductDependencies = (
+			);
+			productName = BatteryHubMac;
+			productReference = 668E2DA35CD366B6E678909C /* BatteryHubMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		FD7E2A60A1255ED6E68C9B93 /* BatteryHubUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 95C208A5A682FD4BF436EF54 /* Build configuration list for PBXNativeTarget "BatteryHubUITests" */;
+			buildPhases = (
+				5EB624B027222EFCF8939F9B /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5D59F708B89F0ACB895FABE1 /* PBXTargetDependency */,
+			);
+			name = BatteryHubUITests;
+			packageProductDependencies = (
+			);
+			productName = BatteryHubUITests;
+			productReference = 6B00AD3E1F4EF43274A4551F /* BatteryHubUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		45C328C8416135D15329479F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2ED45C12699FA61223385B50 = {
+						ProvisioningStyle = Manual;
+					};
+					4AF45F0A628F86C8C5C7497A = {
+						ProvisioningStyle = Manual;
+					};
+					538BC0F47517CB9FFC3CA37B = {
+						ProvisioningStyle = Manual;
+					};
+					8FE3A089DEDFACC3C20459FA = {
+						ProvisioningStyle = Manual;
+					};
+					FD7E2A60A1255ED6E68C9B93 = {
+						ProvisioningStyle = Manual;
+						TestTargetID = 8FE3A089DEDFACC3C20459FA;
+					};
+				};
+			};
+			buildConfigurationList = 1F6D678F0C940761798A05B2 /* Build configuration list for PBXProject "BatteryHub" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 002DB446C47AEBFC67BC451D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 65F597F12CEF68259C141AC9 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8FE3A089DEDFACC3C20459FA /* BatteryHubMac */,
+				538BC0F47517CB9FFC3CA37B /* BatteryHubTests */,
+				FD7E2A60A1255ED6E68C9B93 /* BatteryHubUITests */,
+				2ED45C12699FA61223385B50 /* BatteryHubWatch */,
+				4AF45F0A628F86C8C5C7497A /* BatteryHubiOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		29DA968516713C52EDCDE084 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28C0D03517925A8486D769B9 /* BatteryHubWatchApp.swift in Sources */,
+				1383251E66154E3EEBAC52C6 /* BatterySnapshot.swift in Sources */,
+				FBC9B541E797D671D6B40E04 /* BatterySnapshotStore.swift in Sources */,
+				EF0DAAC2B4EFAEE57DB2E022 /* CloudBatterySync.swift in Sources */,
+				EE18FC894C574D186ECE8106 /* DesignTokens.swift in Sources */,
+				A5FC0F75FDFA828F4A95DB53 /* WatchBatteryReporter.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5D6B88301E66B5D6B6608DF1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BDF61E5A2AE7158894FCBE6B /* BatteryHubMacApp.swift in Sources */,
+				A2BA350B57FACA9D5C264272 /* BatterySnapshot.swift in Sources */,
+				CFDF5EADE3731BA8A03B20A7 /* BatterySnapshotStore.swift in Sources */,
+				942FE4611CC7E0C6850F6065 /* BluetoothBatteryResolver.swift in Sources */,
+				782801FDEA2CCDE36533BA6E /* BluetoothDeviceScanner.swift in Sources */,
+				BDC58F706E30806CCD030046 /* CloudBatterySync.swift in Sources */,
+				A2F311CF66BE5F52F4C17DA3 /* DesignTokens.swift in Sources */,
+				07DB1584A760AE080C17CB52 /* DeviceBatteryRow.swift in Sources */,
+				32FA20A2BF036886CCAFFD31 /* LowBatteryNotifier.swift in Sources */,
+				3E35364E3690DA8E20556AFA /* MacPowerSourceReader.swift in Sources */,
+				98C96F7E9FA25DB0D45FA1E1 /* StatusMenuView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5EB624B027222EFCF8939F9B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C1669D9406E67FD6232BB5DB /* StatusMenuSnapshotTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		880BE8200FC3A6C748F6C387 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CD35FB78B215C978A0464AD2 /* BatterySnapshotStoreTests.swift in Sources */,
+				176743D6BAAD897908EDDE84 /* BluetoothBatteryResolverTests.swift in Sources */,
+				FC2C3F6C10748A0820A9A04D /* CloudBatterySyncTests.swift in Sources */,
+				21BF229FC1379A98B647A82E /* MacPowerSourceReaderTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A56F8A934C6FC9E7FA975D89 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B798AD9CA5A6D7071891035B /* BatteryHubiOSApp.swift in Sources */,
+				EB9686598B1C318A007C4057 /* BatterySnapshot.swift in Sources */,
+				5F62A044EEE106CB6ACDE695 /* BatterySnapshotStore.swift in Sources */,
+				6CCD9B510711CE1E0F36828C /* CloudBatterySync.swift in Sources */,
+				43C97E6D66524B9AAF63DF46 /* DesignTokens.swift in Sources */,
+				726982F048F05B614FCD8C47 /* WatchBatteryRelay.swift in Sources */,
+				18446EFEADF906083A88A048 /* iPhoneBatteryReporter.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		349060F518100472C1DA3FBB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8FE3A089DEDFACC3C20459FA /* BatteryHubMac */;
+			targetProxy = 15B59720232588C5B2692BB2 /* PBXContainerItemProxy */;
+		};
+		5D59F708B89F0ACB895FABE1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8FE3A089DEDFACC3C20459FA /* BatteryHubMac */;
+			targetProxy = 27611F2940FC7620B5933676 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		06F40640661CA1E07150110C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = BatteryHub/iOS/BatteryHubiOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = BatteryHub/iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.ios;
+				PRODUCT_MODULE_NAME = BatteryHubiOS;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		365C74A24FC1866CA7A994E2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BatteryHubMac.app/Contents/MacOS/BatteryHubMac";
+			};
+			name = Debug;
+		};
+		4610D4C2E40FB5DB2F72413C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_FILE = BatteryHub/Watch/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.watch;
+				PRODUCT_MODULE_NAME = BatteryHubWatch;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
+		};
+		4F6DC8F94D9A02A0A001D5C4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_FILE = BatteryHub/Watch/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.watch;
+				PRODUCT_MODULE_NAME = BatteryHubWatch;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
+		697CF0280665B190E5934A94 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = BatteryHubMac;
+			};
+			name = Debug;
+		};
+		8793B1715C382F2466E9C126 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = BatteryHub/Mac/BatteryHubMac.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = BatteryHub/Mac/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.mac;
+				PRODUCT_MODULE_NAME = BatteryHub;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		887820935A5A41464502AAFF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = BatteryHubMac;
+			};
+			name = Release;
+		};
+		C6232A31B2AC08D826F18F67 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		D53FF854576EA859E84C085E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		DC443B977853A69D81E5C7B0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = BatteryHub/iOS/BatteryHubiOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = BatteryHub/iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.ios;
+				PRODUCT_MODULE_NAME = BatteryHubiOS;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		FB21BA57E9DED93C53B14B00 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = BatteryHub/Mac/BatteryHubMac.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = BatteryHub/Mac/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.mac;
+				PRODUCT_MODULE_NAME = BatteryHub;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		FE50E76B56FC40C7C66EE113 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.BatteryHub.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BatteryHubMac.app/Contents/MacOS/BatteryHubMac";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F6D678F0C940761798A05B2 /* Build configuration list for PBXProject "BatteryHub" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D53FF854576EA859E84C085E /* Debug */,
+				C6232A31B2AC08D826F18F67 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		541AAC8F4C20DED83E811B89 /* Build configuration list for PBXNativeTarget "BatteryHubMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8793B1715C382F2466E9C126 /* Debug */,
+				FB21BA57E9DED93C53B14B00 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		811E2D9244B4226D8D2E22DA /* Build configuration list for PBXNativeTarget "BatteryHubWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F6DC8F94D9A02A0A001D5C4 /* Debug */,
+				4610D4C2E40FB5DB2F72413C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		95C208A5A682FD4BF436EF54 /* Build configuration list for PBXNativeTarget "BatteryHubUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				697CF0280665B190E5934A94 /* Debug */,
+				887820935A5A41464502AAFF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A26D6493AAAB268682870C67 /* Build configuration list for PBXNativeTarget "BatteryHubiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				06F40640661CA1E07150110C /* Debug */,
+				DC443B977853A69D81E5C7B0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F22C3B8D4C8E03444263CFAB /* Build configuration list for PBXNativeTarget "BatteryHubTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				365C74A24FC1866CA7A994E2 /* Debug */,
+				FE50E76B56FC40C7C66EE113 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 45C328C8416135D15329479F /* Project object */;
+}
