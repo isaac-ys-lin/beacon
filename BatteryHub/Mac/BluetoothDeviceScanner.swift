@@ -125,28 +125,99 @@ public struct BluetoothDeviceScanner {
             }
 
             return connected.flatMap { entry -> [BluetoothBatteryCandidate] in
-                entry.compactMap { name, value in
-                    guard
-                        let device = value as? [String: Any],
-                        let percent = batteryPercent(from: device)
-                    else {
-                        return nil
+                entry.flatMap { name, value -> [BluetoothBatteryCandidate] in
+                    guard let device = value as? [String: Any] else {
+                        return []
                     }
 
-                    let address = stringValue(device["device_address"]) ?? name
-                    let minorType = stringValue(device["device_minorType"]) ?? ""
-                    let kindHint: DeviceKind? = minorType.localizedCaseInsensitiveContains("keyboard") ? .keyboard : nil
-
-                    return BluetoothBatteryCandidate(
-                        deviceID: address,
-                        displayName: name,
-                        transport: .systemProfiler,
-                        batteryPercent: percent,
-                        kindHint: kindHint
-                    )
+                    return candidates(fromSystemProfilerDeviceNamed: name, device: device)
                 }
             }
         }
+    }
+
+    private static func candidates(fromSystemProfilerDeviceNamed name: String, device: [String: Any]) -> [BluetoothBatteryCandidate] {
+        let address = stringValue(device["device_address"]) ?? name
+        let minorType = stringValue(device["device_minorType"]) ?? ""
+        let kindHint = kindHint(name: name, minorType: minorType)
+        let levels = batteryLevels(from: device)
+        guard !levels.isEmpty else { return [] }
+
+        if isAirPods(name: name, minorType: minorType), levels.count > 1 {
+            return levels.map { level in
+                let component = level.component ?? "Battery"
+                return BluetoothBatteryCandidate(
+                    deviceID: "\(address)-\(component.lowercased())",
+                    displayName: "\(name) \(component)",
+                    transport: .systemProfiler,
+                    batteryPercent: level.percent,
+                    kindHint: .airPods
+                )
+            }
+        }
+
+        guard let percent = batteryPercent(from: device) else {
+            return []
+        }
+
+        return [
+            BluetoothBatteryCandidate(
+                deviceID: address,
+                displayName: name,
+                transport: .systemProfiler,
+                batteryPercent: percent,
+                kindHint: kindHint
+            )
+        ]
+    }
+
+    private static func batteryLevels(from device: [String: Any]) -> [(component: String?, percent: Int)] {
+        device.compactMap { key, value -> (component: String?, percent: Int, order: Int, key: String)? in
+            guard key.hasPrefix("device_batteryLevel"),
+                  let percent = percentageValue(value)
+            else {
+                return nil
+            }
+
+            let component = batteryComponent(from: key)
+            return (component, percent, batteryComponentSortOrder(component), key)
+        }
+        .sorted { left, right in
+            if left.order != right.order {
+                return left.order < right.order
+            }
+            return left.key.localizedStandardCompare(right.key) == .orderedAscending
+        }
+        .map { (component: $0.component, percent: $0.percent) }
+    }
+
+    private static func batteryComponent(from key: String) -> String? {
+        let prefix = "device_batteryLevel"
+        guard key.count > prefix.count else { return nil }
+        return String(key.dropFirst(prefix.count))
+    }
+
+    private static func batteryComponentSortOrder(_ component: String?) -> Int {
+        switch component?.lowercased() {
+        case "case": return 0
+        case "left": return 1
+        case "right": return 2
+        case nil, "main": return 3
+        default: return 4
+        }
+    }
+
+    private static func kindHint(name: String, minorType: String) -> DeviceKind? {
+        let text = "\(name) \(minorType)".lowercased()
+        if text.contains("airpods") || text.contains("air pods") { return .airPods }
+        if text.contains("keyboard") { return .keyboard }
+        if text.contains("mouse") { return .mouse }
+        if text.contains("trackpad") { return .trackpad }
+        return nil
+    }
+
+    private static func isAirPods(name: String, minorType: String) -> Bool {
+        kindHint(name: name, minorType: minorType) == .airPods
     }
 
     private static func batteryPercent(from device: [String: Any]) -> Int? {

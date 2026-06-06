@@ -80,7 +80,10 @@ struct DeviceBatteryRow: View {
         case .macBook: return "desktopcomputer"
         case .iPhone: return "iphone"
         case .appleWatch: return "applewatch"
+        case .airPods: return "airpodspro"
         case .keyboard: return "keyboard"
+        case .mouse: return "computermouse"
+        case .trackpad: return "rectangle.and.hand.point.up.left"
         case .bluetoothPeripheral: return "dot.radiowaves.left.and.right"
         }
     }

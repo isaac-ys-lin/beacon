@@ -66,8 +66,11 @@ private extension DeviceKind {
         case .macBook: return 0
         case .iPhone: return 1
         case .appleWatch: return 2
-        case .keyboard: return 3
-        case .bluetoothPeripheral: return 4
+        case .airPods: return 3
+        case .keyboard: return 4
+        case .mouse: return 5
+        case .trackpad: return 6
+        case .bluetoothPeripheral: return 7
         }
     }
 }

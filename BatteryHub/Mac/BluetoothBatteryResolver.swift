@@ -36,12 +36,11 @@ public struct BluetoothBatteryResolver {
 
     static func snapshot(from candidate: BluetoothBatteryCandidate, now: Date) -> BatterySnapshot {
         let percent = candidate.batteryPercent.map { Swift.max(0, Swift.min(100, $0)) }
-        let isKeyboard = candidate.displayName.localizedCaseInsensitiveContains("keyboard")
 
         return BatterySnapshot(
             deviceID: "bluetooth-\(candidate.deviceID)",
             displayName: candidate.displayName,
-            kind: candidate.kindHint ?? (isKeyboard ? .keyboard : .bluetoothPeripheral),
+            kind: kind(for: candidate),
             percent: percent,
             chargeState: .unknown,
             source: source(for: candidate),
@@ -58,5 +57,18 @@ public struct BluetoothBatteryResolver {
         case .systemProfiler: return .systemProfiler
         case .unknown: return .bluetoothUnsupported
         }
+    }
+
+    private static func kind(for candidate: BluetoothBatteryCandidate) -> DeviceKind {
+        if let kindHint = candidate.kindHint {
+            return kindHint
+        }
+
+        let name = candidate.displayName.lowercased()
+        if name.contains("airpods") || name.contains("air pods") { return .airPods }
+        if name.contains("keyboard") { return .keyboard }
+        if name.contains("mouse") { return .mouse }
+        if name.contains("trackpad") { return .trackpad }
+        return .bluetoothPeripheral
     }
 }

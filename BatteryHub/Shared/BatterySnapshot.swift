@@ -4,7 +4,10 @@ public enum DeviceKind: String, Codable, CaseIterable, Sendable {
     case macBook
     case iPhone
     case appleWatch
+    case airPods
     case keyboard
+    case mouse
+    case trackpad
     case bluetoothPeripheral
 }
 

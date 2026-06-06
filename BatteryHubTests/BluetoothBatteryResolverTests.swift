@@ -79,4 +79,92 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(snapshot.kind, .keyboard)
         XCTAssertEqual(snapshot.source, .systemProfiler)
     }
+
+    func testSystemProfilerParserSplitsConnectedAirPodsBatteryComponents() {
+        let json = """
+        {
+          "SPBluetoothDataType" : [
+            {
+              "device_connected" : [
+                {
+                  "Yi Sung’s AirPods Pro" : {
+                    "device_address" : "7C:F3:4D:74:56:78",
+                    "device_batteryLevelCase" : "70%",
+                    "device_batteryLevelLeft" : "100%",
+                    "device_batteryLevelRight" : "92%",
+                    "device_minorType" : "Headphones"
+                  }
+                }
+              ],
+              "device_not_connected" : [
+                {
+                  "Old AirPods" : {
+                    "device_address" : "AA:BB:CC:DD:EE:FF",
+                    "device_batteryLevelCase" : "10%",
+                    "device_batteryLevelLeft" : "11%",
+                    "device_batteryLevelRight" : "12%",
+                    "device_minorType" : "Headphones"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+        let candidates = BluetoothDeviceScanner.parseSystemProfilerBluetoothData(Data(json.utf8))
+
+        XCTAssertEqual(candidates.map(\.displayName), [
+            "Yi Sung’s AirPods Pro Case",
+            "Yi Sung’s AirPods Pro Left",
+            "Yi Sung’s AirPods Pro Right"
+        ])
+        XCTAssertEqual(candidates.map(\.batteryPercent), [70, 100, 92])
+        XCTAssertEqual(
+            candidates.map { String(describing: BluetoothBatteryResolver.snapshot(from: $0, now: Date(timeIntervalSince1970: 50)).kind) },
+            ["airPods", "airPods", "airPods"]
+        )
+    }
+
+    func testSystemProfilerParserClassifiesMagicMouseTrackpadAndKeyboard() {
+        let json = """
+        {
+          "SPBluetoothDataType" : [
+            {
+              "device_connected" : [
+                {
+                  "Magic Mouse" : {
+                    "device_address" : "11:22:33:44:55:66",
+                    "device_batteryLevelMain" : "50%",
+                    "device_minorType" : "Mouse"
+                  }
+                },
+                {
+                  "Magic Trackpad" : {
+                    "device_address" : "22:33:44:55:66:77",
+                    "device_batteryLevelMain" : "90%",
+                    "device_minorType" : "Trackpad"
+                  }
+                },
+                {
+                  "Magic Keyboard" : {
+                    "device_address" : "33:44:55:66:77:88",
+                    "device_batteryLevelMain" : "42%",
+                    "device_minorType" : "Keyboard"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+        let candidates = BluetoothDeviceScanner.parseSystemProfilerBluetoothData(Data(json.utf8))
+        let kinds = candidates.map {
+            String(describing: BluetoothBatteryResolver.snapshot(from: $0, now: Date(timeIntervalSince1970: 50)).kind)
+        }
+
+        XCTAssertEqual(candidates.map(\.displayName), ["Magic Mouse", "Magic Trackpad", "Magic Keyboard"])
+        XCTAssertEqual(kinds, ["mouse", "trackpad", "keyboard"])
+    }
 }
