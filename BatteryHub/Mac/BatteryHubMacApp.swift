@@ -89,7 +89,7 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
     private func updatePopoverContent() {
         popover.contentViewController = NSHostingController(
             rootView: StatusMenuView(
-                snapshots: model.store.decoratedExternalBatterySnapshots,
+                snapshots: model.store.decoratedSnapshots,
                 onRefresh: { [weak model] in
                     Task { await model?.refresh() }
                 }

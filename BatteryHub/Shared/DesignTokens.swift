@@ -3,9 +3,10 @@ import SwiftUI
 public enum DesignTokens {
     public enum Radius {
         public static let chip: CGFloat = 4
+        public static let statusPill: CGFloat = 9
         public static let row: CGFloat = 12
         public static let card: CGFloat = 14
-        public static let panel: CGFloat = 24
+        public static let panel: CGFloat = 28
     }
 
     public enum Spacing {
@@ -32,25 +33,38 @@ public enum DesignTokens {
         #if os(macOS)
         public static let panel = Color(nsColor: .windowBackgroundColor).opacity(0.92)
         public static let panelTint = Color(nsColor: .underPageBackgroundColor).opacity(0.62)
-        public static let card = Color(nsColor: .controlBackgroundColor).opacity(0.82)
+        public static let card = Color(nsColor: .controlBackgroundColor).opacity(0.74)
         public static let row = Color(nsColor: .controlBackgroundColor)
         public static let separator = Color(nsColor: .separatorColor).opacity(0.55)
+        public static let glassStroke = Color.white.opacity(0.28)
+        public static let controlPill = Color(nsColor: .controlBackgroundColor).opacity(0.58)
         #elseif os(iOS)
         public static let panel = Color(.systemBackground)
         public static let panelTint = Color(.secondarySystemBackground)
         public static let card = Color(.secondarySystemBackground)
         public static let row = Color(.secondarySystemBackground)
         public static let separator = Color(.separator)
+        public static let glassStroke = Color.white.opacity(0.20)
+        public static let controlPill = Color(.tertiarySystemBackground)
         #else
         public static let panel = Color.black
         public static let panelTint = Color.black.opacity(0.6)
         public static let card = Color.white.opacity(0.12)
         public static let row = Color.white.opacity(0.12)
         public static let separator = Color.white.opacity(0.16)
+        public static let glassStroke = Color.white.opacity(0.16)
+        public static let controlPill = Color.white.opacity(0.10)
         #endif
 
         public static let text = Color.primary
         public static let secondaryText = Color.secondary
         public static let tertiaryText = Color.secondary.opacity(0.72)
+
+        #if os(macOS)
+        /// Subtle hover highlight for list rows — matches native macOS selection style.
+        public static let hover = Color(nsColor: .selectedContentBackgroundColor).opacity(0.10)
+        #else
+        public static let hover = Color.accentColor.opacity(0.10)
+        #endif
     }
 }

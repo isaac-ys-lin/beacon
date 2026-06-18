@@ -1,0 +1,18 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "BatteryHub UIUX Prototype": {
+      "versions": [
+        {
+          "path": "BatteryHub UIUX Prototype.html",
+          "createdAt": "2026-06-18T05:32:44.955Z",
+          "status": "needs-review"
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-06-18T05:32:44.955Z",
+  "updatedAt": "2026-06-18T05:35:03.334Z"
+}

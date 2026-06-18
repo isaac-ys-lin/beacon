@@ -11,10 +11,12 @@
 		1383251E66154E3EEBAC52C6 /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */; };
 		176743D6BAAD897908EDDE84 /* BluetoothBatteryResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */; };
 		18446EFEADF906083A88A048 /* iPhoneBatteryReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1144D6D0BE686608C1787E33 /* iPhoneBatteryReporter.swift */; };
+		1ADEC2C6139CA398650A4395 /* DeviceListPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0275CC5FE052D0ECABE095 /* DeviceListPresentationTests.swift */; };
 		21BF229FC1379A98B647A82E /* MacPowerSourceReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E7ECC1AA68CD0E74B08E1BA /* MacPowerSourceReaderTests.swift */; };
 		28C0D03517925A8486D769B9 /* BatteryHubWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88CAEC15F975B4A92952C49 /* BatteryHubWatchApp.swift */; };
 		32FA20A2BF036886CCAFFD31 /* LowBatteryNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */; };
 		3E35364E3690DA8E20556AFA /* MacPowerSourceReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */; };
+		42EAB0D28902C87A454CFEA0 /* DeviceListPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 809F1103BFF7C13AF6817CFD /* DeviceListPresentation.swift */; };
 		43C97E6D66524B9AAF63DF46 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1CB66F60CA615057985048 /* DesignTokens.swift */; };
 		5F62A044EEE106CB6ACDE695 /* BatterySnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */; };
 		6CCD9B510711CE1E0F36828C /* CloudBatterySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAD8EE9FAD476F00A523218 /* CloudBatterySync.swift */; };
@@ -74,6 +76,8 @@
 		755488B9E5D2FB2B1F6A9C5A /* BatteryHubiOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BatteryHubiOS.entitlements; sourceTree = "<group>"; };
 		75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothDeviceScanner.swift; sourceTree = "<group>"; };
 		7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshot.swift; sourceTree = "<group>"; };
+		7B0275CC5FE052D0ECABE095 /* DeviceListPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceListPresentationTests.swift; sourceTree = "<group>"; };
+		809F1103BFF7C13AF6817CFD /* DeviceListPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceListPresentation.swift; sourceTree = "<group>"; };
 		90ED787121B38AFC4AFD42AA /* BatteryHubiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryHubiOSApp.swift; sourceTree = "<group>"; };
 		A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolverTests.swift; sourceTree = "<group>"; };
 		A774E28BA04474F8D42979ED /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -154,6 +158,7 @@
 				5C3F20615717ABC149F0CE39 /* BluetoothBatteryResolver.swift */,
 				75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */,
 				668D7469010F9F52672D0768 /* DeviceBatteryRow.swift */,
+				809F1103BFF7C13AF6817CFD /* DeviceListPresentation.swift */,
 				20C940CE61834B35B25A743C /* Info.plist */,
 				520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */,
 				BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */,
@@ -182,6 +187,7 @@
 				2CBBFCBDA160193064A02179 /* BatterySnapshotStoreTests.swift */,
 				A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */,
 				EDA38D00E2FD0EED376308ED /* CloudBatterySyncTests.swift */,
+				7B0275CC5FE052D0ECABE095 /* DeviceListPresentationTests.swift */,
 				1E7ECC1AA68CD0E74B08E1BA /* MacPowerSourceReaderTests.swift */,
 			);
 			path = BatteryHubTests;
@@ -353,6 +359,7 @@
 				BDC58F706E30806CCD030046 /* CloudBatterySync.swift in Sources */,
 				A2F311CF66BE5F52F4C17DA3 /* DesignTokens.swift in Sources */,
 				07DB1584A760AE080C17CB52 /* DeviceBatteryRow.swift in Sources */,
+				42EAB0D28902C87A454CFEA0 /* DeviceListPresentation.swift in Sources */,
 				32FA20A2BF036886CCAFFD31 /* LowBatteryNotifier.swift in Sources */,
 				3E35364E3690DA8E20556AFA /* MacPowerSourceReader.swift in Sources */,
 				98C96F7E9FA25DB0D45FA1E1 /* StatusMenuView.swift in Sources */,
@@ -374,6 +381,7 @@
 				CD35FB78B215C978A0464AD2 /* BatterySnapshotStoreTests.swift in Sources */,
 				176743D6BAAD897908EDDE84 /* BluetoothBatteryResolverTests.swift in Sources */,
 				FC2C3F6C10748A0820A9A04D /* CloudBatterySyncTests.swift in Sources */,
+				1ADEC2C6139CA398650A4395 /* DeviceListPresentationTests.swift in Sources */,
 				21BF229FC1379A98B647A82E /* MacPowerSourceReaderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

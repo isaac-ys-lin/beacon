@@ -1,4 +1,21 @@
+import AppKit
 import SwiftUI
+
+// MARK: - NSVisualEffectView wrapper (real vibrancy)
+
+private struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
+// MARK: - StatusMenuView
 
 struct StatusMenuView: View {
     let snapshots: [DecoratedBatterySnapshot]
@@ -19,8 +36,8 @@ struct StatusMenuView: View {
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: DesignTokens.Spacing.md) {
-                        ForEach(deviceGroups.indices, id: \.self) { index in
-                            DeviceGroupCard(snapshots: deviceGroups[index])
+                        ForEach(sections.indices, id: \.self) { index in
+                            DeviceSectionCard(section: sections[index])
                         }
                     }
                 }
@@ -33,11 +50,18 @@ struct StatusMenuView: View {
         .padding(.vertical, 18)
         .frame(width: 378)
         .background {
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.panel)
-                .fill(DesignTokens.Palette.panelTint)
-                .overlay(.regularMaterial.opacity(0.72))
+            VisualEffectBackground()
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel))
         }
     }
+
+    // MARK: - Computed sections
+
+    private var sections: [DeviceSection] {
+        groupedDeviceItems(snapshots)
+    }
+
+    // MARK: - Header
 
     private var header: some View {
         HStack(alignment: .center) {
@@ -75,11 +99,13 @@ struct StatusMenuView: View {
         }
     }
 
+    // MARK: - Empty state
+
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             Text("No connected devices")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-            Text("Only external devices with a battery percentage are shown.")
+            Text("Connect Bluetooth devices to see their battery levels here.")
                 .font(.system(size: 12))
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -88,6 +114,8 @@ struct StatusMenuView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(cardBackground)
     }
+
+    // MARK: - Footer
 
     private var footer: some View {
         HStack {
@@ -100,6 +128,8 @@ struct StatusMenuView: View {
                 .foregroundStyle(DesignTokens.Palette.tertiaryText)
         }
     }
+
+    // MARK: - Settings panel
 
     private var settingsPanel: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
@@ -126,6 +156,8 @@ struct StatusMenuView: View {
         .background(cardBackground)
     }
 
+    // MARK: - Helpers
+
     private var clampedLowBatteryThreshold: Int {
         Swift.max(5, Swift.min(50, lowBatteryThreshold))
     }
@@ -141,25 +173,23 @@ struct StatusMenuView: View {
         lowBatteryAlertsEnabled ? "Alerts below \(clampedLowBatteryThreshold)%" : "Alerts off"
     }
 
-    private var deviceGroups: [[DecoratedBatterySnapshot]] {
-        snapshots.chunked(into: 3)
-    }
-
     private var cardBackground: some ShapeStyle {
         DesignTokens.Palette.card
             .shadow(.inner(color: .white.opacity(0.35), radius: 0.5, x: 0, y: 1))
     }
 }
 
-private struct DeviceGroupCard: View {
-    let snapshots: [DecoratedBatterySnapshot]
+// MARK: - DeviceSectionCard
+
+private struct DeviceSectionCard: View {
+    let section: DeviceSection
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(Array(snapshots.enumerated()), id: \.element.id) { index, decorated in
-                DeviceBatteryRow(decorated: decorated)
+            ForEach(section.items.indices, id: \.self) { index in
+                itemView(for: section.items[index])
 
-                if index < snapshots.count - 1 {
+                if index < section.items.count - 1 {
                     Divider()
                         .overlay(DesignTokens.Palette.separator)
                         .padding(.leading, 58)
@@ -174,13 +204,87 @@ private struct DeviceGroupCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.card))
     }
-}
 
-private extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        guard size > 0 else { return [self] }
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
+    @ViewBuilder
+    private func itemView(for item: DeviceListItem) -> some View {
+        switch item {
+        case .device(let decorated):
+            DeviceBatteryRow(decorated: decorated)
+        case .airPods(let name, let id, let components):
+            AirPodsBatteryRow(name: name, id: id, components: components)
         }
     }
 }
+
+// MARK: - Previews
+
+#if DEBUG
+private func mockDecorated(
+    id: String = UUID().uuidString,
+    name: String,
+    kind: DeviceKind,
+    percent: Int?,
+    chargeState: ChargeState = .unplugged,
+    freshness: Freshness = .fresh
+) -> DecoratedBatterySnapshot {
+    DecoratedBatterySnapshot(
+        snapshot: BatterySnapshot(
+            deviceID: id,
+            displayName: name,
+            kind: kind,
+            percent: percent,
+            chargeState: chargeState,
+            source: .coreBluetooth,
+            updatedAt: Date()
+        ),
+        freshness: freshness
+    )
+}
+
+private let previewSnapshots: [DecoratedBatterySnapshot] = [
+    // Mac section
+    mockDecorated(id: "mac1", name: "Mac mini",         kind: .macBook,   percent: nil),
+    mockDecorated(id: "kbd1", name: "Magic Keyboard",   kind: .keyboard,  percent: 95),
+    mockDecorated(id: "mse1", name: "Magic Mouse",      kind: .mouse,     percent: 62),
+    // Mobile + audio section
+    mockDecorated(id: "iph1", name: "Isaac's iPhone",   kind: .iPhone,    percent: 42, chargeState: .charging),
+    mockDecorated(id: "wtc1", name: "Apple Watch",      kind: .appleWatch, percent: 18),
+    // AirPods 3-component
+    mockDecorated(id: "AA-BB-CC-DD-EE-FF-case",  name: "John's AirPods Pro Case",  kind: .airPods, percent: 90),
+    mockDecorated(id: "AA-BB-CC-DD-EE-FF-left",  name: "John's AirPods Pro Left",  kind: .airPods, percent: 75),
+    mockDecorated(id: "AA-BB-CC-DD-EE-FF-right", name: "John's AirPods Pro Right", kind: .airPods, percent: 80),
+]
+
+private let previewSnapshotsEdge: [DecoratedBatterySnapshot] = [
+    // Critical battery
+    mockDecorated(id: "iph2", name: "Low iPhone",       kind: .iPhone,    percent: 8),
+    // Stale data
+    mockDecorated(id: "bt1",  name: "BT Speaker",       kind: .bluetoothPeripheral, percent: 30, freshness: .stale),
+    // AirPods with nil case + low buds
+    mockDecorated(id: "11-22-33-44-55-66-case",  name: "AirPods Case",  kind: .airPods, percent: nil),
+    mockDecorated(id: "11-22-33-44-55-66-left",  name: "AirPods Left",  kind: .airPods, percent: 12),
+    mockDecorated(id: "11-22-33-44-55-66-right", name: "AirPods Right", kind: .airPods, percent: 15, freshness: .stale),
+]
+
+#Preview("StatusMenuView — full (light)") {
+    StatusMenuView(snapshots: previewSnapshots, onRefresh: {})
+}
+
+#Preview("StatusMenuView — full (dark)") {
+    StatusMenuView(snapshots: previewSnapshots, onRefresh: {})
+        .preferredColorScheme(.dark)
+}
+
+#Preview("StatusMenuView — edge cases (light)") {
+    StatusMenuView(snapshots: previewSnapshotsEdge, onRefresh: {})
+}
+
+#Preview("StatusMenuView — edge cases (dark)") {
+    StatusMenuView(snapshots: previewSnapshotsEdge, onRefresh: {})
+        .preferredColorScheme(.dark)
+}
+
+#Preview("StatusMenuView — empty") {
+    StatusMenuView(snapshots: [], onRefresh: {})
+}
+#endif
