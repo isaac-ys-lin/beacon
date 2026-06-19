@@ -68,3 +68,65 @@ public enum DesignTokens {
         #endif
     }
 }
+
+public enum NativeMacStyle {
+    public static let popoverCornerRadius: CGFloat = 26
+    public static let panelCornerRadius: CGFloat = 14
+    public static let rowCornerRadius: CGFloat = 7
+
+    public static var subtleStroke: Color {
+        #if os(macOS)
+        Color(nsColor: .separatorColor).opacity(0.26)
+        #else
+        Color(.separator).opacity(0.26)
+        #endif
+    }
+
+    public static var rowSelection: Color {
+        #if os(macOS)
+        Color(nsColor: .selectedContentBackgroundColor).opacity(0.14)
+        #else
+        Color.accentColor.opacity(0.14)
+        #endif
+    }
+}
+
+public extension View {
+    @ViewBuilder
+    func nativeSystemSurface(cornerRadius: CGFloat, strokeOpacity: Double = 0.24) -> some View {
+        if #available(macOS 26.0, iOS 26.0, *) {
+            self
+                .background {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(.regularMaterial)
+                }
+                .glassEffect(
+                    .regular,
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(Color.white.opacity(strokeOpacity), lineWidth: 0.7)
+                }
+        } else {
+            self
+                .background {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(.regularMaterial)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                .stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
+                        }
+                }
+        }
+    }
+
+    @ViewBuilder
+    func nativeSettingsBackground() -> some View {
+        if #available(macOS 26.0, iOS 26.0, *) {
+            self.containerBackground(.regularMaterial, for: .window)
+        } else {
+            self.background(.regularMaterial)
+        }
+    }
+}

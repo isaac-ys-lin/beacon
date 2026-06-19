@@ -2,6 +2,13 @@ import XCTest
 @testable import BatteryHub
 
 final class BatterySnapshotStoreTests: XCTestCase {
+    private func isolatedDefaults(name: String = UUID().uuidString) -> UserDefaults {
+        let suiteName = "BatteryHistoryStoreTests.\(name)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+
     func testMergeKeepsNewestSnapshotPerDevice() {
         let old = BatterySnapshot(
             deviceID: "iphone",
@@ -98,5 +105,87 @@ final class BatterySnapshotStoreTests: XCTestCase {
 
         XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), ["keyboard"])
         XCTAssertEqual(store.decoratedExternalBatterySnapshots.map(\.snapshot.deviceID), ["keyboard"])
+    }
+
+    func testBatteryHistoryStoreRecordsAndSummarizesPercentTrend() {
+        let defaults = isolatedDefaults()
+        let base = Date(timeIntervalSince1970: 1_000)
+
+        BatteryHistoryStore.record(
+            [
+                BatterySnapshot(
+                    deviceID: "mouse",
+                    displayName: "Magic Mouse",
+                    kind: .mouse,
+                    percent: 42,
+                    chargeState: .unplugged,
+                    source: .coreBluetooth,
+                    updatedAt: base
+                ),
+                BatterySnapshot(
+                    deviceID: "mouse",
+                    displayName: "Magic Mouse",
+                    kind: .mouse,
+                    percent: 38,
+                    chargeState: .unplugged,
+                    source: .coreBluetooth,
+                    updatedAt: base.addingTimeInterval(3_600)
+                ),
+            ],
+            now: base.addingTimeInterval(3_600),
+            defaults: defaults
+        )
+
+        let samples = BatteryHistoryStore.samples(for: "mouse", defaults: defaults)
+        let summary = BatteryHistoryStore.summary(for: "mouse", defaults: defaults)
+
+        XCTAssertEqual(samples.map(\.percent), [42, 38])
+        XCTAssertEqual(summary?.latestPercent, 38)
+        XCTAssertEqual(summary?.delta, -4)
+        XCTAssertEqual(summary?.minimumPercent, 38)
+        XCTAssertEqual(summary?.maximumPercent, 42)
+    }
+
+    func testBatteryHistoryStoreSkipsDuplicateStableReports() {
+        let defaults = isolatedDefaults()
+        let base = Date(timeIntervalSince1970: 1_000)
+        let snapshot = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 82,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: base
+        )
+
+        BatteryHistoryStore.record([snapshot], now: base, defaults: defaults)
+        BatteryHistoryStore.record([snapshot], now: base.addingTimeInterval(60), defaults: defaults)
+
+        XCTAssertEqual(BatteryHistoryStore.samples(for: "keyboard", defaults: defaults).count, 1)
+    }
+
+    func testBatteryHistoryStorePrunesOldAndExcessSamples() {
+        let defaults = isolatedDefaults()
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let snapshots = (0..<(BatteryHistoryStore.maximumSamplesPerDevice + 8)).map { index in
+            BatterySnapshot(
+                deviceID: "watch",
+                displayName: "Apple Watch",
+                kind: .appleWatch,
+                percent: 100 - (index % 50),
+                chargeState: .unplugged,
+                source: .watchConnectivity,
+                updatedAt: now
+                    .addingTimeInterval(-BatteryHistoryStore.retentionInterval)
+                    .addingTimeInterval(Double(index * 600))
+            )
+        }
+
+        BatteryHistoryStore.record(snapshots, now: now, defaults: defaults)
+
+        let samples = BatteryHistoryStore.samples(for: "watch", defaults: defaults)
+        XCTAssertLessThanOrEqual(samples.count, BatteryHistoryStore.maximumSamplesPerDevice)
+        XCTAssertTrue(samples.allSatisfy { $0.recordedAt >= now.addingTimeInterval(-BatteryHistoryStore.retentionInterval) })
     }
 }

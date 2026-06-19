@@ -14,7 +14,7 @@ public struct BluetoothDeviceScanner {
         let hid = readHIDBatteryCandidates()
         var candidates = hid
         let knownIDs = Set(candidates.map(\.deviceID))
-        let classic = readConnectedIOBluetoothDevices().filter { !knownIDs.contains($0.deviceID) }
+        let classic = readPairedIOBluetoothDevices().filter { !knownIDs.contains($0.deviceID) }
         candidates.append(contentsOf: classic)
 
         let profiler = await Self.readSystemProfilerBatteryCandidates()
@@ -35,20 +35,21 @@ public struct BluetoothDeviceScanner {
         return candidates
     }
 
-    private func readConnectedIOBluetoothDevices() -> [BluetoothBatteryCandidate] {
+    private func readPairedIOBluetoothDevices() -> [BluetoothBatteryCandidate] {
         guard let devices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else {
             return []
         }
 
         return devices.compactMap { device -> BluetoothBatteryCandidate? in
-            guard device.isConnected() else { return nil }
             let name = device.nameOrAddress ?? "Bluetooth Device"
             let address = device.addressString ?? name
             return BluetoothBatteryCandidate(
                 deviceID: address,
                 displayName: name,
                 transport: .classic,
-                batteryPercent: nil
+                batteryPercent: nil,
+                kindHint: Self.kindHint(name: name, minorType: ""),
+                connectionState: device.isConnected() ? .connected : .disconnected
             )
         }
     }
@@ -70,14 +71,28 @@ public struct BluetoothDeviceScanner {
             let name = property("Product", service: service) ?? property("ProductID", service: service) ?? "Bluetooth Device"
             let id = property("SerialNumber", service: service) ?? name
             let percent = intProperty("BatteryPercent", service: service)
+            let transport = property("Transport", service: service) ?? ""
+            let usagePage = intProperty("PrimaryUsagePage", service: service)
+            let usage = intProperty("PrimaryUsage", service: service)
+            let kindHint = Self.hidKindHint(
+                name: name,
+                transport: transport,
+                primaryUsagePage: usagePage,
+                primaryUsage: usage
+            )
 
-            if percent != nil || name.localizedCaseInsensitiveContains("keyboard") {
+            if Self.shouldIncludeHIDCandidate(
+                batteryPercent: percent,
+                transport: transport,
+                kindHint: kindHint
+            ) {
                 results.append(
                     BluetoothBatteryCandidate(
                         deviceID: id,
                         displayName: name,
                         transport: .hid,
-                        batteryPercent: percent
+                        batteryPercent: percent,
+                        kindHint: kindHint
                     )
                 )
             }
@@ -216,6 +231,48 @@ public struct BluetoothDeviceScanner {
         return nil
     }
 
+    static func hidKindHint(
+        name: String,
+        transport: String,
+        primaryUsagePage: Int?,
+        primaryUsage: Int?
+    ) -> DeviceKind? {
+        if let nameHint = kindHint(name: name, minorType: "") {
+            return nameHint
+        }
+
+        guard transport.localizedCaseInsensitiveContains("bluetooth"),
+              primaryUsagePage == 1,
+              let primaryUsage
+        else {
+            return nil
+        }
+
+        switch primaryUsage {
+        case 2:
+            return .mouse
+        case 5:
+            return .trackpad
+        case 6:
+            return .keyboard
+        default:
+            return nil
+        }
+    }
+
+    static func shouldIncludeHIDCandidate(
+        batteryPercent: Int?,
+        transport: String,
+        kindHint: DeviceKind?
+    ) -> Bool {
+        if batteryPercent != nil {
+            return true
+        }
+
+        return transport.localizedCaseInsensitiveContains("bluetooth")
+            && kindHint == .keyboard
+    }
+
     private static func isAirPods(name: String, minorType: String) -> Bool {
         kindHint(name: name, minorType: minorType) == .airPods
     }
@@ -264,11 +321,52 @@ public struct BluetoothDeviceScanner {
     }
 }
 
+enum BluetoothDeviceController {
+    @discardableResult
+    static func connect(deviceID: String) -> Bool {
+        guard let address = BluetoothDeviceControlSupport.normalizedAddress(from: deviceID),
+              let device = IOBluetoothDevice(addressString: address)
+        else {
+            return false
+        }
+
+        if device.isConnected() {
+            return true
+        }
+
+        return device.openConnection() == kIOReturnSuccess
+    }
+
+    @discardableResult
+    static func disconnect(deviceID: String) -> Bool {
+        guard let address = BluetoothDeviceControlSupport.normalizedAddress(from: deviceID),
+              let device = IOBluetoothDevice(addressString: address)
+        else {
+            return false
+        }
+
+        if !device.isConnected() {
+            return true
+        }
+
+        return device.closeConnection() == kIOReturnSuccess
+    }
+}
+
 private extension Array where Element == BluetoothBatteryCandidate {
     mutating func upsert(_ candidate: BluetoothBatteryCandidate) {
         if let index = firstIndex(where: { $0.deviceID == candidate.deviceID || $0.displayName.normalizedDeviceName == candidate.displayName.normalizedDeviceName }) {
+            let existing = self[index]
+            let resolved = BluetoothBatteryCandidate(
+                deviceID: candidate.deviceID,
+                displayName: candidate.displayName,
+                transport: candidate.transport,
+                batteryPercent: candidate.batteryPercent,
+                kindHint: candidate.kindHint ?? existing.kindHint,
+                connectionState: candidate.connectionState
+            )
             if candidate.batteryPercent != nil || self[index].batteryPercent == nil {
-                self[index] = candidate
+                self[index] = resolved
             }
         } else {
             append(candidate)

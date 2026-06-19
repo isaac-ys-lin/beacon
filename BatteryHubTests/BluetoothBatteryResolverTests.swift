@@ -32,6 +32,54 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(snapshot.source, .bluetoothUnsupported)
     }
 
+    func testDisconnectedPairedDeviceKeepsConnectionState() {
+        let device = BluetoothBatteryCandidate(
+            deviceID: "20-C1-9B-AA-BB-CC",
+            displayName: "Magic Mouse",
+            transport: .classic,
+            batteryPercent: nil,
+            kindHint: .mouse,
+            connectionState: .disconnected
+        )
+
+        let snapshot = BluetoothBatteryResolver.snapshot(from: device, now: Date(timeIntervalSince1970: 50))
+
+        XCTAssertEqual(snapshot.deviceID, "bluetooth-20-C1-9B-AA-BB-CC")
+        XCTAssertEqual(snapshot.kind, .mouse)
+        XCTAssertNil(snapshot.percent)
+        XCTAssertEqual(snapshot.connectionState, .disconnected)
+        XCTAssertEqual(snapshot.source, .bluetoothUnsupported)
+    }
+
+    func testBluetoothHIDUsageClassifiesKeychronAsKeyboard() {
+        let hint = BluetoothDeviceScanner.hidKindHint(
+            name: "Keychron K3 Max",
+            transport: "Bluetooth Low Energy",
+            primaryUsagePage: 1,
+            primaryUsage: 6
+        )
+
+        XCTAssertEqual(hint, .keyboard)
+    }
+
+    func testUSBKeyboardBacklightDoesNotBecomeBatteryHubCandidate() {
+        let hint = BluetoothDeviceScanner.hidKindHint(
+            name: "Keyboard Backlight",
+            transport: "USB",
+            primaryUsagePage: 65280,
+            primaryUsage: 15
+        )
+
+        XCTAssertEqual(hint, .keyboard)
+        XCTAssertFalse(
+            BluetoothDeviceScanner.shouldIncludeHIDCandidate(
+                batteryPercent: nil,
+                transport: "USB",
+                kindHint: hint
+            )
+        )
+    }
+
     func testSystemProfilerParserKeepsOnlyConnectedBatteryDevices() throws {
         let json = """
         {

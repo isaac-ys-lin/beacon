@@ -31,8 +31,12 @@ app_path() {
 
 open_app() {
   local bundle="$1"
+  local env_args=()
+  if [[ -n "${BATTERYHUB_PREVIEW_DATA:-}" ]]; then
+    env_args+=(--env "BATTERYHUB_PREVIEW_DATA=$BATTERYHUB_PREVIEW_DATA")
+  fi
   /usr/bin/xattr -dr com.apple.quarantine "$bundle" 2>/dev/null || true
-  /usr/bin/open -n "$bundle"
+  /usr/bin/open -n ${env_args[@]+"${env_args[@]}"} "$bundle"
 }
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true

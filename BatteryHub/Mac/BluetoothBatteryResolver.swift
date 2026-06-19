@@ -14,13 +14,22 @@ public struct BluetoothBatteryCandidate: Sendable {
     public let transport: BluetoothTransport
     public let batteryPercent: Int?
     public let kindHint: DeviceKind?
+    public let connectionState: ConnectionState
 
-    public init(deviceID: String, displayName: String, transport: BluetoothTransport, batteryPercent: Int?, kindHint: DeviceKind? = nil) {
+    public init(
+        deviceID: String,
+        displayName: String,
+        transport: BluetoothTransport,
+        batteryPercent: Int?,
+        kindHint: DeviceKind? = nil,
+        connectionState: ConnectionState = .connected
+    ) {
         self.deviceID = deviceID
         self.displayName = displayName
         self.transport = transport
         self.batteryPercent = batteryPercent
         self.kindHint = kindHint
+        self.connectionState = connectionState
     }
 }
 
@@ -43,6 +52,7 @@ public struct BluetoothBatteryResolver {
             kind: kind(for: candidate),
             percent: percent,
             chargeState: .unknown,
+            connectionState: candidate.connectionState,
             source: source(for: candidate),
             updatedAt: now
         )

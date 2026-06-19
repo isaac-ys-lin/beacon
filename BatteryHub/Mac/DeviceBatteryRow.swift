@@ -12,37 +12,216 @@ func resolveSymbol(_ symbol: String, fallback: String) -> String {
     return symbol
 }
 
-// MARK: - Shared row chrome
-
-private struct DeviceIconTile: View {
-    let symbolName: String
-    let color: Color
-    let isActive: Bool
+struct BluetoothLogoMark: View {
+    var size: CGFloat = 28
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+
         ZStack {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.7)
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
+                }
+
+            BluetoothGlyphShape()
+                .stroke(
+                    Color.primary.opacity(0.62),
+                    style: StrokeStyle(
+                        lineWidth: max(1.1, size * 0.068),
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
                 )
-                .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                .padding(size * 0.25)
+        }
+        .frame(width: size, height: size)
+        .ifAvailableGlass(shape: shape)
+        .accessibilityLabel("Bluetooth")
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func ifAvailableGlass<S: Shape>(shape: S) -> some View {
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self
+        }
+    }
+}
+
+private struct BluetoothGlyphShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let midX = rect.midX
+        let midY = rect.midY
+        let topY = rect.minY + rect.height * 0.03
+        let bottomY = rect.maxY - rect.height * 0.03
+        let leftX = rect.minX + rect.width * 0.06
+        let rightX = rect.maxX - rect.width * 0.08
+        let upperY = rect.minY + rect.height * 0.30
+        let lowerY = rect.maxY - rect.height * 0.30
+
+        var path = Path()
+        path.move(to: CGPoint(x: midX, y: topY))
+        path.addLine(to: CGPoint(x: midX, y: bottomY))
+
+        path.move(to: CGPoint(x: midX, y: topY))
+        path.addLine(to: CGPoint(x: rightX, y: upperY))
+        path.addLine(to: CGPoint(x: midX, y: midY))
+        path.addLine(to: CGPoint(x: leftX, y: upperY))
+
+        path.move(to: CGPoint(x: midX, y: bottomY))
+        path.addLine(to: CGPoint(x: rightX, y: lowerY))
+        path.addLine(to: CGPoint(x: midX, y: midY))
+        path.addLine(to: CGPoint(x: leftX, y: lowerY))
+
+        return path
+    }
+}
+
+// MARK: - Shared device iconography
+
+func deviceSymbolName(for kind: DeviceKind, displayName: String = "") -> String {
+    switch kind {
+    case .macBook:
+        return macDeviceSymbolName(for: displayName)
+    case .iPhone:
+        return resolveSymbol("iphone.gen3", fallback: "iphone")
+    case .appleWatch:
+        return resolveSymbol("applewatch", fallback: "watch.analog")
+    case .airPods:
+        return airPodsDeviceSymbolName(for: displayName)
+    case .keyboard:
+        return keyboardDeviceSymbolName()
+    case .mouse:
+        return resolveSymbol("magicmouse", fallback: "cursorarrow")
+    case .trackpad:
+        return resolveSymbol("rectangle.and.hand.point.up.left", fallback: "rectangle")
+    case .bluetoothPeripheral:
+        return resolveSymbol("antenna.radiowaves.left.and.right", fallback: "dot.radiowaves.left.and.right")
+    }
+}
+
+private func macDeviceSymbolName(for name: String) -> String {
+    let lower = name.lowercased()
+    if lower.contains("mac mini") || lower.contains("macmini") {
+        return resolveSymbol("macmini", fallback: "desktopcomputer")
+    }
+    if lower.contains("macbook") {
+        return resolveSymbol("macbook", fallback: "desktopcomputer")
+    }
+    if lower.contains("imac") {
+        return "desktopcomputer"
+    }
+    if lower.contains("mac studio") {
+        return resolveSymbol("macstudio", fallback: "desktopcomputer")
+    }
+    if lower.contains("mac pro") {
+        return resolveSymbol("macpro.gen3", fallback: "desktopcomputer")
+    }
+    return resolveSymbol("macbook", fallback: "desktopcomputer")
+}
+
+private func keyboardDeviceSymbolName() -> String {
+    return resolveSymbol("keyboard", fallback: "rectangle.grid.3x2")
+}
+
+private func airPodsDeviceSymbolName(for name: String) -> String {
+    let lower = name.lowercased()
+    if lower.contains("max") {
+        return resolveSymbol("airpodsmax", fallback: "headphones")
+    }
+    if lower.contains("pro") {
+        return resolveSymbol("airpodspro", fallback: "airpods")
+    }
+    if lower.contains("3rd") || lower.contains("gen 3") || lower.contains("generation 3") {
+        return resolveSymbol("airpods.gen3", fallback: "airpods")
+    }
+    return "airpods"
+}
+
+enum DeviceIconBadge: Equatable {
+    case connected
+    case charging
+    case low
+    case stale
+    case disconnected
+
+    var symbolName: String {
+        switch self {
+        case .connected: return "checkmark"
+        case .charging: return "bolt.fill"
+        case .low: return "exclamationmark"
+        case .stale: return "clock"
+        case .disconnected: return "xmark"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .connected: return DesignTokens.Palette.charging
+        case .charging: return DesignTokens.Palette.charging
+        case .low: return DesignTokens.Palette.critical
+        case .stale: return DesignTokens.Palette.stale
+        case .disconnected: return DesignTokens.Palette.secondaryText
+        }
+    }
+}
+
+struct DeviceIconPlate: View {
+    let symbolName: String
+    let color: Color
+    var size: CGFloat = 34
+    var badge: DeviceIconBadge?
+
+    init(
+        symbolName: String,
+        color: Color,
+        size: CGFloat = 34,
+        badge: DeviceIconBadge? = nil
+    ) {
+        self.symbolName = symbolName
+        self.color = color
+        self.size = size
+        self.badge = badge
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+
+        ZStack {
+            shape
+                .fill(.regularMaterial)
+                .overlay(
+                    shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
+                )
 
             Image(systemName: symbolName)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: max(12, size * 0.54), weight: .medium))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(color)
+                .frame(width: size * 0.72, height: size * 0.72)
+                .accessibilityHidden(true)
 
-            if isActive {
-                Circle()
-                    .fill(DesignTokens.Palette.charging)
-                    .frame(width: 6, height: 6)
-                    .overlay(Circle().stroke(.white.opacity(0.65), lineWidth: 0.7))
-                    .offset(x: 13, y: -13)
+            if let badge {
+                ZStack {
+                    Circle()
+                        .fill(badge.color)
+                    Image(systemName: badge.symbolName)
+                        .font(.system(size: max(6, size * 0.18), weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: max(12, size * 0.36), height: max(12, size * 0.36))
+                .overlay(Circle().stroke(.white.opacity(0.78), lineWidth: 0.8))
+                .shadow(color: badge.color.opacity(0.25), radius: 3, x: 0, y: 1)
+                .offset(x: size * 0.34, y: -size * 0.34)
             }
         }
-        .frame(width: 34, height: 34)
+        .frame(width: size, height: size)
+        .ifAvailableGlass(shape: shape)
     }
 }
 
@@ -64,28 +243,60 @@ private struct StatusCapsule: View {
     }
 }
 
+private struct BatteryReadout: View {
+    let percent: Int
+    let chargeState: ChargeState
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("\(percent)%")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(color)
+                .frame(minWidth: 34, alignment: .trailing)
+
+            BatteryLevelPill(
+                percent: percent,
+                chargeState: chargeState
+            )
+        }
+        .frame(width: 82, alignment: .trailing)
+    }
+}
+
 // MARK: - DeviceBatteryRow
 
 struct DeviceBatteryRow: View {
     let decorated: DecoratedBatterySnapshot
+    var isPinned = false
     @State private var isHovered = false
 
     var body: some View {
         let snapshot = decorated.snapshot
 
         HStack(spacing: 14) {
-            DeviceIconTile(
-                symbolName: symbolName(for: snapshot),
+            DeviceIconPlate(
+                symbolName: deviceSymbolName(for: snapshot.kind, displayName: snapshot.displayName),
                 color: iconColor,
-                isActive: snapshot.chargeState == .charging || snapshot.chargeState == .full
+                badge: iconBadge
             )
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(snapshot.displayName)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(DesignTokens.Palette.text)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 5) {
+                    Text(snapshot.displayName)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(DesignTokens.Palette.text)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if isPinned {
+                        Image(systemName: resolveSymbol("pin.fill", fallback: "pin"))
+                            .font(.system(size: 9, weight: .bold))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(DesignTokens.Palette.accent)
+                    }
+                }
 
                 Text(statusLine)
                     .font(.system(size: 11, weight: .regular))
@@ -96,19 +307,14 @@ struct DeviceBatteryRow: View {
 
             Spacer(minLength: DesignTokens.Spacing.md)
 
-            if let percent = snapshot.percent {
-                HStack(spacing: 8) {
-                    Text("\(percent)%")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(percentColor)
-                        .frame(minWidth: 34, alignment: .trailing)
-
-                    BatteryLevelPill(
-                        percent: percent,
-                        chargeState: snapshot.chargeState
-                    )
-                }
+            if snapshot.connectionState == .disconnected {
+                StatusCapsule(text: "Disconnected", color: DesignTokens.Palette.stale)
+            } else if let percent = snapshot.percent {
+                BatteryReadout(
+                    percent: percent,
+                    chargeState: snapshot.chargeState,
+                    color: percentColor
+                )
             } else {
                 StatusCapsule(text: "No report", color: DesignTokens.Palette.tertiaryText)
             }
@@ -132,6 +338,9 @@ struct DeviceBatteryRow: View {
     // MARK: - Colors
 
     private var iconColor: Color {
+        if decorated.snapshot.connectionState == .disconnected {
+            return DesignTokens.Palette.stale
+        }
         if let percent = decorated.snapshot.percent, percent <= LowBatteryNotifier.threshold {
             return DesignTokens.Palette.critical
         }
@@ -139,6 +348,26 @@ struct DeviceBatteryRow: View {
         case .charging, .full: return DesignTokens.Palette.charging
         default: return DesignTokens.Palette.secondaryText
         }
+    }
+
+    private var iconBadge: DeviceIconBadge? {
+        let snapshot = decorated.snapshot
+        if snapshot.connectionState == .disconnected {
+            return .disconnected
+        }
+        if let percent = snapshot.percent,
+           percent <= LowBatteryNotifier.threshold,
+           snapshot.chargeState != .charging,
+           snapshot.chargeState != .full {
+            return .low
+        }
+        if snapshot.chargeState == .charging || snapshot.chargeState == .full {
+            return .charging
+        }
+        if decorated.freshness != .fresh {
+            return .stale
+        }
+        return nil
     }
 
     private var percentColor: Color {
@@ -150,14 +379,17 @@ struct DeviceBatteryRow: View {
 
     private var statusLine: String {
         let snapshot = decorated.snapshot
+        if snapshot.connectionState == .disconnected {
+            return "\(sourceLabel) · disconnected"
+        }
         if snapshot.percent == nil {
-            return "\(sourceLabel) · no battery report"
+            return "\(sourceLabel) · no report"
         }
         if let percent = snapshot.percent,
            percent <= LowBatteryNotifier.threshold,
            snapshot.chargeState != .charging,
            snapshot.chargeState != .full {
-            return "\(sourceLabel) · needs charging"
+            return "\(sourceLabel) · low"
         }
         switch decorated.freshness {
         case .fresh:
@@ -175,6 +407,9 @@ struct DeviceBatteryRow: View {
     }
 
     private var statusLineColor: Color {
+        if decorated.snapshot.connectionState == .disconnected {
+            return DesignTokens.Palette.stale
+        }
         if let percent = decorated.snapshot.percent, percent <= LowBatteryNotifier.threshold {
             return DesignTokens.Palette.critical
         }
@@ -196,66 +431,6 @@ struct DeviceBatteryRow: View {
         }
     }
 
-    // MARK: - Symbol resolution
-
-    /// Returns a precise SF Symbol name based on both kind and displayName.
-    /// Uses runtime resolution so symbols unavailable on older macOS automatically
-    /// fall back to a safe symbol.
-    private func symbolName(for snapshot: BatterySnapshot) -> String {
-        switch snapshot.kind {
-        case .macBook:
-            return macSymbol(for: snapshot.displayName)
-        case .iPhone:
-            return resolveSymbol("iphone.gen3", fallback: "iphone")
-        case .appleWatch:
-            return resolveSymbol("applewatch.side.right", fallback: "applewatch")
-        case .airPods:
-            return airPodsSymbol(for: snapshot.displayName)
-        case .keyboard:
-            return "keyboard"
-        case .mouse:
-            return resolveSymbol("magicmouse", fallback: "computermouse")
-        case .trackpad:
-            return resolveSymbol("rectangle.and.hand.point.up.left.fill", fallback: "rectangle.and.hand.point.up.left")
-        case .bluetoothPeripheral:
-            return "dot.radiowaves.left.and.right"
-        }
-    }
-
-    private func macSymbol(for name: String) -> String {
-        let lower = name.lowercased()
-        if lower.contains("mac mini") || lower.contains("macmini") {
-            return resolveSymbol("macmini", fallback: "desktopcomputer")
-        }
-        if lower.contains("macbook") {
-            return resolveSymbol("macbook", fallback: "desktopcomputer")
-        }
-        if lower.contains("imac") {
-            return "desktopcomputer"
-        }
-        if lower.contains("mac studio") {
-            return resolveSymbol("macstudio", fallback: "desktopcomputer")
-        }
-        if lower.contains("mac pro") {
-            return resolveSymbol("macpro.gen3", fallback: "desktopcomputer")
-        }
-        return "desktopcomputer"
-    }
-
-    private func airPodsSymbol(for name: String) -> String {
-        let lower = name.lowercased()
-        if lower.contains("max") {
-            return resolveSymbol("airpodsmax", fallback: "headphones")
-        }
-        if lower.contains("pro") {
-            return resolveSymbol("airpodspro", fallback: "airpods")
-        }
-        // Third-generation: "airpods (3rd generation)" or similar
-        if lower.contains("3rd") || lower.contains("gen 3") || lower.contains("generation 3") {
-            return resolveSymbol("airpods.gen3", fallback: "airpods")
-        }
-        return "airpods"
-    }
 }
 
 // MARK: - AirPodsBatteryRow
@@ -264,23 +439,33 @@ struct AirPodsBatteryRow: View {
     let name: String
     let id: String
     let components: [AirPodsComponent]
+    var isPinned = false
     @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 14) {
-                DeviceIconTile(
+                DeviceIconPlate(
                     symbolName: airPodsHeaderSymbol,
                     color: airPodsStatusColor,
-                    isActive: componentSummaryPercent.map { $0 > LowBatteryNotifier.threshold } ?? false
+                    badge: airPodsIconBadge
                 )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(DesignTokens.Palette.text)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    HStack(spacing: 5) {
+                        Text(name)
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(DesignTokens.Palette.text)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+
+                        if isPinned {
+                            Image(systemName: resolveSymbol("pin.fill", fallback: "pin"))
+                                .font(.system(size: 9, weight: .bold))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(DesignTokens.Palette.accent)
+                        }
+                    }
 
                     Text(airPodsStatusLine)
                         .font(.system(size: 11, weight: .regular))
@@ -292,20 +477,16 @@ struct AirPodsBatteryRow: View {
                 Spacer(minLength: DesignTokens.Spacing.md)
 
                 if let summary = componentSummaryPercent {
-                    HStack(spacing: 8) {
-                        Text("\(summary)%")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(summary <= LowBatteryNotifier.threshold ? DesignTokens.Palette.critical : DesignTokens.Palette.text)
-                            .frame(minWidth: 34, alignment: .trailing)
-
-                        BatteryLevelPill(percent: summary, chargeState: .unplugged)
-                    }
+                    BatteryReadout(
+                        percent: summary,
+                        chargeState: summaryChargeState,
+                        color: summaryColor
+                    )
                 }
             }
 
             HStack(spacing: 8) {
-                Spacer().frame(width: 44) // align under the text
+                Spacer().frame(width: 48) // align under the text
                 ForEach(components, id: \.slot.rawValue) { component in
                     AirPodsComponentChip(component: component)
                 }
@@ -328,13 +509,20 @@ struct AirPodsBatteryRow: View {
     }
 
     private var airPodsHeaderSymbol: String {
-        let lower = name.lowercased()
-        if lower.contains("max") { return resolveSymbol("airpodsmax", fallback: "headphones") }
-        if lower.contains("pro") { return resolveSymbol("airpodspro", fallback: "airpods") }
-        if lower.contains("3rd") || lower.contains("gen 3") {
-            return resolveSymbol("airpods.gen3", fallback: "airpods")
+        deviceSymbolName(for: .airPods, displayName: name)
+    }
+
+    private var airPodsIconBadge: DeviceIconBadge? {
+        if components.contains(where: { ($0.percent ?? 100) <= LowBatteryNotifier.threshold }) {
+            return .low
         }
-        return "airpods"
+        if components.contains(where: { $0.chargeState == .charging || $0.chargeState == .full }) {
+            return .charging
+        }
+        if components.contains(where: { $0.freshness != .fresh }) {
+            return .stale
+        }
+        return nil
     }
 
     private var componentSummaryPercent: Int? {
@@ -343,14 +531,28 @@ struct AirPodsBatteryRow: View {
         return percents.min()
     }
 
+    private var summaryChargeState: ChargeState {
+        if components.contains(where: { $0.chargeState == .charging || $0.chargeState == .full }) {
+            return .charging
+        }
+        return .unplugged
+    }
+
+    private var summaryColor: Color {
+        guard let summary = componentSummaryPercent else { return DesignTokens.Palette.secondaryText }
+        if summary <= LowBatteryNotifier.threshold { return DesignTokens.Palette.critical }
+        if components.contains(where: { $0.freshness != .fresh }) { return DesignTokens.Palette.stale }
+        return DesignTokens.Palette.text
+    }
+
     private var airPodsStatusLine: String {
         if components.contains(where: { ($0.percent ?? 100) <= LowBatteryNotifier.threshold }) {
-            return "Nearby · component needs charging"
+            return "Nearby · component low"
         }
         if components.contains(where: { $0.freshness != .fresh }) {
             return "Nearby · component data stale"
         }
-        return "Nearby · component batteries"
+        return "Nearby · components"
     }
 
     private var airPodsStatusColor: Color {
@@ -421,86 +623,93 @@ private struct MiniPill: View {
     let chargeState: ChargeState
 
     var body: some View {
-        HStack(spacing: 1) {
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(borderColor, lineWidth: 1.2)
-                    .frame(width: 22, height: 11)
-
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(fillColor)
-                    .frame(width: fillWidth, height: 7)
-                    .padding(.leading, 2.5)
-
-                if chargeState == .charging || chargeState == .full {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 6, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 11)
-                }
-            }
-
-            Capsule()
-                .fill(borderColor.opacity(0.72))
-                .frame(width: 1.5, height: 4.5)
-        }
-        .accessibilityLabel("\(percent)%")
-    }
-
-    private var normalizedPercent: CGFloat {
-        CGFloat(Swift.max(0, Swift.min(100, percent))) / 100
-    }
-
-    private var fillWidth: CGFloat {
-        Swift.max(2.5, 17 * normalizedPercent)
-    }
-
-    private var fillColor: Color {
-        if percent <= LowBatteryNotifier.threshold { return DesignTokens.Palette.critical }
-        if percent <= 45 { return DesignTokens.Palette.warning }
-        return DesignTokens.Palette.healthy
-    }
-
-    private var borderColor: Color {
-        if chargeState == .charging || chargeState == .full {
-            return DesignTokens.Palette.charging
-        }
-        return DesignTokens.Palette.secondaryText.opacity(0.55)
+        BatteryGauge(
+            percent: percent,
+            chargeState: chargeState,
+            width: 22,
+            height: 11,
+            bodyCornerRadius: 3,
+            fillCornerRadius: 2,
+            fillInset: 2.5,
+            terminalWidth: 1.5,
+            terminalHeight: 4.5,
+            strokeWidth: 1.15,
+            boltSize: 6
+        )
     }
 }
 
-// MARK: - BatteryLevelPill (main row, kept from original)
+// MARK: - BatteryLevelPill
 
 struct BatteryLevelPill: View {
     let percent: Int
     let chargeState: ChargeState
 
     var body: some View {
+        BatteryGauge(
+            percent: percent,
+            chargeState: chargeState,
+            width: 34,
+            height: 18,
+            bodyCornerRadius: 5,
+            fillCornerRadius: 3,
+            fillInset: 4,
+            terminalWidth: 2.5,
+            terminalHeight: 7,
+            strokeWidth: 1.55,
+            boltSize: 9
+        )
+    }
+}
+
+private struct BatteryGauge: View {
+    let percent: Int
+    let chargeState: ChargeState
+    let width: CGFloat
+    let height: CGFloat
+    let bodyCornerRadius: CGFloat
+    let fillCornerRadius: CGFloat
+    let fillInset: CGFloat
+    let terminalWidth: CGFloat
+    let terminalHeight: CGFloat
+    let strokeWidth: CGFloat
+    let boltSize: CGFloat
+
+    var body: some View {
         HStack(spacing: 1) {
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(borderColor, lineWidth: 1.6)
-                    .frame(width: 34, height: 18)
+                RoundedRectangle(cornerRadius: bodyCornerRadius, style: .continuous)
+                    .fill(DesignTokens.Palette.controlPill.opacity(0.74))
+                    .frame(width: width, height: height)
 
-                RoundedRectangle(cornerRadius: 3)
+                RoundedRectangle(cornerRadius: bodyCornerRadius, style: .continuous)
+                    .stroke(borderColor, lineWidth: strokeWidth)
+                    .frame(width: width, height: height)
+
+                RoundedRectangle(cornerRadius: fillCornerRadius, style: .continuous)
                     .fill(fillColor)
-                    .frame(width: fillWidth, height: 12)
-                    .padding(.leading, 4)
+                    .frame(width: fillWidth, height: fillHeight)
+                    .padding(.leading, fillInset)
+                    .shadow(color: fillColor.opacity(0.35), radius: isCharging ? 2 : 0, x: 0, y: 0)
 
-                if chargeState == .charging || chargeState == .full {
+                if isCharging {
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: boltSize, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 34, height: 18)
+                        .frame(width: width, height: height)
                         .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
                 }
             }
 
             Capsule()
                 .fill(borderColor.opacity(0.72))
-                .frame(width: 2.5, height: 7)
+                .frame(width: terminalWidth, height: terminalHeight)
         }
         .accessibilityLabel("\(percent)%")
+    }
+
+    private var isCharging: Bool {
+        chargeState == .charging || chargeState == .full
     }
 
     private var normalizedPercent: CGFloat {
@@ -508,7 +717,11 @@ struct BatteryLevelPill: View {
     }
 
     private var fillWidth: CGFloat {
-        Swift.max(4, 26 * normalizedPercent)
+        Swift.max(fillInset, (width - (fillInset * 2)) * normalizedPercent)
+    }
+
+    private var fillHeight: CGFloat {
+        Swift.max(2, height - (fillInset * 1.5))
     }
 
     private var fillColor: Color {
@@ -518,7 +731,7 @@ struct BatteryLevelPill: View {
     }
 
     private var borderColor: Color {
-        if chargeState == .charging || chargeState == .full {
+        if isCharging {
             return DesignTokens.Palette.charging
         }
         return DesignTokens.Palette.secondaryText.opacity(0.55)

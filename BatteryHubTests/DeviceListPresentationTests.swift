@@ -1,3 +1,6 @@
+import AppKit
+import AppIntents
+import SwiftUI
 import XCTest
 @testable import BatteryHub
 
@@ -13,6 +16,7 @@ final class DeviceListPresentationTests: XCTestCase {
         kind: DeviceKind,
         percent: Int?,
         chargeState: ChargeState = .unplugged,
+        connectionState: ConnectionState = .connected,
         source: BatterySource = .coreBluetooth,
         updatedAt: Date = fixedDate
     ) -> BatterySnapshot {
@@ -22,6 +26,7 @@ final class DeviceListPresentationTests: XCTestCase {
             kind: kind,
             percent: percent,
             chargeState: chargeState,
+            connectionState: connectionState,
             source: source,
             updatedAt: updatedAt
         )
@@ -33,7 +38,10 @@ final class DeviceListPresentationTests: XCTestCase {
         kind: DeviceKind,
         percent: Int?,
         chargeState: ChargeState = .unplugged,
-        freshness: Freshness = .fresh
+        freshness: Freshness = .fresh,
+        connectionState: ConnectionState = .connected,
+        source: BatterySource = .coreBluetooth,
+        updatedAt: Date = fixedDate
     ) -> DecoratedBatterySnapshot {
         DecoratedBatterySnapshot(
             snapshot: makeSnapshot(
@@ -41,10 +49,20 @@ final class DeviceListPresentationTests: XCTestCase {
                 displayName: displayName,
                 kind: kind,
                 percent: percent,
-                chargeState: chargeState
+                chargeState: chargeState,
+                connectionState: connectionState,
+                source: source,
+                updatedAt: updatedAt
             ),
             freshness: freshness
         )
+    }
+
+    private func isolatedDefaults(name: String = UUID().uuidString) -> UserDefaults {
+        let suiteName = "BatteryHubTests.\(name)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 
     // MARK: - airPodsPrefix
@@ -279,6 +297,822 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(ids, ["mac1", "kbd1", "mouse1"])
     }
 
+    // MARK: - Device display preferences
+
+    func testConfiguredDeviceSectionsPinAndHideItemsWithoutChangingStoreOrder() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 18),
+            makeDecorated(deviceID: "trackpad", displayName: "Magic Trackpad", kind: .trackpad, percent: 51),
+        ]
+        let preferences = DeviceDisplayPreferences(
+            pinnedDeviceIDs: ["trackpad"],
+            hiddenDeviceIDs: ["mouse"]
+        )
+
+        let sections = configuredDeviceSections(snapshots, preferences: preferences)
+
+        XCTAssertEqual(sections.count, 1)
+        let ids = sections[0].items.map(\.id)
+        XCTAssertEqual(ids, ["trackpad", "keyboard"])
+        XCTAssertEqual(groupedDeviceItems(snapshots)[0].items.map(\.id), ["keyboard", "mouse", "trackpad"])
+    }
+
+    func testDeviceDisplayPreferencesRoundTripThroughUserDefaults() {
+        let defaults = isolatedDefaults()
+        let preferences = DeviceDisplayPreferences(
+            pinnedDeviceIDs: ["keyboard", "airpods"],
+            hiddenDeviceIDs: ["mouse"]
+        )
+
+        preferences.save(to: defaults)
+        let loaded = DeviceDisplayPreferences.load(from: defaults)
+
+        XCTAssertEqual(loaded, preferences)
+    }
+
+    func testDeviceDisplayPreferencesRestoreSingleHiddenItem() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 18),
+        ]
+        let mouse = groupedDeviceItems(snapshots)[0].items[1]
+        let preferences = DeviceDisplayPreferences(
+            pinnedDeviceIDs: ["keyboard"],
+            hiddenDeviceIDs: ["mouse"]
+        )
+
+        let restored = preferences.restoring(mouse)
+
+        XCTAssertEqual(restored.pinnedDeviceIDs, ["keyboard"])
+        XCTAssertTrue(restored.hiddenDeviceIDs.isEmpty)
+    }
+
+    func testDeviceInspectorItemsSortPinnedVisibleThenHidden() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 18),
+            makeDecorated(deviceID: "trackpad", displayName: "Magic Trackpad", kind: .trackpad, percent: 51),
+        ]
+        let preferences = DeviceDisplayPreferences(
+            pinnedDeviceIDs: ["trackpad"],
+            hiddenDeviceIDs: ["mouse"]
+        )
+
+        let inspectorItems = deviceInspectorItems(snapshots, preferences: preferences)
+
+        XCTAssertEqual(inspectorItems.map(\.id), ["trackpad", "keyboard", "mouse"])
+        XCTAssertEqual(inspectorItems.map(\.isPinned), [true, false, false])
+        XCTAssertEqual(inspectorItems.map(\.isHidden), [false, false, true])
+    }
+
+    func testDashboardSectionsHideDisconnectedDevicesAndInspectorMarksThemHidden() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keychron", displayName: "Keychron K3 Max", kind: .keyboard, percent: 93),
+            makeDecorated(
+                deviceID: "mouse",
+                displayName: "Magic Mouse",
+                kind: .mouse,
+                percent: nil,
+                connectionState: .disconnected
+            ),
+            makeDecorated(
+                deviceID: "speaker",
+                displayName: "Bluetooth Speaker",
+                kind: .bluetoothPeripheral,
+                percent: nil,
+                connectionState: .disconnected,
+                source: .bluetoothUnsupported
+            ),
+        ]
+
+        let dashboardItems = dashboardDeviceSections(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        ).flatMap(\.items)
+        let inspectorItems = deviceInspectorItems(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        )
+
+        XCTAssertEqual(dashboardItems.map(\.displayName), ["Keychron K3 Max"])
+        XCTAssertEqual(inspectorItems.map(\.displayName), ["Keychron K3 Max", "Magic Mouse", "Bluetooth Speaker"])
+        XCTAssertEqual(inspectorItems.map(\.isHidden), [false, true, true])
+        XCTAssertEqual(inspectorItems.map(\.isUnavailable), [false, true, true])
+    }
+
+    func testInspectorAutoHidesConnectedDevicesWithoutBatteryReport() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keychron", displayName: "Keychron K3 Max", kind: .keyboard, percent: 89),
+            makeDecorated(deviceID: "backlight", displayName: "Keyboard Backlight", kind: .keyboard, percent: nil),
+        ]
+
+        let inspectorItems = deviceInspectorItems(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        )
+
+        XCTAssertEqual(inspectorItems.map(\.displayName), ["Keychron K3 Max", "Keyboard Backlight"])
+        XCTAssertEqual(inspectorItems.map(\.isHidden), [false, true])
+        XCTAssertEqual(inspectorItems.map(\.isUserHidden), [false, false])
+        XCTAssertEqual(inspectorItems.map(\.isUnavailable), [false, true])
+    }
+
+    func testSettingsDeviceInspectorRowsCanCollapseHiddenUnavailableItems() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keychron", displayName: "Keychron K3 Max", kind: .keyboard, percent: 89),
+            makeDecorated(deviceID: "backlight", displayName: "Keyboard Backlight", kind: .keyboard, percent: nil),
+            makeDecorated(
+                deviceID: "airpods",
+                displayName: "Yi Sung's AirPods Pro",
+                kind: .airPods,
+                percent: nil,
+                connectionState: .disconnected
+            ),
+        ]
+
+        let inspectorItems = deviceInspectorItems(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        )
+
+        XCTAssertEqual(
+            displayedDeviceInspectorItems(inspectorItems, showHiddenUnavailable: true).map(\.displayName),
+            ["Keychron K3 Max", "Keyboard Backlight", "Yi Sung's AirPods Pro"]
+        )
+        XCTAssertEqual(
+            displayedDeviceInspectorItems(inspectorItems, showHiddenUnavailable: false).map(\.displayName),
+            ["Keychron K3 Max"]
+        )
+    }
+
+    func testStatusMenuSizingGrowsWithDashboardDeviceCount() {
+        let nativeOneDevice = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 1,
+            showsOverview: true,
+            showsAirPodsCard: false,
+            style: .native,
+            visibleScreenHeight: 1_000
+        )
+        let nativeFiveDevices = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 5,
+            showsOverview: true,
+            showsAirPodsCard: true,
+            style: .native,
+            visibleScreenHeight: 1_000
+        )
+        let oneDevice = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 1,
+            showsOverview: true,
+            showsAirPodsCard: false,
+            style: .large,
+            visibleScreenHeight: 1_000
+        )
+        let fiveDevices = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 5,
+            showsOverview: true,
+            showsAirPodsCard: false,
+            style: .large,
+            visibleScreenHeight: 1_000
+        )
+        let withAirPodsCard = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 5,
+            showsOverview: true,
+            showsAirPodsCard: true,
+            style: .large,
+            visibleScreenHeight: 1_000
+        )
+
+        XCTAssertEqual(nativeOneDevice.width, 386)
+        XCTAssertGreaterThan(nativeOneDevice.height, 240)
+        XCTAssertGreaterThan(nativeFiveDevices.height, nativeOneDevice.height)
+        XCTAssertLessThan(nativeFiveDevices.height, fiveDevices.height)
+        XCTAssertEqual(oneDevice.width, 430)
+        XCTAssertGreaterThan(oneDevice.height, 600)
+        XCTAssertGreaterThan(fiveDevices.height, oneDevice.height)
+        XCTAssertGreaterThan(withAirPodsCard.height, fiveDevices.height)
+    }
+
+    func testNativeStatusMenuSizingMatchesRenderedRowChrome() {
+        let size = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 5,
+            showsOverview: true,
+            showsAirPodsCard: true,
+            style: .native,
+            visibleScreenHeight: 1_000
+        )
+
+        XCTAssertEqual(size.width, 386)
+        XCTAssertEqual(size.height, 430)
+    }
+
+    @MainActor
+    func testStatusPopoverContentCoordinatorReusesHostingController() {
+        let popover = NSPopover()
+        let coordinator = StatusPopoverContentCoordinator()
+
+        coordinator.install(
+            rootView: StatusMenuView(snapshots: [], onRefresh: {}),
+            in: popover
+        )
+        let firstController = popover.contentViewController
+
+        coordinator.install(
+            rootView: StatusMenuView(snapshots: [], isRefreshing: true, onRefresh: {}),
+            in: popover
+        )
+
+        XCTAssertNotNil(firstController)
+        XCTAssertTrue(popover.contentViewController === firstController)
+        XCTAssertTrue(coordinator.hostingController === firstController)
+    }
+
+    func testStatusMenuSizingCapsToVisibleScreenHeight() {
+        let size = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 12,
+            showsOverview: true,
+            showsAirPodsCard: true,
+            style: .large,
+            visibleScreenHeight: 720
+        )
+
+        XCTAssertEqual(size.height, 674)
+    }
+
+    // MARK: - Battery overview summary
+
+    func testBatteryOverviewSummaryCountsDeviceSignals() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "mouse", displayName: "Mouse", kind: .mouse, percent: 18),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 63, chargeState: .charging),
+            makeDecorated(deviceID: "speaker", displayName: "Speaker", kind: .bluetoothPeripheral, percent: 44, freshness: .stale),
+        ]
+
+        let summary = batteryOverviewSummary(
+            for: groupedDeviceItems(snapshots),
+            lowBatteryThreshold: 20
+        )
+
+        XCTAssertEqual(summary.reportedItemCount, 4)
+        XCTAssertEqual(summary.lowestPercent, 18)
+        XCTAssertEqual(summary.lowBatteryItemCount, 1)
+        XCTAssertEqual(summary.chargingItemCount, 1)
+        XCTAssertEqual(summary.staleItemCount, 1)
+    }
+
+    func testBatteryOverviewSummaryTreatsAirPodsAsOneVisibleItem() {
+        let addr = "20-C1-9B-AA-BB-CC"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "AirPods Pro Case", kind: .airPods, percent: 88),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "AirPods Pro Left", kind: .airPods, percent: 12),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "AirPods Pro Right", kind: .airPods, percent: 33, chargeState: .charging, freshness: .stale),
+        ]
+
+        let summary = batteryOverviewSummary(
+            for: groupedDeviceItems(snapshots),
+            lowBatteryThreshold: 20
+        )
+
+        XCTAssertEqual(summary.reportedItemCount, 1)
+        XCTAssertEqual(summary.lowestPercent, 12)
+        XCTAssertEqual(summary.lowBatteryItemCount, 1)
+        XCTAssertEqual(summary.chargingItemCount, 1)
+        XCTAssertEqual(summary.staleItemCount, 1)
+    }
+
+    func testBatteryOverviewDevicesPrioritizeLowestReportedDevices() {
+        let addr = "20-C1-9B-AA-BB-CC"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 18),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 63),
+            makeDecorated(deviceID: "\(addr)-case", displayName: "AirPods Pro Case", kind: .airPods, percent: 88),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "AirPods Pro Left", kind: .airPods, percent: 12),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "AirPods Pro Right", kind: .airPods, percent: 33, chargeState: .charging, freshness: .stale),
+        ]
+
+        let devices = batteryOverviewDevices(for: groupedDeviceItems(snapshots), limit: 3)
+
+        XCTAssertEqual(devices.map(\.displayName), ["AirPods Pro", "Magic Mouse", "Apple Watch"])
+        XCTAssertEqual(devices.map(\.percent), [12, 18, 63])
+        XCTAssertEqual(devices[0].kind, .airPods)
+        XCTAssertEqual(devices[0].chargeState, .charging)
+        XCTAssertEqual(devices[0].freshness, .stale)
+    }
+
+    // MARK: - Context menu actions
+
+    func testContextMenuActionsExposeSafeImplementedCommandsFirst() {
+        let item = DeviceListItem.device(
+            makeDecorated(deviceID: "20-C1-9B-AA-BB-CC", displayName: "Magic Mouse", kind: .mouse, percent: 18)
+        )
+
+        let actions = deviceContextMenuActions(for: item)
+
+        XCTAssertEqual(actions.prefix(3), [.batteryAlerts, .options, .refresh])
+        XCTAssertTrue(DeviceContextMenuAction.batteryAlerts.isEnabled)
+        XCTAssertTrue(DeviceContextMenuAction.options.isEnabled)
+        XCTAssertTrue(DeviceContextMenuAction.refresh.isEnabled)
+        XCTAssertTrue(DeviceContextMenuAction.pin.isEnabled)
+        XCTAssertTrue(DeviceContextMenuAction.disconnect.isEnabled(for: item))
+        XCTAssertTrue(DeviceContextMenuAction.remove.isEnabled)
+    }
+
+    func testAirPodsContextMenuIncludesAudioControls() {
+        let airPods = DeviceListItem.airPods(
+            name: "AirPods Pro",
+            id: "bluetooth-20-C1-9B-AA-BB-CC",
+            components: [
+                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh),
+                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh),
+            ]
+        )
+
+        let actions = deviceContextMenuActions(for: airPods)
+
+        XCTAssertEqual(actions.prefix(3), [.batteryAlerts, .audioControls, .options])
+        XCTAssertTrue(DeviceContextMenuAction.audioControls.isEnabled(for: airPods))
+        XCTAssertEqual(DeviceContextMenuAction.audioControls.title(for: "AirPods Pro"), "Audio Controls...")
+    }
+
+    func testAirPodsAudioPreferencesRoundTripPerDevice() {
+        let defaults = isolatedDefaults()
+        let deviceID = "bluetooth-20-C1-9B-AA-BB-CC"
+
+        AirPodsAudioPreferences(
+            listeningMode: .noiseCancellation,
+            microphone: .left
+        )
+        .save(for: deviceID, defaults: defaults)
+
+        XCTAssertEqual(
+            AirPodsAudioPreferences.load(for: deviceID, defaults: defaults),
+            AirPodsAudioPreferences(listeningMode: .noiseCancellation, microphone: .left)
+        )
+
+        AirPodsAudioPreferences.reset(for: deviceID, defaults: defaults)
+        XCTAssertEqual(
+            AirPodsAudioPreferences.load(for: deviceID, defaults: defaults),
+            AirPodsAudioPreferences()
+        )
+    }
+
+    func testBluetoothDeviceControlSupportNormalizesKnownAddressFormats() {
+        XCTAssertEqual(
+            BluetoothDeviceControlSupport.normalizedAddress(from: "bluetooth-20-C1-9B-AA-BB-CC"),
+            "20:c1:9b:aa:bb:cc"
+        )
+        XCTAssertEqual(
+            BluetoothDeviceControlSupport.normalizedAddress(from: "20:C1:9B:AA:BB:CC-left"),
+            "20:c1:9b:aa:bb:cc"
+        )
+        XCTAssertNil(BluetoothDeviceControlSupport.normalizedAddress(from: "Magic Mouse"))
+        XCTAssertNil(BluetoothDeviceControlSupport.normalizedAddress(from: "not-a-bt-address"))
+    }
+
+    func testBluetoothDisconnectIsOnlyEnabledForAddressBackedBluetoothDevices() {
+        let airPods = DeviceListItem.airPods(
+            name: "AirPods Pro",
+            id: "bluetooth-20-C1-9B-AA-BB-CC",
+            components: [
+                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh),
+                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh),
+            ]
+        )
+        let namedMouse = DeviceListItem.device(
+            makeDecorated(deviceID: "Magic Mouse", displayName: "Magic Mouse", kind: .mouse, percent: 18)
+        )
+        let watch = DeviceListItem.device(
+            makeDecorated(deviceID: "20-C1-9B-AA-BB-CC", displayName: "Apple Watch", kind: .appleWatch, percent: 80)
+        )
+
+        XCTAssertTrue(BluetoothDeviceControlSupport.canDisconnect(airPods))
+        XCTAssertFalse(BluetoothDeviceControlSupport.canDisconnect(namedMouse))
+        XCTAssertFalse(BluetoothDeviceControlSupport.canDisconnect(watch))
+        XCTAssertTrue(DeviceContextMenuAction.disconnect.isEnabled(for: airPods))
+        XCTAssertFalse(DeviceContextMenuAction.disconnect.isEnabled(for: namedMouse))
+        XCTAssertFalse(DeviceContextMenuAction.disconnect.isEnabled(for: watch))
+    }
+
+    func testBluetoothConnectIsOnlyEnabledForDisconnectedAddressBackedDevices() {
+        let disconnectedMouse = DeviceListItem.device(
+            makeDecorated(
+                deviceID: "bluetooth-20-C1-9B-AA-BB-CC",
+                displayName: "Magic Mouse",
+                kind: .mouse,
+                percent: nil,
+                connectionState: .disconnected
+            )
+        )
+        let connectedMouse = DeviceListItem.device(
+            makeDecorated(
+                deviceID: "bluetooth-20-C1-9B-AA-BB-CC",
+                displayName: "Magic Mouse",
+                kind: .mouse,
+                percent: 18
+            )
+        )
+
+        XCTAssertTrue(BluetoothDeviceControlSupport.canConnect(disconnectedMouse))
+        XCTAssertFalse(BluetoothDeviceControlSupport.canDisconnect(disconnectedMouse))
+        XCTAssertFalse(BluetoothDeviceControlSupport.canConnect(connectedMouse))
+        XCTAssertTrue(BluetoothDeviceControlSupport.canDisconnect(connectedMouse))
+        XCTAssertTrue(deviceContextMenuActions(for: disconnectedMouse).contains(.connect))
+        XCTAssertFalse(deviceContextMenuActions(for: disconnectedMouse).contains(.disconnect))
+    }
+
+    func testDeviceControlTargetConnectsLowestVisibleDisconnectedDevice() {
+        let snapshots = [
+            makeDecorated(
+                deviceID: "bluetooth-20-C1-9B-AA-BB-CC",
+                displayName: "Magic Mouse",
+                kind: .mouse,
+                percent: nil,
+                connectionState: .disconnected
+            ),
+            makeDecorated(
+                deviceID: "bluetooth-AA-BB-CC-DD-EE-FF",
+                displayName: "Magic Trackpad",
+                kind: .trackpad,
+                percent: 24,
+                connectionState: .disconnected
+            ),
+            makeDecorated(
+                deviceID: "bluetooth-11-22-33-44-55-66",
+                displayName: "Magic Keyboard",
+                kind: .keyboard,
+                percent: 82
+            ),
+        ]
+
+        let target = deviceControlTarget(for: .connectNearby, snapshots: snapshots)
+
+        XCTAssertEqual(target?.action, .connect)
+        XCTAssertEqual(target?.item.displayName, "Magic Trackpad")
+    }
+
+    func testDeviceControlTargetDisconnectsLowestVisibleConnectedDeviceAndSkipsHidden() {
+        let snapshots = [
+            makeDecorated(
+                deviceID: "bluetooth-20-C1-9B-AA-BB-CC",
+                displayName: "Magic Mouse",
+                kind: .mouse,
+                percent: 18
+            ),
+            makeDecorated(
+                deviceID: "bluetooth-AA-BB-CC-DD-EE-FF",
+                displayName: "Magic Trackpad",
+                kind: .trackpad,
+                percent: 24
+            ),
+            makeDecorated(
+                deviceID: "watch",
+                displayName: "Apple Watch",
+                kind: .appleWatch,
+                percent: 9
+            ),
+        ]
+        let preferences = DeviceDisplayPreferences(hiddenDeviceIDs: ["bluetooth-20-C1-9B-AA-BB-CC"])
+
+        let target = deviceControlTarget(
+            for: .disconnectLowest,
+            snapshots: snapshots,
+            preferences: preferences
+        )
+
+        XCTAssertEqual(target?.action, .disconnect)
+        XCTAssertEqual(target?.item.displayName, "Magic Trackpad")
+    }
+
+    func testContextMenuActionsSwitchToUnpinForPinnedItems() {
+        let item = DeviceListItem.device(
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 18)
+        )
+        let preferences = DeviceDisplayPreferences(pinnedDeviceIDs: ["mouse"])
+
+        let actions = deviceContextMenuActions(for: item, preferences: preferences)
+
+        XCTAssertTrue(actions.contains(.unpin))
+        XCTAssertFalse(actions.contains(.pin))
+    }
+
+    func testContextMenuActionTitlesMatchAirBuddyStyleCommands() {
+        XCTAssertEqual(DeviceContextMenuAction.batteryAlerts.title(for: "AirPods Pro"), "Battery Alerts...")
+        XCTAssertEqual(DeviceContextMenuAction.options.title(for: "AirPods Pro"), "Options")
+        XCTAssertEqual(DeviceContextMenuAction.pin.title(for: "AirPods Pro"), "Pin AirPods Pro")
+        XCTAssertEqual(DeviceContextMenuAction.unpin.title(for: "AirPods Pro"), "Unpin AirPods Pro")
+        XCTAssertEqual(DeviceContextMenuAction.remove.title(for: "AirPods Pro"), "Remove from BatteryHub")
+    }
+
+    // MARK: - Per-device alert thresholds
+
+    func testLowBatteryNotifierUsesCustomDeviceThresholdWithGlobalFallback() {
+        let defaults = isolatedDefaults()
+        defaults.set(20, forKey: LowBatteryNotifier.thresholdDefaultsKey)
+
+        XCTAssertEqual(LowBatteryNotifier.threshold(forDeviceID: "keyboard", defaults: defaults), 20)
+
+        LowBatteryNotifier.setThreshold(35, forDeviceID: "keyboard", defaults: defaults)
+        XCTAssertEqual(LowBatteryNotifier.threshold(forDeviceID: "keyboard", defaults: defaults), 35)
+        XCTAssertTrue(LowBatteryNotifier.hasCustomThreshold(forDeviceID: "keyboard", defaults: defaults))
+
+        LowBatteryNotifier.resetThreshold(forDeviceID: "keyboard", defaults: defaults)
+        XCTAssertEqual(LowBatteryNotifier.threshold(forDeviceID: "keyboard", defaults: defaults), 20)
+        XCTAssertFalse(LowBatteryNotifier.hasCustomThreshold(forDeviceID: "keyboard", defaults: defaults))
+    }
+
+    func testLowBatteryNotifierFallsBackToAirPodsPrefixThreshold() {
+        let defaults = isolatedDefaults()
+        defaults.set(20, forKey: LowBatteryNotifier.thresholdDefaultsKey)
+        LowBatteryNotifier.setThreshold(30, forDeviceID: "AA-BB-CC", defaults: defaults)
+
+        XCTAssertEqual(LowBatteryNotifier.threshold(forDeviceID: "AA-BB-CC-left", defaults: defaults), 30)
+        XCTAssertEqual(LowBatteryNotifier.threshold(forDeviceID: "AA-BB-CC-right", defaults: defaults), 30)
+    }
+
+    func testLowBatteryNotifierCreatesLowBatteryEventOnceUntilRecovered() {
+        let defaults = isolatedDefaults()
+        defaults.set(20, forKey: LowBatteryNotifier.thresholdDefaultsKey)
+        let lowSnapshot = makeSnapshot(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18)
+        let recoveredSnapshot = makeSnapshot(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 50)
+
+        let firstEvents = LowBatteryNotifier.pendingAlertEvents(for: [lowSnapshot], defaults: defaults)
+        let duplicateEvents = LowBatteryNotifier.pendingAlertEvents(for: [lowSnapshot], defaults: defaults)
+        _ = LowBatteryNotifier.pendingAlertEvents(for: [recoveredSnapshot], defaults: defaults)
+        let nextLowEvents = LowBatteryNotifier.pendingAlertEvents(for: [lowSnapshot], defaults: defaults)
+
+        XCTAssertEqual(firstEvents, [
+            BatteryAlertEvent(kind: .lowBattery, deviceID: "watch", displayName: "Apple Watch", percent: 18)
+        ])
+        XCTAssertTrue(duplicateEvents.isEmpty)
+        XCTAssertEqual(nextLowEvents, firstEvents)
+    }
+
+    func testChargedAlertRequiresDeviceOptInAndCreatesEventOnceUntilDrained() {
+        let defaults = isolatedDefaults()
+        let chargingSnapshot = makeSnapshot(
+            deviceID: "iphone",
+            displayName: "Isaac's iPhone",
+            kind: .iPhone,
+            percent: 100,
+            chargeState: .charging
+        )
+        let drainedSnapshot = makeSnapshot(
+            deviceID: "iphone",
+            displayName: "Isaac's iPhone",
+            kind: .iPhone,
+            percent: 80,
+            chargeState: .charging
+        )
+
+        XCTAssertTrue(LowBatteryNotifier.pendingAlertEvents(for: [chargingSnapshot], defaults: defaults).isEmpty)
+
+        LowBatteryNotifier.setChargedAlertEnabled(true, forDeviceID: "iphone", defaults: defaults)
+        let firstEvents = LowBatteryNotifier.pendingAlertEvents(for: [chargingSnapshot], defaults: defaults)
+        let duplicateEvents = LowBatteryNotifier.pendingAlertEvents(for: [chargingSnapshot], defaults: defaults)
+        _ = LowBatteryNotifier.pendingAlertEvents(for: [drainedSnapshot], defaults: defaults)
+        let nextChargedEvents = LowBatteryNotifier.pendingAlertEvents(for: [chargingSnapshot], defaults: defaults)
+
+        XCTAssertEqual(firstEvents, [
+            BatteryAlertEvent(kind: .charged, deviceID: "iphone", displayName: "Isaac's iPhone", percent: 100)
+        ])
+        XCTAssertTrue(duplicateEvents.isEmpty)
+        XCTAssertEqual(nextChargedEvents, firstEvents)
+    }
+
+    func testChargedAlertCanBeDisabledGloballyAndFallsBackToAirPodsPrefix() {
+        let defaults = isolatedDefaults()
+        defaults.set(false, forKey: LowBatteryNotifier.chargedNotificationsEnabledDefaultsKey)
+        LowBatteryNotifier.setChargedAlertEnabled(true, forDeviceID: "AA-BB-CC", defaults: defaults)
+        let caseSnapshot = makeSnapshot(
+            deviceID: "AA-BB-CC-case",
+            displayName: "AirPods Pro Case",
+            kind: .airPods,
+            percent: 100,
+            chargeState: .full
+        )
+
+        XCTAssertTrue(LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: "AA-BB-CC-case", defaults: defaults))
+        XCTAssertTrue(LowBatteryNotifier.pendingAlertEvents(for: [caseSnapshot], defaults: defaults).isEmpty)
+
+        defaults.set(true, forKey: LowBatteryNotifier.chargedNotificationsEnabledDefaultsKey)
+        XCTAssertEqual(LowBatteryNotifier.pendingAlertEvents(for: [caseSnapshot], defaults: defaults), [
+            BatteryAlertEvent(kind: .charged, deviceID: "AA-BB-CC-case", displayName: "AirPods Pro Case", percent: 100)
+        ])
+    }
+
+    func testBatteryHUDPreferencesDefaultToEnabled() {
+        let defaults = isolatedDefaults()
+
+        XCTAssertTrue(BatteryHUDPreferences.isEnabled(defaults: defaults))
+        XCTAssertTrue(BatteryHUDPreferences.isEnabled(for: .lowBattery, defaults: defaults))
+        XCTAssertTrue(BatteryHUDPreferences.isEnabled(for: .charged, defaults: defaults))
+        XCTAssertTrue(BatteryHUDPreferences.isAutoDismissEnabled(defaults: defaults))
+        XCTAssertTrue(BatteryHUDPreferences.showsDismissButton(defaults: defaults))
+        XCTAssertEqual(BatteryHUDPreferences.dismissDelaySeconds(defaults: defaults), 4)
+
+        defaults.set(false, forKey: BatteryHUDPreferences.showActionHUDKey)
+        XCTAssertFalse(BatteryHUDPreferences.isEnabled(defaults: defaults))
+        XCTAssertFalse(BatteryHUDPreferences.isEnabled(for: .lowBattery, defaults: defaults))
+        XCTAssertFalse(BatteryHUDPreferences.isEnabled(for: .charged, defaults: defaults))
+    }
+
+    func testBatteryHUDPreferencesCanDisableIndividualEvents() {
+        let defaults = isolatedDefaults()
+
+        defaults.set(false, forKey: BatteryHUDPreferences.lowBatteryHUDEnabledKey)
+
+        XCTAssertFalse(BatteryHUDPreferences.isEnabled(for: .lowBattery, defaults: defaults))
+        XCTAssertTrue(BatteryHUDPreferences.isEnabled(for: .charged, defaults: defaults))
+    }
+
+    func testBatteryHUDPreferencesClampDismissDelayAndDisableBehaviors() {
+        let defaults = isolatedDefaults()
+
+        defaults.set(1.5, forKey: BatteryHUDPreferences.dismissDelaySecondsKey)
+        XCTAssertEqual(BatteryHUDPreferences.dismissDelaySeconds(defaults: defaults), 2)
+
+        defaults.set(12.0, forKey: BatteryHUDPreferences.dismissDelaySecondsKey)
+        XCTAssertEqual(BatteryHUDPreferences.dismissDelaySeconds(defaults: defaults), 10)
+
+        defaults.set(false, forKey: BatteryHUDPreferences.autoDismissEnabledKey)
+        defaults.set(false, forKey: BatteryHUDPreferences.showDismissButtonKey)
+
+        XCTAssertFalse(BatteryHUDPreferences.isAutoDismissEnabled(defaults: defaults))
+        XCTAssertFalse(BatteryHUDPreferences.showsDismissButton(defaults: defaults))
+    }
+
+    func testQuickActionPreferencesDefaultToSafeEnabledActions() {
+        let preferences = BatteryHubQuickActionPreferences()
+
+        XCTAssertTrue(preferences.isEnabled(.showDashboard))
+        XCTAssertTrue(preferences.isEnabled(.refreshBatteries))
+        XCTAssertFalse(preferences.isEnabled(.openSettings))
+        XCTAssertFalse(preferences.isEnabled(.addDevice))
+        XCTAssertFalse(preferences.isEnabled(.openBluetoothSettings))
+        XCTAssertFalse(preferences.isEnabled(.connectNearbyDevice))
+        XCTAssertFalse(preferences.isEnabled(.disconnectLowestDevice))
+        XCTAssertFalse(preferences.isEnabled(.transferToMac))
+        XCTAssertEqual(BatteryHubQuickAction.showDashboard.shortcut?.displayText, "⌥⌘B")
+        XCTAssertEqual(BatteryHubQuickAction.connectNearbyDevice.shortcut?.displayText, "⌥⌘N")
+        XCTAssertEqual(BatteryHubQuickAction.disconnectLowestDevice.shortcut?.displayText, "⌥⌘X")
+        XCTAssertNil(BatteryHubQuickAction.transferToMac.shortcut)
+    }
+
+    func testQuickActionPreferencesRoundTripAndFilterUnsupportedActions() {
+        let defaults = isolatedDefaults()
+        let preferences = BatteryHubQuickActionPreferences()
+            .setting(false, for: .showDashboard)
+            .setting(true, for: .openSettings)
+            .setting(true, for: .connectNearbyDevice)
+            .setting(true, for: .transferToMac)
+
+        preferences.save(to: defaults)
+
+        let restored = BatteryHubQuickActionPreferences.load(from: defaults)
+        XCTAssertFalse(restored.isEnabled(.showDashboard))
+        XCTAssertTrue(restored.isEnabled(.refreshBatteries))
+        XCTAssertTrue(restored.isEnabled(.openSettings))
+        XCTAssertTrue(restored.isEnabled(.connectNearbyDevice))
+        XCTAssertFalse(restored.isEnabled(.transferToMac))
+    }
+
+    @MainActor
+    func testBatteryHubAppShortcutsExposeSupportedAutomationActions() {
+        let shortcutCount = BatteryHubAppShortcuts.appShortcuts.count
+
+        XCTAssertEqual(shortcutCount, 10)
+        XCTAssertNil(BatteryHubQuickAction.transferToMac.shortcut)
+    }
+
+    @MainActor
+    func testBatteryHubIntentBridgeRunsSupportedActionsOnly() {
+        var handledActions: [BatteryHubQuickAction] = []
+        BatteryHubIntentBridge.shared.register(
+            handler: { action in
+                handledActions.append(action)
+            },
+            snapshotProvider: { [] }
+        )
+
+        XCTAssertTrue(BatteryHubIntentBridge.shared.perform(.refreshBatteries))
+        XCTAssertFalse(BatteryHubIntentBridge.shared.perform(.transferToMac))
+        XCTAssertEqual(handledActions, [.refreshBatteries])
+    }
+
+    @MainActor
+    func testBatteryHubIntentBridgeProvidesSnapshotsForReadOnlyShortcuts() {
+        let snapshots = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18),
+        ]
+
+        BatteryHubIntentBridge.shared.register(
+            handler: { _ in },
+            snapshotProvider: { snapshots }
+        )
+
+        XCTAssertEqual(BatteryHubIntentBridge.shared.snapshots(), snapshots)
+    }
+
+    func testBatteryHubShortcutSummaryFormatsUsefulAutomationText() {
+        let snapshots = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, freshness: .stale),
+            makeDecorated(
+                deviceID: "watch",
+                displayName: "Apple Watch",
+                kind: .appleWatch,
+                percent: 18,
+                chargeState: .unplugged
+            ),
+            makeDecorated(
+                deviceID: "iphone",
+                displayName: "Isaac's iPhone",
+                kind: .iPhone,
+                percent: 64,
+                chargeState: .charging
+            ),
+        ]
+
+        let summary = BatteryHubShortcutSnapshotFormatter.summary(
+            for: snapshots,
+            lowBatteryThreshold: 20
+        )
+
+        XCTAssertEqual(summary.reportedDeviceCount, 4)
+        XCTAssertEqual(summary.lowestBatteryLine, "Apple Watch 18%")
+        XCTAssertEqual(summary.lowBatteryLines, ["Apple Watch 18%"])
+        XCTAssertEqual(summary.chargingLines, ["Isaac's iPhone 64%"])
+        XCTAssertEqual(summary.staleDeviceCount, 1)
+        XCTAssertEqual(
+            summary.summaryText,
+            "BatteryHub: 4 reporting devices. Lowest: Apple Watch 18%. Low battery: Apple Watch 18%. Charging: Isaac's iPhone 64%. Stale reports: 1."
+        )
+        XCTAssertEqual(
+            BatteryHubShortcutSnapshotFormatter.lowBatteryText(
+                for: snapshots,
+                lowBatteryThreshold: 20
+            ),
+            "Apple Watch 18%"
+        )
+    }
+
+    func testBatteryHubShortcutTrendSummaryUsesLocalHistory() {
+        let defaults = isolatedDefaults()
+        let base = Date(timeIntervalSince1970: 2_000)
+        let snapshots = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31),
+        ]
+
+        BatteryHistoryStore.record(
+            [
+                BatterySnapshot(
+                    deviceID: "keyboard",
+                    displayName: "Magic Keyboard",
+                    kind: .keyboard,
+                    percent: 87,
+                    chargeState: .unplugged,
+                    source: .coreBluetooth,
+                    updatedAt: base
+                ),
+                BatterySnapshot(
+                    deviceID: "keyboard",
+                    displayName: "Magic Keyboard",
+                    kind: .keyboard,
+                    percent: 82,
+                    chargeState: .unplugged,
+                    source: .coreBluetooth,
+                    updatedAt: base.addingTimeInterval(3_600)
+                ),
+            ],
+            now: base.addingTimeInterval(3_600),
+            defaults: defaults
+        )
+
+        XCTAssertEqual(
+            BatteryHubShortcutSnapshotFormatter.batteryTrendText(
+                for: snapshots,
+                defaults: defaults
+            ),
+            "Magic Keyboard: -5% trend, range 82%-87% across 2 reports."
+        )
+    }
+
+    func testBatteryHubShortcutTrendSummaryFallsBackWhileCollecting() {
+        XCTAssertEqual(
+            BatteryHubShortcutSnapshotFormatter.batteryTrendText(
+                for: [
+                    makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82)
+                ],
+                defaults: isolatedDefaults()
+            ),
+            "No battery trends yet. BatteryHub builds trends as reports arrive."
+        )
+    }
+
     // MARK: - SF Symbol runtime availability guard
 
     func testSFSymbolRuntimeAvailability() {
@@ -288,17 +1122,39 @@ final class DeviceListPresentationTests: XCTestCase {
         let knownGoodSymbols = ["desktopcomputer", "macmini", "macbook", "iphone",
                                 "iphone.gen3", "applewatch", "applewatch.side.right",
                                 "keyboard", "computermouse", "magicmouse",
+                                "macwindow", "rectangle", "circle.fill",
                                 "rectangle.and.hand.point.up.left",
                                 "rectangle.and.hand.point.up.left.fill",
+                                "rectangle.grid.3x2.fill",
                                 "dot.radiowaves.left.and.right",
-                                "airpodspro", "airpodsmax", "airpods",
+                                "airpodspro", "airpodsmax", "airpods", "headphones",
                                 "airpods.chargingcase", "airpod.left", "airpod.right",
-                                "bolt.fill", "arrow.clockwise", "gearshape"]
+                                "l.circle", "r.circle",
+                                "battery.25", "battery.100", "bolt.fill", "bell.badge", "bell.slash",
+                                "bell.badge.fill", "bell.slash.fill",
+                                "checkmark.circle.fill", "checkmark.icloud", "clock.badge.exclamationmark",
+                                "arrow.clockwise", "gearshape", "info.circle", "xmark.circle",
+                                "slider.horizontal.3", "pin", "pin.fill", "pin.slash",
+                                "bolt.horizontal.circle", "minus.circle",
+                                "eye", "eye.slash", "arrow.uturn.backward", "xmark",
+                                "rectangle.grid.2x2", "rectangle.grid.3x2",
+                                "plus", "keyboard"]
 
         for symbol in knownGoodSymbols {
             let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
             XCTAssertNotNil(img, "Symbol '\(symbol)' did not resolve on host OS — check fallback")
         }
+    }
+
+    func testKeyboardDevicesUseKeyboardSymbol() {
+        XCTAssertEqual(
+            deviceSymbolName(for: .keyboard, displayName: "Keychron K3 Max"),
+            "keyboard"
+        )
+        XCTAssertEqual(
+            deviceSymbolName(for: .keyboard, displayName: "Magic Keyboard"),
+            "keyboard"
+        )
     }
 
     func testPotentiallyUnavailableSymbolsHaveFallback() {
@@ -310,6 +1166,10 @@ final class DeviceListPresentationTests: XCTestCase {
             ("macstudio",     "desktopcomputer"),
             ("macpro.gen3",   "desktopcomputer"),
             ("airpods.gen3",  "airpods"),
+            ("ear.badge.waveform", "ear"),
+            ("speaker.wave.2", "gearshape"),
+            ("waveform", "circle.fill"),
+            ("mic", "circle.fill"),
         ]
 
         for pair in symbolsToCheck {
@@ -320,5 +1180,518 @@ final class DeviceListPresentationTests: XCTestCase {
                 "Fallback '\(pair.fallback)' for '\(pair.symbol)' must always resolve")
             _ = primary // may be nil on older OS — guarded at runtime in production
         }
+    }
+
+    // MARK: - Menu bar battery summary
+
+    func testMenuBarBatteryTextUsesLowestAvailablePercent() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "mouse", displayName: "Mouse", kind: .mouse, percent: 41),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 63),
+        ]
+
+        XCTAssertEqual(MenuBarBatteryFormatter.menuBarText(for: snapshots), "41%")
+    }
+
+    func testMenuBarBatteryTextSkipsExpiredAndUnknownPercent() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Keyboard", kind: .keyboard, percent: nil),
+            makeDecorated(deviceID: "mouse", displayName: "Mouse", kind: .mouse, percent: 12, freshness: .expired),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 57),
+        ]
+
+        XCTAssertEqual(MenuBarBatteryFormatter.menuBarText(for: snapshots), "57%")
+    }
+
+    func testMenuBarBatteryTextReturnsNilWhenNoFreshPercentExists() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Keyboard", kind: .keyboard, percent: nil),
+            makeDecorated(deviceID: "mouse", displayName: "Mouse", kind: .mouse, percent: 18, freshness: .expired),
+        ]
+
+        XCTAssertNil(MenuBarBatteryFormatter.menuBarText(for: snapshots))
+    }
+
+    // MARK: - Runtime-adjacent render smoke test
+
+    @MainActor
+    func testBatteryDesktopWidgetRenderProducesNonBlankImage() throws {
+        let now = Date()
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 82, updatedAt: now),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 24, freshness: .stale, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .iCloud, updatedAt: now),
+        ]
+
+        let view = BatteryDesktopWidgetView(snapshots: snapshots, style: .expanded)
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: DesktopWidgetStyle.expanded.width, height: DesktopWidgetStyle.expanded.height)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-desktop-widget-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 18_000)
+    }
+
+    @MainActor
+    func testBatteryHubDashboardSettingsRenderProducesDesktopWidgetPreview() throws {
+        UserDefaults.standard.set(true, forKey: DesktopWidgetPreferences.showDesktopWidgetKey)
+        UserDefaults.standard.set(DesktopWidgetStyle.expanded.rawValue, forKey: DesktopWidgetPreferences.widgetStyleKey)
+        defer {
+            UserDefaults.standard.removeObject(forKey: DesktopWidgetPreferences.showDesktopWidgetKey)
+            UserDefaults.standard.removeObject(forKey: DesktopWidgetPreferences.widgetStyleKey)
+        }
+
+        let view = BatteryHubSettingsView(
+            snapshots: [
+                makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+                makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 24),
+                makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18),
+            ],
+            onRefresh: {},
+            initialPane: .dashboard
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-dashboard-settings-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testStatusMenuViewPreviewRenderProducesNonBlankImage() throws {
+        UserDefaults.standard.set(StatusWindowStyle.native.rawValue, forKey: StatusWindowPreferences.styleKey)
+        defer { UserDefaults.standard.removeObject(forKey: StatusWindowPreferences.styleKey) }
+
+        let addr = "AA-BB-CC-DD-EE-FF"
+        let now = Date()
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "mac", displayName: "MacBook Pro", kind: .macBook, percent: nil, source: .macPowerSource, updatedAt: now),
+            makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 82, updatedAt: now),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
+            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .iCloud, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Isaac's AirPods Pro Case", kind: .airPods, percent: 90, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Isaac's AirPods Pro Left", kind: .airPods, percent: 72, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Isaac's AirPods Pro Right", kind: .airPods, percent: 68, updatedAt: now),
+        ]
+
+        let view = StatusMenuView(snapshots: snapshots, onRefresh: {})
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 386, height: 430)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-status-menu-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
+    }
+
+    @MainActor
+    func testStatusMenuViewRefreshingRenderProducesNonBlankImage() throws {
+        UserDefaults.standard.set(StatusWindowStyle.native.rawValue, forKey: StatusWindowPreferences.styleKey)
+        defer { UserDefaults.standard.removeObject(forKey: StatusWindowPreferences.styleKey) }
+
+        let view = StatusMenuView(
+            snapshots: [],
+            isRefreshing: true,
+            onRefresh: {}
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 386, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-status-menu-refreshing-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 18_000)
+    }
+
+    @MainActor
+    func testStatusMenuViewPreviewDataModeRenderProducesNonBlankImage() throws {
+        UserDefaults.standard.set(StatusWindowStyle.native.rawValue, forKey: StatusWindowPreferences.styleKey)
+        defer { UserDefaults.standard.removeObject(forKey: StatusWindowPreferences.styleKey) }
+
+        let now = Date()
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+        ]
+
+        let view = StatusMenuView(
+            snapshots: snapshots,
+            isPreviewingData: true,
+            onRefresh: {}
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 386, height: 370)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-status-menu-preview-data-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 18_000)
+    }
+
+    @MainActor
+    func testStatusMenuSettingsPreviewRenderProducesNonBlankImage() throws {
+        let now = Date()
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+        ]
+
+        let view = StatusMenuView(
+            snapshots: snapshots,
+            onRefresh: {},
+            initiallyShowingSettings: true,
+            initialDisplayPreferences: DeviceDisplayPreferences(
+                pinnedDeviceIDs: ["keyboard"],
+                hiddenDeviceIDs: ["mouse"]
+            ),
+            initialSelectedDeviceConfiguration: SelectedDeviceConfiguration(
+                id: "keyboard",
+                displayName: "Magic Keyboard",
+                kind: .keyboard
+            )
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 430, height: 980)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-status-menu-settings-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
+    }
+
+    @MainActor
+    func testBatteryHubSettingsWindowRenderProducesNonBlankImage() throws {
+        let addr = "AA-BB-CC-DD-EE-FF"
+        let now = Date()
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
+            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 100, chargeState: .full, source: .iCloud, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Isaac's AirPods Pro Case", kind: .airPods, percent: 90, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Isaac's AirPods Pro Left", kind: .airPods, percent: 72, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Isaac's AirPods Pro Right", kind: .airPods, percent: 68, updatedAt: now),
+        ]
+
+        let view = BatteryHubSettingsView(snapshots: snapshots, onRefresh: {})
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-settings-window-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBatteryHubSettingsWindowRefreshingRenderProducesNonBlankImage() throws {
+        let view = BatteryHubSettingsView(
+            snapshots: [
+                makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+                makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31),
+            ],
+            isRefreshing: true,
+            onRefresh: {}
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-settings-refreshing-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBatteryHubSettingsWindowCanRenderAirPodsAudioControls() throws {
+        let addr = "AA-BB-CC-DD-EE-FF"
+        let now = Date()
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Isaac's AirPods Pro Case", kind: .airPods, percent: 90, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Isaac's AirPods Pro Left", kind: .airPods, percent: 72, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Isaac's AirPods Pro Right", kind: .airPods, percent: 68, updatedAt: now),
+        ]
+
+        AirPodsAudioPreferences(
+            listeningMode: .transparency,
+            microphone: .right
+        )
+        .save(for: addr)
+        defer {
+            AirPodsAudioPreferences.reset(for: addr)
+        }
+
+        let view = BatteryHubSettingsView(
+            snapshots: snapshots,
+            onRefresh: {},
+            initialPane: .devices,
+            initialSelectedDeviceID: addr
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-airpods-settings-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBatteryHubSettingsWindowCanRenderInitialSelectedDevice() throws {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(
+                deviceID: "bluetooth-20-C1-9B-AA-BB-CC",
+                displayName: "Magic Mouse",
+                kind: .mouse,
+                percent: nil,
+                connectionState: .disconnected
+            ),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18),
+        ]
+
+        let view = BatteryHubSettingsView(
+            snapshots: snapshots,
+            onRefresh: {},
+            initialPane: .devices,
+            initialSelectedDeviceID: "bluetooth-20-C1-9B-AA-BB-CC"
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-settings-selected-device-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBatteryHubAlertsCanRenderInitialSelectedDeviceOverrides() throws {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18),
+        ]
+
+        let view = BatteryHubSettingsView(
+            snapshots: snapshots,
+            onRefresh: {},
+            initialPane: .alerts,
+            initialSelectedDeviceID: "watch"
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-alerts-selected-device-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testAddDeviceGuideRenderProducesNonBlankImage() throws {
+        let view = AddDeviceGuideView(onOpenBluetoothSettings: {}, onDismiss: {})
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 520, height: 330)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-add-device-guide-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
+    }
+
+    @MainActor
+    func testBatteryActionHUDRenderProducesNonBlankImage() throws {
+        let view = BatteryActionHUDView(
+            event: BatteryAlertEvent(
+                kind: .lowBattery,
+                deviceID: "watch",
+                displayName: "Apple Watch",
+                percent: 18
+            )
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 520, height: 92)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-action-hud-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 12_000)
+    }
+
+    @MainActor
+    func testBatteryHubActionHUDSettingsRenderProducesNonBlankImage() throws {
+        let view = BatteryHubSettingsView(
+            snapshots: [
+                makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18)
+            ],
+            onRefresh: {},
+            initialPane: .actionHUD
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-action-hud-settings-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBatteryHubQuickActionsSettingsRenderProducesNonBlankImage() throws {
+        let view = BatteryHubSettingsView(
+            snapshots: [],
+            onRefresh: {},
+            initialPane: .quickActions
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-quick-actions-settings-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
     }
 }
