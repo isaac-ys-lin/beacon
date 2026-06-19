@@ -546,34 +546,16 @@ enum MenuBarBatteryFormatter {
 
 private enum BluetoothStatusIconImage {
     static func make() -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
-            let path = NSBezierPath()
-            path.lineWidth = 2.2
-            path.lineCapStyle = .round
-            path.lineJoinStyle = .round
+        let symbolName = resolveSymbol(
+            "antenna.radiowaves.left.and.right",
+            fallback: "dot.radiowaves.left.and.right"
+        )
+        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "BatteryHub")?
+            .withSymbolConfiguration(configuration)
+            ?? NSImage(size: NSSize(width: 18, height: 18))
 
-            let midX = rect.midX - 0.1
-            let top = rect.maxY - 1.45
-            let bottom = rect.minY + 1.45
-            let upper = rect.midY + 3.45
-            let lower = rect.midY - 3.45
-            let right = rect.maxX - 2.65
-            let left = rect.minX + 3.75
-
-            path.move(to: NSPoint(x: midX, y: top))
-            path.line(to: NSPoint(x: right, y: upper))
-            path.line(to: NSPoint(x: midX, y: rect.midY))
-            path.line(to: NSPoint(x: right, y: lower))
-            path.line(to: NSPoint(x: midX, y: bottom))
-            path.line(to: NSPoint(x: midX, y: top))
-            path.move(to: NSPoint(x: left, y: upper))
-            path.line(to: NSPoint(x: midX, y: rect.midY))
-            path.line(to: NSPoint(x: left, y: lower))
-
-            NSColor.black.setStroke()
-            path.stroke()
-            return true
-        }
+        image.size = NSSize(width: 18, height: 18)
         image.isTemplate = true
         image.accessibilityDescription = "BatteryHub"
         return image

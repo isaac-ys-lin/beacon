@@ -16,28 +16,17 @@ struct BluetoothLogoMark: View {
     var size: CGFloat = 28
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+        let symbolName = resolveSymbol(
+            "antenna.radiowaves.left.and.right",
+            fallback: "dot.radiowaves.left.and.right"
+        )
 
-        ZStack {
-            shape
-                .fill(.regularMaterial)
-                .overlay {
-                    shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
-                }
-
-            BluetoothGlyphShape()
-                .stroke(
-                    Color.primary.opacity(0.62),
-                    style: StrokeStyle(
-                        lineWidth: max(1.1, size * 0.068),
-                        lineCap: .round,
-                        lineJoin: .round
-                    )
-                )
-                .padding(size * 0.25)
-        }
+        Image(systemName: symbolName)
+            .font(.system(size: max(15, size * 0.70), weight: .regular))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(Color.primary.opacity(0.68))
+            .frame(width: size, height: size)
         .frame(width: size, height: size)
-        .ifAvailableGlass(shape: shape)
         .accessibilityLabel("Bluetooth")
     }
 }
@@ -46,63 +35,13 @@ struct SettingsLogoMark: View {
     var size: CGFloat = 22
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-
-        ZStack {
-            shape
-                .fill(.regularMaterial)
-                .overlay {
-                    shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
-                }
-
-            Image(systemName: resolveSymbol("gearshape.2.fill", fallback: "gearshape.fill"))
-                .font(.system(size: max(12, size * 0.52), weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.primary.opacity(0.62))
-        }
+        Image(systemName: resolveSymbol("gearshape.2.fill", fallback: "gearshape.fill"))
+            .font(.system(size: max(12, size * 0.52), weight: .medium))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(Color.primary.opacity(0.62))
+            .frame(width: size, height: size)
         .frame(width: size, height: size)
-        .ifAvailableGlass(shape: shape)
         .accessibilityLabel("Settings")
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func ifAvailableGlass<S: Shape>(shape: S) -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular, in: shape)
-        } else {
-            self
-        }
-    }
-}
-
-private struct BluetoothGlyphShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let midX = rect.midX
-        let midY = rect.midY
-        let topY = rect.minY + rect.height * 0.03
-        let bottomY = rect.maxY - rect.height * 0.03
-        let leftX = rect.minX + rect.width * 0.06
-        let rightX = rect.maxX - rect.width * 0.08
-        let upperY = rect.minY + rect.height * 0.30
-        let lowerY = rect.maxY - rect.height * 0.30
-
-        var path = Path()
-        path.move(to: CGPoint(x: midX, y: topY))
-        path.addLine(to: CGPoint(x: midX, y: bottomY))
-
-        path.move(to: CGPoint(x: midX, y: topY))
-        path.addLine(to: CGPoint(x: rightX, y: upperY))
-        path.addLine(to: CGPoint(x: midX, y: midY))
-        path.addLine(to: CGPoint(x: leftX, y: upperY))
-
-        path.move(to: CGPoint(x: midX, y: bottomY))
-        path.addLine(to: CGPoint(x: rightX, y: lowerY))
-        path.addLine(to: CGPoint(x: midX, y: midY))
-        path.addLine(to: CGPoint(x: leftX, y: lowerY))
-
-        return path
     }
 }
 
@@ -214,15 +153,7 @@ struct DeviceIconPlate: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
-
         ZStack {
-            shape
-                .fill(.regularMaterial)
-                .overlay(
-                    shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
-                )
-
             Image(systemName: symbolName)
                 .font(.system(size: max(12, size * 0.54), weight: .medium))
                 .symbolRenderingMode(.hierarchical)
@@ -245,7 +176,6 @@ struct DeviceIconPlate: View {
             }
         }
         .frame(width: size, height: size)
-        .ifAvailableGlass(shape: shape)
     }
 }
 
