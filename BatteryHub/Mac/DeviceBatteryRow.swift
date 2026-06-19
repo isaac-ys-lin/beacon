@@ -12,16 +12,29 @@ func resolveSymbol(_ symbol: String, fallback: String) -> String {
     return symbol
 }
 
+enum BatteryHubSymbols {
+    static var bluetooth: String {
+        resolveSymbol(
+            "antenna.radiowaves.left.and.right",
+            fallback: "dot.radiowaves.left.and.right"
+        )
+    }
+
+    static func resolved(_ systemImage: String, fallback: String = "circle") -> String {
+        switch systemImage {
+        case "antenna.radiowaves.left.and.right", "dot.radiowaves.left.and.right":
+            return bluetooth
+        default:
+            return resolveSymbol(systemImage, fallback: fallback)
+        }
+    }
+}
+
 struct BluetoothLogoMark: View {
     var size: CGFloat = 28
 
     var body: some View {
-        let symbolName = resolveSymbol(
-            "antenna.radiowaves.left.and.right",
-            fallback: "dot.radiowaves.left.and.right"
-        )
-
-        Image(systemName: symbolName)
+        Image(systemName: BatteryHubSymbols.bluetooth)
             .font(.system(size: max(15, size * 0.70), weight: .regular))
             .symbolRenderingMode(.monochrome)
             .foregroundStyle(Color.primary.opacity(0.68))
@@ -64,7 +77,7 @@ func deviceSymbolName(for kind: DeviceKind, displayName: String = "") -> String 
     case .trackpad:
         return resolveSymbol("rectangle.and.hand.point.up.left", fallback: "rectangle")
     case .bluetoothPeripheral:
-        return resolveSymbol("antenna.radiowaves.left.and.right", fallback: "dot.radiowaves.left.and.right")
+        return BatteryHubSymbols.bluetooth
     }
 }
 
@@ -115,11 +128,11 @@ enum DeviceIconBadge: Equatable {
 
     var symbolName: String {
         switch self {
-        case .connected: return "checkmark"
-        case .charging: return "bolt.fill"
-        case .low: return "exclamationmark"
-        case .stale: return "clock"
-        case .disconnected: return "xmark"
+        case .connected: return "checkmark.circle.fill"
+        case .charging: return "bolt.circle.fill"
+        case .low: return "exclamationmark.circle.fill"
+        case .stale: return "clock.badge.exclamationmark"
+        case .disconnected: return "xmark.circle.fill"
         }
     }
 
@@ -162,17 +175,12 @@ struct DeviceIconPlate: View {
                 .accessibilityHidden(true)
 
             if let badge {
-                ZStack {
-                    Circle()
-                        .fill(badge.color)
-                    Image(systemName: badge.symbolName)
-                        .font(.system(size: max(6, size * 0.18), weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: max(12, size * 0.36), height: max(12, size * 0.36))
-                .overlay(Circle().stroke(.white.opacity(0.78), lineWidth: 0.8))
-                .shadow(color: badge.color.opacity(0.25), radius: 3, x: 0, y: 1)
-                .offset(x: size * 0.34, y: -size * 0.34)
+                Image(systemName: resolveSymbol(badge.symbolName, fallback: "circle.fill"))
+                    .font(.system(size: max(9, size * 0.27), weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(badge.color)
+                    .frame(width: max(13, size * 0.36), height: max(13, size * 0.36))
+                    .offset(x: size * 0.31, y: -size * 0.31)
             }
         }
         .frame(width: size, height: size)

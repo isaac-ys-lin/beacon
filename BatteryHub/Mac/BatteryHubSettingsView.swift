@@ -740,25 +740,18 @@ struct BatteryHubSettingsView: View {
     }
 
     private func deviceDetail(for row: DeviceInspectorItem) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .center, spacing: 14) {
-                Image(systemName: deviceSymbolName(for: row.kind, displayName: row.displayName))
-                    .font(.system(size: 34, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(detailIconColor(for: row))
-                    .frame(width: 52, height: 52)
-                    .overlay(alignment: .bottomTrailing) {
-                        if let badge = detailIconBadge(for: row) {
-                            Image(systemName: badge.symbolName)
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(badge.color)
-                                .offset(x: 2, y: 1)
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                DeviceIconPlate(
+                    symbolName: deviceSymbolName(for: row.kind, displayName: row.displayName),
+                    color: detailIconColor(for: row),
+                    size: 36,
+                    badge: detailIconBadge(for: row)
+                )
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(row.displayName)
-                        .font(DesignTokens.Typography.popoverTitle)
+                        .font(DesignTokens.Typography.sectionTitle)
                         .lineLimit(1)
                     Text(detailSubtitle(for: row))
                         .font(DesignTokens.Typography.caption)
@@ -868,7 +861,7 @@ struct BatteryHubSettingsView: View {
                                 _ = BluetoothDeviceController.connect(deviceID: row.id)
                                 onRefresh()
                             } label: {
-                                Label("Connect Device", systemImage: "dot.radiowaves.left.and.right")
+                                Label("Connect Device", systemImage: BatteryHubSymbols.bluetooth)
                             }
                         }
 
@@ -1363,7 +1356,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
 
     var systemImage: String {
         switch self {
-        case .devices: return "dot.radiowaves.left.and.right"
+        case .devices: return BatteryHubSymbols.bluetooth
         case .alerts: return "bell.badge"
         case .actionHUD: return "sparkles"
         case .quickActions: return "keyboard"
@@ -1378,7 +1371,7 @@ private struct QuickActionSettingsRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: action.systemImage)
+            Image(systemName: BatteryHubSymbols.resolved(action.systemImage))
                 .font(.system(size: 15, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(iconColor)
@@ -1449,7 +1442,7 @@ private struct AutomationShortcutsBanner: View {
         ("Battery Summary", "list.bullet.rectangle"),
         ("Lowest Battery", "battery.25"),
         ("Low List", "exclamationmark.triangle"),
-        ("Connect", "dot.radiowaves.left.and.right"),
+        ("Connect", BatteryHubSymbols.bluetooth),
         ("Disconnect", "bolt.horizontal.circle")
     ]
 
@@ -1612,7 +1605,7 @@ private struct AirPodsAudioControlsCard: View {
                 Button {
                     onOpenBluetoothSettings()
                 } label: {
-                    Label("Bluetooth", systemImage: "dot.radiowaves.left.and.right")
+                    Label("Bluetooth", systemImage: BatteryHubSymbols.bluetooth)
                 }
 
                 Spacer()
@@ -1753,7 +1746,7 @@ private struct DeviceCurrentStatsCard: View {
                 SettingsInfoRow(
                     title: "Source",
                     value: sourceText,
-                    systemImage: "antenna.radiowaves.left.and.right",
+                    systemImage: BatteryHubSymbols.bluetooth,
                     color: DesignTokens.Palette.accent
                 )
 

@@ -393,7 +393,7 @@ struct StatusMenuView: View {
             BluetoothLogoMark(size: 30)
 
             Text("Bluetooth")
-                .font(DesignTokens.Typography.popoverTitle)
+                .font(DesignTokens.Typography.nativePopoverTitle)
                 .foregroundStyle(DesignTokens.Palette.text)
                 .lineLimit(1)
 
@@ -431,7 +431,7 @@ struct StatusMenuView: View {
                     .symbolRenderingMode(.hierarchical)
 
                 Text("On")
-                    .font(DesignTokens.Typography.captionEmphasis)
+                    .font(DesignTokens.Typography.nativePopoverPill)
                     .lineLimit(1)
             }
             .foregroundStyle(DesignTokens.Palette.accent)
@@ -506,10 +506,10 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("No reporting devices")
-                        .font(DesignTokens.Typography.rowTitleEmphasis)
+                        .font(DesignTokens.Typography.nativePopoverRowTitle)
                         .foregroundStyle(DesignTokens.Palette.text)
                     Text(isRefreshing ? "Scanning connected devices now." : "No connected devices are reporting battery levels.")
-                        .font(DesignTokens.Typography.caption)
+                        .font(DesignTokens.Typography.nativePopoverRowSubtitle)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -534,7 +534,7 @@ struct StatusMenuView: View {
                 onOpenSettings(.devices, nil)
             }
 
-            NativeFooterButton(title: "Bluetooth Settings...", systemImage: "dot.radiowaves.left.and.right", usesBluetoothLogo: true) {
+            NativeFooterButton(title: "Bluetooth Settings...", systemImage: BatteryHubSymbols.bluetooth, usesBluetoothLogo: true) {
                 BatteryHubSystemSettingsActions.openBluetoothSettings()
             }
         }
@@ -695,7 +695,7 @@ struct StatusMenuView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            Image(systemName: "dot.radiowaves.left.and.right")
+            Image(systemName: BatteryHubSymbols.bluetooth)
                 .font(.system(size: 24, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
@@ -718,7 +718,7 @@ struct StatusMenuView: View {
                 Button {
                     BatteryHubSystemSettingsActions.openBluetoothSettings()
                 } label: {
-                    Label("Bluetooth", systemImage: "dot.radiowaves.left.and.right")
+                    Label("Bluetooth", systemImage: BatteryHubSymbols.bluetooth)
                 }
             }
             .buttonStyle(StatusMenuPillButtonStyle())
@@ -1361,7 +1361,7 @@ struct StatusMenuView: View {
             Button {
                 handleDeviceContextAction(action, item: item)
             } label: {
-                Label(action.title(for: displayName), systemImage: resolveSymbol(action.systemImage, fallback: "circle"))
+                Label(action.title(for: displayName), systemImage: BatteryHubSymbols.resolved(action.systemImage))
             }
             .disabled(!action.isEnabled(for: item))
         }
@@ -1412,79 +1412,24 @@ struct StatusWindowPreview: View {
                     .foregroundStyle(DesignTokens.Palette.accent)
             }
 
-            HStack(spacing: 6) {
-                Image(systemName: "dot.radiowaves.left.and.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(DesignTokens.Palette.accent)
-                if showsMenuBarBattery {
-                    Text("42%")
-                        .font(DesignTokens.Typography.caption2Emphasis)
-                        .monospacedDigit()
-                        .foregroundStyle(DesignTokens.Palette.text)
-                }
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 18)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(DesignTokens.Palette.controlPill)
-            )
+            previewMenuBarItem
 
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
+                previewHeader
+
                 if style != .native && showsBatteryOverview {
-                    HStack(spacing: 5) {
-                        ForEach(0..<4, id: \.self) { index in
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(index == 0 ? DesignTokens.Palette.healthy.opacity(0.74) : DesignTokens.Palette.secondaryText.opacity(0.24))
-                                .frame(height: 18)
-                        }
-                    }
+                    previewOverview
                 }
 
                 if style != .native && showsAirPodsCard {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(DesignTokens.Palette.accent.opacity(0.20))
-                        .overlay(
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(DesignTokens.Palette.accent.opacity(0.58))
-                                    .frame(width: 20, height: 20)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Capsule()
-                                        .fill(DesignTokens.Palette.text.opacity(0.48))
-                                        .frame(width: 86, height: 5)
-                                    Capsule()
-                                        .fill(DesignTokens.Palette.secondaryText.opacity(0.38))
-                                        .frame(width: 58, height: 4)
-                                }
-                                Spacer()
-                            }
-                            .padding(.horizontal, 10)
-                        )
-                        .frame(height: 42)
+                    previewRow(symbolName: resolveSymbol("airpodspro", fallback: "airpods"), title: "AirPods Pro", value: "61%")
                 }
 
                 ForEach(0..<rowCount, id: \.self) { index in
-                    HStack(spacing: 8) {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(DesignTokens.Palette.secondaryText.opacity(0.30))
-                            .frame(width: 18, height: 18)
-
-                        Capsule()
-                            .fill(DesignTokens.Palette.text.opacity(0.42))
-                            .frame(width: index == 1 ? 112 : 88, height: 5)
-
-                        Spacer()
-
-                        Capsule()
-                            .fill(DesignTokens.Palette.healthy.opacity(0.74))
-                            .frame(width: 28, height: 8)
-                    }
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(DesignTokens.Palette.controlPill)
+                    previewRow(
+                        symbolName: previewRowSymbolName(for: index),
+                        title: previewRowTitle(for: index),
+                        value: previewRowValue(for: index)
                     )
                 }
             }
@@ -1501,6 +1446,121 @@ struct StatusWindowPreview: View {
         case .native: return 2
         case .large: return 3
         case .compact: return 2
+        }
+    }
+
+    private var previewMenuBarItem: some View {
+        HStack(spacing: 5) {
+            BluetoothLogoMark(size: 14)
+
+            if showsMenuBarBattery {
+                Text("42%")
+                    .font(DesignTokens.Typography.caption2Emphasis)
+                    .monospacedDigit()
+                    .foregroundStyle(DesignTokens.Palette.text)
+            }
+        }
+        .padding(.horizontal, 7)
+        .frame(height: 20)
+        .background(
+            Capsule(style: .continuous)
+                .fill(DesignTokens.Palette.controlPill)
+        )
+    }
+
+    private var previewHeader: some View {
+        HStack(spacing: 8) {
+            BluetoothLogoMark(size: 20)
+            Text("Bluetooth")
+                .font(DesignTokens.Typography.nativePopoverRowTitle)
+                .foregroundStyle(DesignTokens.Palette.text)
+            Spacer()
+            Text("On")
+                .font(DesignTokens.Typography.nativePopoverPill)
+                .foregroundStyle(DesignTokens.Palette.accent)
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 30)
+        .background(
+            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
+                .fill(DesignTokens.Palette.controlPill)
+        )
+    }
+
+    private var previewOverview: some View {
+        HStack(spacing: 6) {
+            previewMetric("4", "Devices", color: DesignTokens.Palette.accent)
+            previewMetric("1", "Low", color: DesignTokens.Palette.critical)
+        }
+    }
+
+    private func previewMetric(_ value: String, _ title: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(DesignTokens.Typography.nativePopoverPercent)
+                .monospacedDigit()
+                .foregroundStyle(color)
+            Text(title)
+                .font(DesignTokens.Typography.caption2)
+                .foregroundStyle(DesignTokens.Palette.secondaryText)
+        }
+        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
+                .fill(DesignTokens.Palette.controlPill)
+        )
+    }
+
+    private func previewRow(symbolName: String, title: String, value: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbolName)
+                .font(.system(size: 14, weight: .regular))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Color.primary.opacity(0.58))
+                .frame(width: 20, height: 20)
+
+            Text(title)
+                .font(DesignTokens.Typography.nativePopoverRowSubtitle)
+                .foregroundStyle(DesignTokens.Palette.text)
+                .lineLimit(1)
+
+            Spacer()
+
+            Text(value)
+                .font(DesignTokens.Typography.nativePopoverRowSubtitle)
+                .monospacedDigit()
+                .foregroundStyle(DesignTokens.Palette.secondaryText)
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 28)
+        .background(
+            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
+                .fill(DesignTokens.Palette.controlPill)
+        )
+    }
+
+    private func previewRowSymbolName(for index: Int) -> String {
+        switch index {
+        case 0: return resolveSymbol("keyboard", fallback: "rectangle.grid.3x2")
+        case 1: return resolveSymbol("magicmouse", fallback: "cursorarrow")
+        default: return resolveSymbol("applewatch", fallback: "watch.analog")
+        }
+    }
+
+    private func previewRowTitle(for index: Int) -> String {
+        switch index {
+        case 0: return "Keyboard"
+        case 1: return "Mouse"
+        default: return "Watch"
+        }
+    }
+
+    private func previewRowValue(for index: Int) -> String {
+        switch index {
+        case 0: return "82%"
+        case 1: return "42%"
+        default: return "18%"
         }
     }
 }
@@ -1522,7 +1582,7 @@ private struct NativeStatusRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 5) {
                     Text(item.displayName)
-                        .font(DesignTokens.Typography.rowTitle)
+                        .font(DesignTokens.Typography.nativePopoverRowTitle)
                         .foregroundStyle(DesignTokens.Palette.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
@@ -1536,7 +1596,7 @@ private struct NativeStatusRow: View {
 
                 if let statusText {
                     Text(statusText)
-                        .font(DesignTokens.Typography.caption2)
+                        .font(DesignTokens.Typography.nativePopoverRowSubtitle)
                         .foregroundStyle(statusColor)
                         .lineLimit(1)
                 }
@@ -1547,7 +1607,7 @@ private struct NativeStatusRow: View {
             if let percent {
                 HStack(spacing: 5) {
                     Text("\(percent)%")
-                        .font(DesignTokens.Typography.percent)
+                        .font(DesignTokens.Typography.nativePopoverPercent)
                         .foregroundStyle(statusColor)
                         .monospacedDigit()
                         .lineLimit(1)
@@ -1695,7 +1755,7 @@ private struct NativeFooterButton: View {
                 }
 
                 Text(title)
-                    .font(DesignTokens.Typography.rowTitle)
+                    .font(DesignTokens.Typography.nativePopoverFooter)
                     .foregroundStyle(DesignTokens.Palette.text)
                     .lineLimit(1)
 
@@ -2127,7 +2187,7 @@ private struct DeviceSectionCard: View {
             Button {
                 onAction(action, item)
             } label: {
-                Label(action.title(for: displayName), systemImage: resolveSymbol(action.systemImage, fallback: "circle"))
+                Label(action.title(for: displayName), systemImage: BatteryHubSymbols.resolved(action.systemImage))
             }
             .disabled(!action.isEnabled(for: item))
         }

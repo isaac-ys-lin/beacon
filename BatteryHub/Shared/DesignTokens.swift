@@ -39,6 +39,13 @@ public enum DesignTokens {
         public static let percentEmphasis: Font = .body.weight(.semibold)
         public static let percentSmall: Font = .callout.weight(.semibold)
         public static let percentLarge: Font = .title2.weight(.semibold)
+
+        public static let nativePopoverTitle: Font = .title3.weight(.semibold)
+        public static let nativePopoverRowTitle: Font = .body.weight(.regular)
+        public static let nativePopoverRowSubtitle: Font = .caption.weight(.regular)
+        public static let nativePopoverFooter: Font = .body.weight(.regular)
+        public static let nativePopoverPercent: Font = .body.weight(.semibold)
+        public static let nativePopoverPill: Font = .caption.weight(.medium)
     }
 
     public enum Palette {

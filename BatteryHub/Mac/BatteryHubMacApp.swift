@@ -546,10 +546,7 @@ enum MenuBarBatteryFormatter {
 
 private enum BluetoothStatusIconImage {
     static func make() -> NSImage {
-        let symbolName = resolveSymbol(
-            "antenna.radiowaves.left.and.right",
-            fallback: "dot.radiowaves.left.and.right"
-        )
+        let symbolName = BatteryHubSymbols.bluetooth
         let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
         let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "BatteryHub")?
             .withSymbolConfiguration(configuration)
