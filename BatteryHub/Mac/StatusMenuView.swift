@@ -32,7 +32,7 @@ private struct UtilityIconButtonStyle: ButtonStyle {
 private struct StatusMenuPillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .semibold))
+            .font(DesignTokens.Typography.captionEmphasis)
             .foregroundStyle(DesignTokens.Palette.text)
             .padding(.horizontal, 10)
             .frame(height: 28)
@@ -62,7 +62,7 @@ private struct StatusMenuPill: View {
             Image(systemName: resolveSymbol(systemImage, fallback: "circle.fill"))
                 .symbolRenderingMode(.hierarchical)
         }
-        .font(.system(size: 11, weight: .semibold, design: .rounded))
+        .font(DesignTokens.Typography.captionEmphasis)
         .foregroundStyle(color)
         .padding(.horizontal, 9)
         .frame(height: 24)
@@ -393,7 +393,7 @@ struct StatusMenuView: View {
             BluetoothLogoMark(size: 30)
 
             Text("Bluetooth")
-                .font(.system(size: 20, weight: .semibold))
+                .font(DesignTokens.Typography.popoverTitle)
                 .foregroundStyle(DesignTokens.Palette.text)
                 .lineLimit(1)
 
@@ -431,7 +431,7 @@ struct StatusMenuView: View {
                     .symbolRenderingMode(.hierarchical)
 
                 Text("On")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .lineLimit(1)
             }
             .foregroundStyle(DesignTokens.Palette.accent)
@@ -458,11 +458,11 @@ struct StatusMenuView: View {
                 .foregroundStyle(DesignTokens.Palette.warning)
 
             Text("Preview data")
-                .font(.system(size: 12, weight: .semibold))
+                .font(DesignTokens.Typography.captionEmphasis)
                 .foregroundStyle(DesignTokens.Palette.text)
 
             Text("Sample devices, not live Bluetooth.")
-                .font(.system(size: 11, weight: .medium))
+                .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                 .lineLimit(1)
         }
@@ -506,10 +506,10 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("No reporting devices")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(DesignTokens.Typography.rowTitleEmphasis)
                         .foregroundStyle(DesignTokens.Palette.text)
                     Text(isRefreshing ? "Scanning connected devices now." : "No connected devices are reporting battery levels.")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -526,7 +526,11 @@ struct StatusMenuView: View {
                 .overlay(NativeMacStyle.subtleStroke)
                 .padding(.horizontal, 16)
 
-            NativeFooterButton(title: "BatteryHub Settings...", systemImage: "gearshape") {
+            NativeFooterButton(
+                title: "BatteryHub Settings...",
+                systemImage: resolveSymbol("gearshape.2.fill", fallback: "gearshape"),
+                usesSettingsLogo: true
+            ) {
                 onOpenSettings(.devices, nil)
             }
 
@@ -639,11 +643,11 @@ struct StatusMenuView: View {
         HStack(alignment: .center, spacing: DesignTokens.Spacing.md) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Your Devices")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.popoverTitle)
                     .foregroundStyle(DesignTokens.Palette.accent)
 
                 Text(headerStatusText)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .monospacedDigit()
             }
@@ -675,7 +679,7 @@ struct StatusMenuView: View {
                         onOpenSettings(.devices, nil)
                     }
                 } label: {
-                    Image(systemName: isShowingSettings ? "xmark.circle" : "gearshape")
+                    Image(systemName: isShowingSettings ? "xmark.circle" : resolveSymbol("gearshape.2.fill", fallback: "gearshape"))
                         .font(.system(size: 20, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                         .frame(width: 30, height: 30)
@@ -698,9 +702,9 @@ struct StatusMenuView: View {
                 .padding(.bottom, 4)
 
             Text("No reporting devices")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(DesignTokens.Typography.rowTitleEmphasis)
             Text(isRefreshing ? "Scanning connected, paired, and synced devices now." : "Currently no connected devices are reporting battery levels.")
-                .font(.system(size: 12))
+                .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -708,7 +712,7 @@ struct StatusMenuView: View {
                 Button {
                     onOpenSettings(.devices, nil)
                 } label: {
-                    Label("Settings", systemImage: "gearshape")
+                    Label("Settings", systemImage: resolveSymbol("gearshape.2.fill", fallback: "gearshape"))
                 }
 
                 Button {
@@ -734,11 +738,11 @@ struct StatusMenuView: View {
                 .foregroundStyle(DesignTokens.Palette.warning)
 
             Text("Preview data")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(DesignTokens.Typography.captionEmphasis)
                 .foregroundStyle(DesignTokens.Palette.text)
 
             Text("Sample devices, not live Bluetooth.")
-                .font(.system(size: 10, weight: .medium))
+                .font(DesignTokens.Typography.caption2)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
@@ -807,11 +811,11 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Status Window")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.sectionTitle)
                         .foregroundStyle(DesignTokens.Palette.text)
 
                     Text("Choose how much detail opens from the menu bar.")
-                        .font(.system(size: 11, weight: .regular))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
             }
@@ -826,7 +830,7 @@ struct StatusMenuView: View {
             Toggle(isOn: $showAirPodsStatusCard) {
                 Label {
                     Text("Show AirPods status card")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DesignTokens.Typography.controlLabel)
                 } icon: {
                     Image(systemName: resolveSymbol("airpodspro", fallback: "airpods"))
                         .symbolRenderingMode(.hierarchical)
@@ -839,7 +843,7 @@ struct StatusMenuView: View {
             Toggle(isOn: $showMenuBarBattery) {
                 Label {
                     Text("Show battery in menu bar")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DesignTokens.Typography.controlLabel)
                 } icon: {
                     Image(systemName: resolveSymbol("battery.100", fallback: "battery.25"))
                         .symbolRenderingMode(.hierarchical)
@@ -850,7 +854,7 @@ struct StatusMenuView: View {
             Toggle(isOn: $showBatteryOverview) {
                 Label {
                     Text("Show battery overview")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DesignTokens.Typography.controlLabel)
                 } icon: {
                     Image(systemName: resolveSymbol("rectangle.and.hand.point.up.left", fallback: "rectangle"))
                         .symbolRenderingMode(.hierarchical)
@@ -888,11 +892,11 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Battery Alerts")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.sectionTitle)
                         .foregroundStyle(DesignTokens.Palette.text)
 
                     Text("Notify when devices are low or done charging.")
-                        .font(.system(size: 11, weight: .regular))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -924,9 +928,9 @@ struct StatusMenuView: View {
             HStack(alignment: .center, spacing: DesignTokens.Spacing.md) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Low battery")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.controlLabelEmphasis)
                     Text("Warn before a device becomes unavailable.")
-                        .font(.system(size: 11))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -940,10 +944,10 @@ struct StatusMenuView: View {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                 HStack {
                     Text("Alert threshold")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(DesignTokens.Typography.controlLabel)
                     Spacer()
                     Text("\(clampedLowBatteryThreshold)%")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(DesignTokens.Typography.percentSmall)
                         .foregroundStyle(DesignTokens.Palette.accent)
                 }
 
@@ -968,9 +972,9 @@ struct StatusMenuView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Charged alerts")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.controlLabelEmphasis)
                 Text("Allow device-specific alerts when charging finishes.")
-                    .font(.system(size: 11))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1003,9 +1007,9 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Low battery preview")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.controlLabelEmphasis)
                     Text("Apple Watch reaches \(clampedLowBatteryThreshold)%")
-                        .font(.system(size: 11))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -1031,9 +1035,9 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Charged preview")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.controlLabelEmphasis)
                     Text("iPhone finishes charging")
-                        .font(.system(size: 11))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -1065,10 +1069,10 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(selection.displayName)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.controlLabelEmphasis)
                         .lineLimit(1)
                     Text(deviceAlertSubtitle(for: selection.id))
-                        .font(.system(size: 11, weight: .medium))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -1078,10 +1082,10 @@ struct StatusMenuView: View {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                 HStack {
                     Text("Device low-battery threshold")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DesignTokens.Typography.caption)
                     Spacer()
                     Text("\(Int(selectedDeviceAlertThreshold))%")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(DesignTokens.Typography.percentSmall)
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Palette.accent)
                 }
@@ -1114,9 +1118,9 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Notify when charged")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.captionEmphasis)
                     Text("Best for devices that keep reporting while charging.")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -1134,7 +1138,7 @@ struct StatusMenuView: View {
                     LowBatteryNotifier.resetThreshold(forDeviceID: selection.id)
                     selectedDeviceAlertThreshold = Double(clampedLowBatteryThreshold)
                 }
-                .font(.system(size: 11, weight: .semibold))
+                .font(DesignTokens.Typography.captionEmphasis)
                 .disabled(!LowBatteryNotifier.hasCustomThreshold(forDeviceID: selection.id))
 
                 Spacer()
@@ -1178,11 +1182,11 @@ struct StatusMenuView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Device Controls")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.sectionTitle)
                         .foregroundStyle(DesignTokens.Palette.text)
 
                     Text("Pinned devices stay at the top. Removed devices stay hidden until restored.")
-                        .font(.system(size: 11, weight: .regular))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1212,7 +1216,7 @@ struct StatusMenuView: View {
                 } label: {
                     Label("Restore Hidden Devices", systemImage: "arrow.uturn.backward")
                 }
-                .font(.system(size: 12, weight: .semibold))
+                .font(DesignTokens.Typography.captionEmphasis)
             }
         }
         .padding(18)
@@ -1400,11 +1404,11 @@ struct StatusWindowPreview: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Preview")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                 Spacer()
                 Text(style.title)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.accent)
             }
 
@@ -1414,7 +1418,7 @@ struct StatusWindowPreview: View {
                     .foregroundStyle(DesignTokens.Palette.accent)
                 if showsMenuBarBattery {
                     Text("42%")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(DesignTokens.Typography.caption2Emphasis)
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Palette.text)
                 }
@@ -1518,7 +1522,7 @@ private struct NativeStatusRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 5) {
                     Text(item.displayName)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(DesignTokens.Typography.rowTitle)
                         .foregroundStyle(DesignTokens.Palette.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
@@ -1532,7 +1536,7 @@ private struct NativeStatusRow: View {
 
                 if let statusText {
                     Text(statusText)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(statusColor)
                         .lineLimit(1)
                 }
@@ -1543,7 +1547,7 @@ private struct NativeStatusRow: View {
             if let percent {
                 HStack(spacing: 5) {
                     Text("\(percent)%")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(DesignTokens.Typography.percent)
                         .foregroundStyle(statusColor)
                         .monospacedDigit()
                         .lineLimit(1)
@@ -1669,6 +1673,7 @@ private struct NativeFooterButton: View {
     let title: String
     let systemImage: String
     var usesBluetoothLogo = false
+    var usesSettingsLogo = false
     let action: () -> Void
     @State private var isHovered = false
 
@@ -1677,6 +1682,9 @@ private struct NativeFooterButton: View {
             HStack(spacing: 10) {
                 if usesBluetoothLogo {
                     BluetoothLogoMark(size: 22)
+                        .frame(width: 22)
+                } else if usesSettingsLogo {
+                    SettingsLogoMark(size: 22)
                         .frame(width: 22)
                 } else {
                     Image(systemName: resolveSymbol(systemImage, fallback: "circle"))
@@ -1687,7 +1695,7 @@ private struct NativeFooterButton: View {
                 }
 
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(DesignTokens.Typography.rowTitle)
                     .foregroundStyle(DesignTokens.Palette.text)
                     .lineLimit(1)
 
@@ -1720,11 +1728,11 @@ private struct BatteryOverviewStrip: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Battery Overview")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(DesignTokens.Typography.controlLabelEmphasis)
                         .foregroundStyle(DesignTokens.Palette.text)
 
                     Text("\(summary.reportedItemCount) reporting · alert below \(lowBatteryThreshold)%")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                         .monospacedDigit()
                 }
@@ -1835,12 +1843,12 @@ private struct BatteryOverviewRing: View {
             }
 
             Text("\(device.percent)%")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(DesignTokens.Typography.percentSmall)
                 .monospacedDigit()
                 .foregroundStyle(ringColor)
 
             Text(shortName)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(DesignTokens.Typography.caption2)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -1896,13 +1904,13 @@ private struct BatteryOverviewMetric: View {
                     .foregroundStyle(color)
 
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.caption2Emphasis)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(1)
             }
 
             Text(value)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(DesignTokens.Typography.percentEmphasis)
                 .monospacedDigit()
                 .foregroundStyle(color)
                 .lineLimit(1)
@@ -1932,10 +1940,10 @@ private struct DeviceControlMetric: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.caption2Emphasis)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                 Text(value)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.percent)
                     .monospacedDigit()
                     .foregroundStyle(color)
             }
@@ -1973,7 +1981,7 @@ private struct DeviceInspectorRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(inspectorItem.displayName)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.controlLabelEmphasis)
                         .foregroundStyle(inspectorItem.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.text)
                         .lineLimit(1)
 
@@ -2049,7 +2057,7 @@ private struct DeviceInspectorChip: View {
             Image(systemName: resolveSymbol(systemImage, fallback: "circle.fill"))
                 .symbolRenderingMode(.hierarchical)
         }
-        .font(.system(size: 9, weight: .semibold, design: .rounded))
+        .font(DesignTokens.Typography.caption2Emphasis)
         .foregroundStyle(color)
         .padding(.horizontal, 6)
         .frame(height: 18)
@@ -2141,13 +2149,13 @@ private struct AirPodsPlatterCard: View {
         VStack(spacing: DesignTokens.Spacing.md) {
             VStack(spacing: 3) {
                 Text(summary.name)
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.popoverTitle)
                     .foregroundStyle(DesignTokens.Palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Text(summary.statusText)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(summary.statusColor)
                     .lineLimit(1)
             }
@@ -2155,7 +2163,7 @@ private struct AirPodsPlatterCard: View {
 
             HStack(spacing: 8) {
                 Label("\(preferences.listeningMode.shortTitle) · Mic \(preferences.microphone.shortTitle)", systemImage: "waveform")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(1)
 
@@ -2274,7 +2282,7 @@ private struct AirPodsComponentReadout: View {
                     .foregroundStyle(labelColor)
 
                 Text(slotLabel)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(1)
             }
@@ -2284,13 +2292,13 @@ private struct AirPodsComponentReadout: View {
                     BatteryLevelPill(percent: percent, chargeState: component.chargeState)
 
                     Text("\(percent)%")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(DesignTokens.Typography.percentSmall)
                         .monospacedDigit()
                         .foregroundStyle(labelColor)
                 }
             } else {
                 Text("No report")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.tertiaryText)
                     .frame(height: 34)
             }

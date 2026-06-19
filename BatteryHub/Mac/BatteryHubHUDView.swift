@@ -80,12 +80,12 @@ struct BatteryActionHUDView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.rowTitleEmphasis)
                     .foregroundStyle(DesignTokens.Palette.text)
                     .lineLimit(1)
 
                 Text(subtitle)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(1)
             }
@@ -94,7 +94,7 @@ struct BatteryActionHUDView: View {
 
             if let percent = event.percent {
                 Text("\(percent)%")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.percentLarge)
                     .monospacedDigit()
                     .foregroundStyle(iconColor)
                     .frame(minWidth: 58, alignment: .trailing)

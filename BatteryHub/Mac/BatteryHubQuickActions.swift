@@ -57,7 +57,7 @@ enum BatteryHubQuickAction: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .showDashboard: return resolveSymbol("macwindow", fallback: "rectangle")
         case .refreshBatteries: return "arrow.clockwise"
-        case .openSettings: return "gearshape"
+        case .openSettings: return resolveSymbol("gearshape.2.fill", fallback: "gearshape")
         case .addDevice: return "plus"
         case .openBluetoothSettings: return "dot.radiowaves.left.and.right"
         case .connectNearbyDevice: return "dot.radiowaves.left.and.right"

@@ -341,7 +341,7 @@ struct BatteryHubAppShortcuts: AppShortcutsProvider {
                 "Show settings in \(.applicationName)"
             ],
             shortTitle: "Open Settings",
-            systemImageName: "gearshape"
+            systemImageName: "gearshape.2.fill"
         )
 
         AppShortcut(

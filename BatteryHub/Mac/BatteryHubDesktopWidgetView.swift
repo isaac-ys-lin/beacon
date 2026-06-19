@@ -120,10 +120,10 @@ struct BatteryDesktopWidgetView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Batteries")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.sectionTitle)
                     .foregroundStyle(DesignTokens.Palette.text)
                 Text(latestUpdateText)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
             }
 
@@ -131,7 +131,7 @@ struct BatteryDesktopWidgetView: View {
 
             if let lowest = summary.lowestPercent {
                 Text("\(lowest)%")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.percentSmall)
                     .monospacedDigit()
                     .foregroundStyle(summary.lowBatteryItemCount > 0 ? DesignTokens.Palette.critical : DesignTokens.Palette.accent)
                     .padding(.horizontal, 8)
@@ -144,9 +144,7 @@ struct BatteryDesktopWidgetView: View {
 
             if let onOpenSettings {
                 Button(action: onOpenSettings) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 22, height: 22)
+                    SettingsLogoMark(size: 22)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
@@ -169,9 +167,9 @@ struct BatteryDesktopWidgetView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("No battery reports")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DesignTokens.Typography.controlLabelEmphasis)
                 Text("Refresh or pair a nearby device.")
-                    .font(.system(size: 10))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
             }
         }
@@ -237,7 +235,7 @@ private struct DesktopWidgetDeviceRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text(device.displayName)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DesignTokens.Typography.controlLabelEmphasis)
                         .foregroundStyle(DesignTokens.Palette.text)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -245,7 +243,7 @@ private struct DesktopWidgetDeviceRow: View {
                     Spacer(minLength: 0)
 
                     Text("\(device.percent)%")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(DesignTokens.Typography.percentSmall)
                         .monospacedDigit()
                         .foregroundStyle(percentColor)
                 }
@@ -263,7 +261,7 @@ private struct DesktopWidgetDeviceRow: View {
                     .frame(height: 5)
 
                     Text(subtitle)
-                        .font(.system(size: 9, weight: .medium))
+                        .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                         .lineLimit(1)
                         .frame(width: 58, alignment: .trailing)

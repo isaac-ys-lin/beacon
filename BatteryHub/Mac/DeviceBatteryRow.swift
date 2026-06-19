@@ -42,6 +42,30 @@ struct BluetoothLogoMark: View {
     }
 }
 
+struct SettingsLogoMark: View {
+    var size: CGFloat = 22
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+
+        ZStack {
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
+                }
+
+            Image(systemName: resolveSymbol("gearshape.2.fill", fallback: "gearshape.fill"))
+                .font(.system(size: max(12, size * 0.52), weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.primary.opacity(0.62))
+        }
+        .frame(width: size, height: size)
+        .ifAvailableGlass(shape: shape)
+        .accessibilityLabel("Settings")
+    }
+}
+
 private extension View {
     @ViewBuilder
     func ifAvailableGlass<S: Shape>(shape: S) -> some View {
@@ -231,7 +255,7 @@ private struct StatusCapsule: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .font(DesignTokens.Typography.captionEmphasis)
             .lineLimit(1)
             .foregroundStyle(color)
             .padding(.horizontal, 8)
@@ -251,7 +275,7 @@ private struct BatteryReadout: View {
     var body: some View {
         HStack(spacing: 8) {
             Text("\(percent)%")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(DesignTokens.Typography.percentSmall)
                 .monospacedDigit()
                 .foregroundStyle(color)
                 .frame(minWidth: 34, alignment: .trailing)
@@ -285,7 +309,7 @@ struct DeviceBatteryRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Text(snapshot.displayName)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.rowTitleEmphasis)
                         .foregroundStyle(DesignTokens.Palette.text)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -299,7 +323,7 @@ struct DeviceBatteryRow: View {
                 }
 
                 Text(statusLine)
-                    .font(.system(size: 11, weight: .regular))
+                    .font(DesignTokens.Typography.rowSubtitle)
                     .foregroundStyle(statusLineColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -454,7 +478,7 @@ struct AirPodsBatteryRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 5) {
                         Text(name)
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .font(DesignTokens.Typography.rowTitleEmphasis)
                             .foregroundStyle(DesignTokens.Palette.text)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -468,7 +492,7 @@ struct AirPodsBatteryRow: View {
                     }
 
                     Text(airPodsStatusLine)
-                        .font(.system(size: 11, weight: .regular))
+                        .font(DesignTokens.Typography.rowSubtitle)
                         .foregroundStyle(airPodsStatusColor)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -579,14 +603,14 @@ private struct AirPodsComponentChip: View {
 
             if let percent = component.percent {
                 Text("\(percent)%")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .monospacedDigit()
                     .foregroundStyle(chipTextColor(percent: percent))
 
                 MiniPill(percent: percent, chargeState: component.chargeState)
             } else {
                 Text("–")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.tertiaryText)
             }
         }

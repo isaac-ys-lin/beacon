@@ -21,6 +21,26 @@ public enum DesignTokens {
         public static let quick: Double = 0.12
     }
 
+    public enum Typography {
+        public static let windowTitle: Font = .title2.weight(.semibold)
+        public static let popoverTitle: Font = .title3.weight(.semibold)
+        public static let sidebarTitle: Font = .headline.weight(.semibold)
+        public static let sectionTitle: Font = .headline.weight(.semibold)
+        public static let rowTitle: Font = .body.weight(.medium)
+        public static let rowTitleEmphasis: Font = .body.weight(.semibold)
+        public static let rowSubtitle: Font = .caption
+        public static let controlLabel: Font = .callout
+        public static let controlLabelEmphasis: Font = .callout.weight(.semibold)
+        public static let caption: Font = .caption
+        public static let captionEmphasis: Font = .caption.weight(.semibold)
+        public static let caption2: Font = .caption2
+        public static let caption2Emphasis: Font = .caption2.weight(.semibold)
+        public static let percent: Font = .body.weight(.medium)
+        public static let percentEmphasis: Font = .body.weight(.semibold)
+        public static let percentSmall: Font = .callout.weight(.semibold)
+        public static let percentLarge: Font = .title2.weight(.semibold)
+    }
+
     public enum Palette {
         public static let charging = Color.green
         public static let healthy = Color(red: 0.36, green: 0.78, blue: 0.38)

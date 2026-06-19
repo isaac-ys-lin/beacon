@@ -84,7 +84,7 @@ struct BatteryHubSettingsView: View {
     private var settingsSidebar: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("BatteryHub")
-                .font(.system(size: 18, weight: .semibold))
+                .font(DesignTokens.Typography.sidebarTitle)
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 10)
                 .padding(.top, 4)
@@ -98,7 +98,7 @@ struct BatteryHubSettingsView: View {
                             SettingsPaneIcon(pane: pane)
 
                             Text(pane.title)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(selectedPane == pane ? DesignTokens.Typography.controlLabelEmphasis : DesignTokens.Typography.controlLabel)
                                 .foregroundStyle(selectedPane == pane ? .primary : .secondary)
 
                             Spacer(minLength: 0)
@@ -125,7 +125,7 @@ struct BatteryHubSettingsView: View {
     private var settingsHeader: some View {
         HStack(spacing: 10) {
             Text(selectedPane.title)
-                .font(.system(size: 20, weight: .semibold))
+                .font(DesignTokens.Typography.windowTitle)
                 .lineLimit(1)
 
             Spacer()
@@ -223,9 +223,9 @@ struct BatteryHubSettingsView: View {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.sectionTitle)
                     Text(subtitle)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -291,10 +291,10 @@ struct BatteryHubSettingsView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.displayName)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.rowTitleEmphasis)
                     .lineLimit(1)
                 Text(deviceAlertSubtitle(for: row))
-                    .font(.system(size: 11, weight: .medium))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(1)
             }
@@ -308,7 +308,7 @@ struct BatteryHubSettingsView: View {
 
     private func compactAlertSummaryBadge(for row: DeviceInspectorItem) -> some View {
         Text(row.isHidden ? "Hidden" : alertSummary(for: row.item))
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .font(DesignTokens.Typography.captionEmphasis)
             .monospacedDigit()
             .foregroundStyle(row.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.accent)
             .padding(.horizontal, 9)
@@ -332,7 +332,7 @@ struct BatteryHubSettingsView: View {
 
             HStack(spacing: 10) {
                 Text("Low threshold")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .frame(width: 94, alignment: .leading)
 
                 Slider(value: deviceThresholdBinding(for: row.id), in: 5...50, step: 5)
@@ -340,7 +340,7 @@ struct BatteryHubSettingsView: View {
                     .disabled(row.isHidden || !lowBatteryAlertsEnabled)
 
                 Text("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.percentSmall)
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Palette.accent)
                     .frame(width: 40, alignment: .trailing)
@@ -366,7 +366,7 @@ struct BatteryHubSettingsView: View {
                 .controlSize(.small)
                 .disabled(row.isHidden || !LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id))
             }
-            .font(.system(size: 12, weight: .medium))
+            .font(DesignTokens.Typography.controlLabel)
             .padding(.horizontal, 12)
             .frame(height: 42)
             .opacity(row.isHidden || !chargedBatteryAlertsEnabled ? 0.5 : 1)
@@ -396,18 +396,18 @@ struct BatteryHubSettingsView: View {
                 Spacer(minLength: 8)
 
                 Text("\(clampedLowBatteryThreshold)%")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.percentSmall)
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Palette.accent)
                     .frame(width: 40, alignment: .trailing)
             }
-            .font(.system(size: 12, weight: .medium))
+            .font(DesignTokens.Typography.controlLabel)
             .padding(.horizontal, 12)
             .frame(height: 40)
 
             HStack(spacing: 10) {
                 Text("Default threshold")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .frame(width: 104, alignment: .leading)
 
                 Slider(value: lowBatteryThresholdBinding, in: 5...50, step: 5)
@@ -424,7 +424,7 @@ struct BatteryHubSettingsView: View {
             Toggle("Charged alerts", isOn: $chargedBatteryAlertsEnabled)
                 .toggleStyle(.switch)
                 .controlSize(.small)
-                .font(.system(size: 12, weight: .medium))
+                .font(DesignTokens.Typography.controlLabel)
                 .padding(.horizontal, 12)
                 .frame(height: 40, alignment: .leading)
         }
@@ -434,7 +434,7 @@ struct BatteryHubSettingsView: View {
     private var compactAlertPreviewCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Preview")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(DesignTokens.Typography.captionEmphasis)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
 
             HStack(spacing: 10) {
@@ -470,9 +470,9 @@ struct BatteryHubSettingsView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                 Text(subtitle)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(1)
             }
@@ -484,9 +484,9 @@ struct BatteryHubSettingsView: View {
     private var emptyAlertDetail: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("No selectable devices")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(DesignTokens.Typography.sectionTitle)
             Text("Show hidden devices or connect a reporting device to edit per-device alerts.")
-                .font(.system(size: 12))
+                .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -541,9 +541,9 @@ struct BatteryHubSettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Preview")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.sectionTitle)
                 Text(autoDismissActionHUD ? "Dismisses after \(Int(clampedActionHUDDismissDelay)) seconds" : "Stays until dismissed")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
             }
 
@@ -586,7 +586,7 @@ struct BatteryHubSettingsView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Behavior")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
 
                 Toggle("Auto-dismiss", isOn: $autoDismissActionHUD)
                     .disabled(!showActionHUD)
@@ -595,7 +595,7 @@ struct BatteryHubSettingsView: View {
                     Slider(value: actionHUDDismissDelayBinding, in: 2...10, step: 1)
                         .disabled(!showActionHUD || !autoDismissActionHUD)
                     Text("\(Int(clampedActionHUDDismissDelay))s")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.captionEmphasis)
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Palette.accent)
                         .frame(width: 30, alignment: .trailing)
@@ -605,7 +605,7 @@ struct BatteryHubSettingsView: View {
                 Toggle("Show dismiss button", isOn: $showActionHUDDismissButton)
                     .disabled(!showActionHUD)
             }
-            .font(.system(size: 12, weight: .medium))
+            .font(DesignTokens.Typography.controlLabel)
         }
         .padding(16)
         .frame(width: 330, alignment: .topLeading)
@@ -657,7 +657,7 @@ struct BatteryHubSettingsView: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("Preview")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
 
                 VStack(alignment: .leading, spacing: 14) {
@@ -673,10 +673,10 @@ struct BatteryHubSettingsView: View {
 
                     HStack {
                         Text("Desktop Widget")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(DesignTokens.Typography.captionEmphasis)
                         Spacer()
                         Text(desktopWidgetStyle.title)
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(DesignTokens.Typography.captionEmphasis)
                             .foregroundStyle(DesignTokens.Palette.accent)
                     }
 
@@ -730,7 +730,7 @@ struct BatteryHubSettingsView: View {
                     Label("Cross-Mac transfer remains unavailable in this build.", systemImage: "minus.circle")
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
-                .font(.system(size: 11, weight: .medium))
+                .font(DesignTokens.Typography.caption)
             } header: {
                 Text("Status")
             }
@@ -758,10 +758,10 @@ struct BatteryHubSettingsView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(row.displayName)
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.popoverTitle)
                         .lineLimit(1)
                     Text(detailSubtitle(for: row))
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -801,10 +801,10 @@ struct BatteryHubSettingsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Low-battery threshold")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(DesignTokens.Typography.captionEmphasis)
                     Spacer()
                     Text("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(DesignTokens.Typography.percentSmall)
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Palette.accent)
                 }
@@ -828,7 +828,7 @@ struct BatteryHubSettingsView: View {
                     Spacer()
 
                     Text(alertSummary(for: row.item))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.captionEmphasis)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
             }
@@ -855,9 +855,9 @@ struct BatteryHubSettingsView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Bluetooth Controls")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(DesignTokens.Typography.captionEmphasis)
                             Text("Connect and disconnect use the paired Bluetooth address when macOS exposes one.")
-                                .font(.system(size: 11))
+                                .font(DesignTokens.Typography.caption2)
                                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                         }
                     }
@@ -906,7 +906,7 @@ struct BatteryHubSettingsView: View {
                     }
                 } else if row.isUnavailable {
                     Label("Hidden until connected", systemImage: "eye.slash")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 } else {
                     Button(role: .destructive) {
@@ -926,9 +926,9 @@ struct BatteryHubSettingsView: View {
     private var emptyDeviceDetail: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("No devices")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(DesignTokens.Typography.sectionTitle)
             Text("Connected devices will appear here after the next refresh.")
-                .font(.system(size: 12))
+                .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
         }
         .padding(.top, 12)
@@ -980,10 +980,10 @@ struct BatteryHubSettingsView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Preview data is active")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.text)
                 Text("Sample devices are shown for UI QA, not live Bluetooth.")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -1130,7 +1130,7 @@ struct BatteryHubSettingsView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(isOn ? DesignTokens.Palette.charging : DesignTokens.Palette.secondaryText)
             Text(title)
-                .font(.system(size: 11, weight: .medium))
+                .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
             Spacer(minLength: 0)
         }
@@ -1200,9 +1200,9 @@ struct AddDeviceGuideView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Add New Device")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(DesignTokens.Typography.windowTitle)
                     Text("Choose the kind of device you want BatteryHub to monitor.")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
 
@@ -1244,7 +1244,7 @@ struct AddDeviceGuideView: View {
 
             HStack(spacing: 10) {
                 Label("Devices appear automatically after BatteryHub receives a fresh battery report.", systemImage: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
 
                 Spacer()
@@ -1289,10 +1289,10 @@ private struct AddDeviceGuideRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(DesignTokens.Typography.captionEmphasis)
                         .foregroundStyle(isEnabled ? DesignTokens.Palette.text : DesignTokens.Palette.secondaryText)
                     Text(subtitle)
-                        .font(.system(size: 11))
+                        .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                         .lineLimit(2)
                 }
@@ -1300,7 +1300,7 @@ private struct AddDeviceGuideRow: View {
                 Spacer()
 
                 Text(actionTitle)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(isEnabled ? DesignTokens.Palette.accent : DesignTokens.Palette.tertiaryText)
                     .padding(.horizontal, 9)
                     .frame(height: 24)
@@ -1391,10 +1391,10 @@ private struct QuickActionSettingsRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(action.title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(DesignTokens.Typography.captionEmphasis)
 
                     Text(shortcutText)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(DesignTokens.Typography.caption2Emphasis)
                         .monospaced()
                         .foregroundStyle(action.isSupported ? DesignTokens.Palette.accent : DesignTokens.Palette.tertiaryText)
                         .padding(.horizontal, 7)
@@ -1406,7 +1406,7 @@ private struct QuickActionSettingsRow: View {
 
                     if action.isSupported {
                         Label("Shortcuts", systemImage: "checkmark.circle.fill")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .font(DesignTokens.Typography.caption2Emphasis)
                             .foregroundStyle(DesignTokens.Palette.charging)
                             .padding(.horizontal, 7)
                             .frame(height: 20)
@@ -1418,7 +1418,7 @@ private struct QuickActionSettingsRow: View {
                 }
 
                 Text(action.subtitle)
-                    .font(.system(size: 11))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(2)
             }
@@ -1468,10 +1468,10 @@ private struct AutomationShortcutsBanner: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 7) {
                     Text("Automation Shortcuts")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DesignTokens.Typography.captionEmphasis)
                         .foregroundStyle(DesignTokens.Palette.text)
                     Label("Actions", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(DesignTokens.Typography.caption2Emphasis)
                         .labelStyle(.titleAndIcon)
                         .foregroundStyle(DesignTokens.Palette.charging)
                         .padding(.horizontal, 7)
@@ -1485,7 +1485,7 @@ private struct AutomationShortcutsBanner: View {
                 HStack(spacing: 6) {
                     ForEach(actions, id: \.0) { action in
                         Label(action.0, systemImage: action.1)
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(DesignTokens.Typography.caption2Emphasis)
                             .lineLimit(1)
                             .foregroundStyle(DesignTokens.Palette.text.opacity(0.82))
                             .padding(.horizontal, 7)
@@ -1525,9 +1525,9 @@ private struct ActionHUDEventToggle: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                 Text(subtitle)
-                    .font(.system(size: 11))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
             }
 
@@ -1563,10 +1563,10 @@ private struct AirPodsAudioControlsCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("Audio Controls", systemImage: "waveform")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                 Spacer()
                 Text("AirPods")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.caption2Emphasis)
                     .foregroundStyle(DesignTokens.Palette.accent)
                     .padding(.horizontal, 7)
                     .frame(height: 20)
@@ -1617,10 +1617,10 @@ private struct AirPodsAudioControlsCard: View {
 
                 Spacer()
             }
-            .font(.system(size: 11, weight: .semibold))
+            .font(DesignTokens.Typography.captionEmphasis)
 
             Text("BatteryHub keeps your preferred AirPods audio choices here; macOS applies the actual listening mode and mic switch from Sound Settings.")
-                .font(.system(size: 10, weight: .medium))
+                .font(DesignTokens.Typography.caption2)
                 .foregroundStyle(DesignTokens.Palette.tertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1679,12 +1679,12 @@ private struct AudioPreferenceTile: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
                 Text(title)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
             }
 
@@ -1712,10 +1712,10 @@ private struct DeviceCurrentStatsCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("Current Stats", systemImage: "chart.bar.xaxis")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                 Spacer()
                 Text(connectionText)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(DesignTokens.Typography.caption2Emphasis)
                     .foregroundStyle(connectionColor)
                     .padding(.horizontal, 7)
                     .frame(height: 20)
@@ -1771,11 +1771,11 @@ private struct DeviceCurrentStatsCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Battery Trend")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(DesignTokens.Typography.caption2Emphasis)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                     Spacer()
                     Text(trendText)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(DesignTokens.Typography.caption2Emphasis)
                         .foregroundStyle(trendColor)
                 }
 
@@ -1783,7 +1783,7 @@ private struct DeviceCurrentStatsCard: View {
                     .frame(height: 34)
 
                 Text(rangeText)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.tertiaryText)
                     .lineLimit(1)
             }
@@ -2042,13 +2042,13 @@ private struct SettingsInfoRow: View {
                 .frame(width: 22)
 
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.text)
 
             Spacer(minLength: 12)
 
             Text(value)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(DesignTokens.Typography.captionEmphasis)
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
@@ -2087,11 +2087,11 @@ private struct SettingsDeviceSidebarRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.displayName)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DesignTokens.Typography.captionEmphasis)
                         .foregroundStyle(item.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.text)
                         .lineLimit(1)
                     Text(rowSubtitle)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                         .lineLimit(1)
                 }
@@ -2137,9 +2137,9 @@ private struct SettingsDetailToggle: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                 Text(subtitle)
-                    .font(.system(size: 11))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
             }
 
@@ -2174,9 +2174,9 @@ private struct SettingsAlertPreview: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DesignTokens.Typography.captionEmphasis)
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .lineLimit(1)
             }
