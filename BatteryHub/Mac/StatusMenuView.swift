@@ -99,9 +99,9 @@ enum StatusWindowStyle: String, CaseIterable, Identifiable {
     var symbolName: String {
         switch self {
         case .native:
-            return BatteryHubSymbols.app
+            return resolveSymbol("rectangle.grid.2x2", fallback: "rectangle.grid.3x2")
         case .large:
-            return resolveSymbol("rectangle.grid.3x2", fallback: BatteryHubSymbols.app)
+            return resolveSymbol("rectangle.grid.3x2", fallback: "rectangle.grid.2x2")
         case .compact:
             return resolveSymbol("rectangle.grid.1x2", fallback: "rectangle")
         }
@@ -283,6 +283,7 @@ struct StatusMenuView: View {
     let isPreviewingData: Bool
     let configuration: StatusWindowConfiguration
     let bluetoothPowerState: BluetoothPowerState
+    let notificationAuthorizationState: NotificationCenterAuthorizationState
     let onRefresh: () -> Void
     let onOpenSettings: (SettingsPane, String?) -> Void
 
@@ -306,6 +307,7 @@ struct StatusMenuView: View {
         isPreviewingData: Bool = false,
         configuration: StatusWindowConfiguration = .load(),
         bluetoothPowerState: BluetoothPowerState = .on,
+        notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown,
         onRefresh: @escaping () -> Void,
         onOpenSettings: @escaping (SettingsPane, String?) -> Void = { _, _ in },
         initiallyShowingSettings: Bool = false,
@@ -317,6 +319,7 @@ struct StatusMenuView: View {
         self.isPreviewingData = isPreviewingData
         self.configuration = configuration
         self.bluetoothPowerState = bluetoothPowerState
+        self.notificationAuthorizationState = notificationAuthorizationState
         self.onRefresh = onRefresh
         self.onOpenSettings = onOpenSettings
         _isShowingSettings = State(initialValue: initiallyShowingSettings)
@@ -493,15 +496,7 @@ struct StatusMenuView: View {
 
     private var nativeHeader: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: BatteryHubSymbols.app)
-                .font(.system(size: 16, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DesignTokens.Palette.accent)
-                .frame(width: 32, height: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
-                )
+            BatteryHubLogoMark(size: 32)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Batteries")
@@ -1072,6 +1067,10 @@ struct StatusMenuView: View {
                     Text("Notify when devices are low or done charging.")
                         .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
+
+                    Text(notificationCenterMenuSummary)
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(notificationCenterMenuColor)
                 }
 
                 Spacer()
@@ -1169,7 +1168,7 @@ struct StatusMenuView: View {
     private var alertPreview: some View {
         VStack(spacing: 8) {
             HStack(spacing: DesignTokens.Spacing.md) {
-                Image(systemName: "applewatch.side.right")
+                Image(systemName: resolveSymbol("magicmouse", fallback: "cursorarrow"))
                     .font(.system(size: 17, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(DesignTokens.Palette.critical)
@@ -1182,7 +1181,7 @@ struct StatusMenuView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Low battery preview")
                         .font(DesignTokens.Typography.controlLabelEmphasis)
-                    Text("Apple Watch reaches \(clampedLowBatteryThreshold)%")
+                    Text("Magic Mouse reaches \(clampedLowBatteryThreshold)%")
                         .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
@@ -1210,7 +1209,7 @@ struct StatusMenuView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Charged preview")
                         .font(DesignTokens.Typography.controlLabelEmphasis)
-                    Text("iPhone finishes charging")
+                    Text("Magic Keyboard finishes charging")
                         .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
@@ -1450,6 +1449,23 @@ struct StatusMenuView: View {
         }
     }
 
+    private var notificationCenterMenuSummary: String {
+        "Notification Center: \(notificationAuthorizationState.title)"
+    }
+
+    private var notificationCenterMenuColor: Color {
+        switch notificationAuthorizationState {
+        case .authorized:
+            return DesignTokens.Palette.healthy
+        case .provisional, .notDetermined:
+            return DesignTokens.Palette.warning
+        case .denied:
+            return DesignTokens.Palette.critical
+        case .unknown:
+            return DesignTokens.Palette.tertiaryText
+        }
+    }
+
     private var thresholdSliderValue: Binding<Double> {
         Binding(
             get: { Double(clampedLowBatteryThreshold) },
@@ -1659,15 +1675,7 @@ struct StatusWindowPreview: View {
 
     private var previewHeader: some View {
         HStack(spacing: 8) {
-            Image(systemName: BatteryHubSymbols.app)
-                .font(.system(size: 13, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DesignTokens.Palette.accent)
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
-                )
+            BatteryHubLogoMark(size: 22)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Batteries")
@@ -1774,9 +1782,9 @@ struct StatusWindowPreview: View {
             )
         default:
             return DashboardBatteryDevice(
-                id: "preview-watch",
-                displayName: "Watch",
-                kind: .appleWatch,
+                id: "preview-airpods",
+                displayName: "AirPods",
+                kind: .airPods,
                 percent: 18,
                 chargeState: .unplugged,
                 freshness: .fresh
@@ -2438,9 +2446,8 @@ private let previewSnapshots: [DecoratedBatterySnapshot] = [
     mockDecorated(id: "mac1", name: "Mac mini",         kind: .macBook,   percent: nil),
     mockDecorated(id: "kbd1", name: "Magic Keyboard",   kind: .keyboard,  percent: 95),
     mockDecorated(id: "mse1", name: "Magic Mouse",      kind: .mouse,     percent: 62),
-    // Mobile + audio section
-    mockDecorated(id: "iph1", name: "Isaac's iPhone",   kind: .iPhone,    percent: 42, chargeState: .charging),
-    mockDecorated(id: "wtc1", name: "Apple Watch",      kind: .appleWatch, percent: 18),
+    // Audio section
+    mockDecorated(id: "hp1",  name: "AirPods Max",      kind: .airPods, percent: 42, chargeState: .charging),
     // AirPods 3-component
     mockDecorated(id: "AA-BB-CC-DD-EE-FF-case",  name: "John's AirPods Pro Case",  kind: .airPods, percent: 90),
     mockDecorated(id: "AA-BB-CC-DD-EE-FF-left",  name: "John's AirPods Pro Left",  kind: .airPods, percent: 75),
@@ -2449,7 +2456,7 @@ private let previewSnapshots: [DecoratedBatterySnapshot] = [
 
 private let previewSnapshotsEdge: [DecoratedBatterySnapshot] = [
     // Critical battery
-    mockDecorated(id: "iph2", name: "Low iPhone",       kind: .iPhone,    percent: 8),
+    mockDecorated(id: "mse2", name: "Low Magic Mouse",  kind: .mouse,    percent: 8),
     // Stale data
     mockDecorated(id: "bt1",  name: "BT Speaker",       kind: .bluetoothPeripheral, percent: 30, freshness: .stale),
     // AirPods with nil case + low buds

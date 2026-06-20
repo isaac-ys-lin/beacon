@@ -13,6 +13,9 @@ func resolveSymbol(_ symbol: String, fallback: String) -> String {
 }
 
 enum BatteryHubSymbols {
+    static let appIconAsset = "BatteryHubAppIcon"
+    static let statusGlyphAsset = "BatteryHubStatusGlyph"
+
     static var app: String {
         resolveSymbol("rectangle.grid.2x2", fallback: "rectangle.grid.3x2")
     }
@@ -38,10 +41,11 @@ struct BatteryHubLogoMark: View {
     var size: CGFloat = 28
 
     var body: some View {
-        Image(systemName: BatteryHubSymbols.app)
-            .font(.system(size: max(14, size * 0.58), weight: .semibold))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(DesignTokens.Palette.accent)
+        Image(BatteryHubSymbols.appIconAsset)
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .aspectRatio(1, contentMode: .fit)
             .frame(width: size, height: size)
             .accessibilityLabel("BatteryHub")
     }
@@ -706,8 +710,6 @@ struct DeviceBatteryRow: View {
     private var sourceLabel: String {
         switch decorated.snapshot.source {
         case .macPowerSource: return "Local Mac"
-        case .iCloud: return "iCloud"
-        case .watchConnectivity: return "Watch relay"
         case .ioRegistry: return "IORegistry"
         case .coreBluetooth, .ioBluetooth: return "Bluetooth"
         case .systemProfiler: return "System"
@@ -1053,9 +1055,7 @@ private func mockDecorated(
         Divider().padding(.leading, 58)
         DeviceBatteryRow(decorated: mockDecorated(name: "Mac mini",       kind: .macBook,   percent: nil))
         Divider().padding(.leading, 58)
-        DeviceBatteryRow(decorated: mockDecorated(name: "Isaac's iPhone", kind: .iPhone,    percent: 42, chargeState: .charging))
-        Divider().padding(.leading, 58)
-        DeviceBatteryRow(decorated: mockDecorated(name: "Apple Watch",    kind: .appleWatch, percent: 18))
+        DeviceBatteryRow(decorated: mockDecorated(name: "AirPods Max",    kind: .airPods, percent: 42, chargeState: .charging))
         Divider().padding(.leading, 58)
         DeviceBatteryRow(decorated: mockDecorated(name: "Magic Keyboard", kind: .keyboard,   percent: 95))
         Divider().padding(.leading, 58)
@@ -1070,7 +1070,7 @@ private func mockDecorated(
         Divider().padding(.leading, 58)
         DeviceBatteryRow(decorated: mockDecorated(name: "Mac mini",       kind: .macBook,   percent: nil))
         Divider().padding(.leading, 58)
-        DeviceBatteryRow(decorated: mockDecorated(name: "Isaac's iPhone", kind: .iPhone,    percent: 8, chargeState: .unplugged))
+        DeviceBatteryRow(decorated: mockDecorated(name: "Magic Mouse",    kind: .mouse,    percent: 8, chargeState: .unplugged))
     }
     .frame(width: 378)
     .preferredColorScheme(.dark)

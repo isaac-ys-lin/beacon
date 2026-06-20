@@ -14,6 +14,133 @@ struct BatteryAlertEvent: Equatable, Sendable {
     let percent: Int?
 }
 
+enum NotificationCenterAuthorizationState: Equatable, Sendable {
+    case unknown
+    case notDetermined
+    case denied
+    case authorized
+    case provisional
+
+    static func from(_ status: UNAuthorizationStatus) -> NotificationCenterAuthorizationState {
+        from(
+            authorizationStatus: status,
+            alertSetting: .enabled,
+            notificationCenterSetting: .enabled
+        )
+    }
+
+    static func from(
+        authorizationStatus: UNAuthorizationStatus,
+        alertSetting: UNNotificationSetting,
+        notificationCenterSetting: UNNotificationSetting
+    ) -> NotificationCenterAuthorizationState {
+        switch authorizationStatus {
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        case .authorized:
+            return deliverySettingsAreEnabled(
+                alertSetting: alertSetting,
+                notificationCenterSetting: notificationCenterSetting
+            ) ? .authorized : .denied
+        case .provisional:
+            return deliverySettingsAreEnabled(
+                alertSetting: alertSetting,
+                notificationCenterSetting: notificationCenterSetting
+            ) ? .provisional : .denied
+        @unknown default:
+            return .unknown
+        }
+    }
+
+    private static func deliverySettingsAreEnabled(
+        alertSetting: UNNotificationSetting,
+        notificationCenterSetting: UNNotificationSetting
+    ) -> Bool {
+        alertSetting == .enabled && notificationCenterSetting == .enabled
+    }
+
+    var title: String {
+        switch self {
+        case .unknown:
+            return "Checking"
+        case .notDetermined:
+            return "Needs Permission"
+        case .denied:
+            return "Disabled"
+        case .authorized:
+            return "Allowed"
+        case .provisional:
+            return "Limited"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .unknown:
+            return "Checking macOS notification permission."
+        case .notDetermined:
+            return "Allow BatteryHub to show system notifications."
+        case .denied:
+            return "Enable BatteryHub in macOS Notifications settings."
+        case .authorized:
+            return "System notifications can appear in Notification Center."
+        case .provisional:
+            return "System notifications are allowed with limited delivery."
+        }
+    }
+
+    var canRequestPermission: Bool {
+        self == .notDetermined
+    }
+
+    var canOpenSystemSettings: Bool {
+        switch self {
+        case .denied, .authorized, .provisional:
+            return true
+        case .unknown, .notDetermined:
+            return false
+        }
+    }
+
+    var canSendTestNotification: Bool {
+        switch self {
+        case .authorized, .provisional:
+            return true
+        case .unknown, .notDetermined, .denied:
+            return false
+        }
+    }
+}
+
+struct NotificationCenterDeliveryResult: Equatable, Sendable {
+    enum State: Equatable, Sendable {
+        case queued
+        case failed
+    }
+
+    let state: State
+    let title: String
+    let subtitle: String
+
+    static func queued(_ notificationTitle: String) -> NotificationCenterDeliveryResult {
+        NotificationCenterDeliveryResult(
+            state: .queued,
+            title: "Queued",
+            subtitle: notificationTitle
+        )
+    }
+
+    static func failed(_ message: String) -> NotificationCenterDeliveryResult {
+        NotificationCenterDeliveryResult(
+            state: .failed,
+            title: "Could not send",
+            subtitle: message
+        )
+    }
+}
+
 enum LowBatteryNotifier {
     private static let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "notifications")
 
@@ -130,23 +257,42 @@ enum LowBatteryNotifier {
     private static let chargedAlertedDefaultsPrefix = "BatteryHub.chargedBatteryAlerted."
     private static let currentChargedAlertedStateVersion = 2
 
-    static func requestAuthorization() {
+    static func currentAuthorizationState() async -> NotificationCenterAuthorizationState {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        return NotificationCenterAuthorizationState.from(
+            authorizationStatus: settings.authorizationStatus,
+            alertSetting: settings.alertSetting,
+            notificationCenterSetting: settings.notificationCenterSetting
+        )
+    }
+
+    static func requestAuthorization(
+        completion: (@Sendable (NotificationCenterAuthorizationState, NotificationCenterDeliveryResult?) -> Void)? = nil
+    ) {
         migrateChargedAlertedStateIfNeeded(defaults: .standard)
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error {
                 logger.error("Notification authorization failed: \(error.localizedDescription)")
                 resetAllChargedAlertedStates(defaults: .standard)
+                completion?(.denied, .failed(error.localizedDescription))
             } else {
                 logger.info("Notification authorization granted=\(granted)")
                 if !granted {
                     resetAllChargedAlertedStates(defaults: .standard)
+                }
+                Task {
+                    let state = await currentAuthorizationState()
+                    completion?(state, nil)
                 }
             }
         }
     }
 
     @discardableResult
-    static func notifyIfNeeded(for snapshots: [BatterySnapshot]) -> [BatteryAlertEvent] {
+    static func notifyIfNeeded(
+        for snapshots: [BatterySnapshot],
+        deliveryHandler: @escaping @Sendable (NotificationCenterDeliveryResult) -> Void = { _ in }
+    ) -> [BatteryAlertEvent] {
         let defaults = UserDefaults.standard
         let events = pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: false)
         logger.info("Notification check snapshots=\(snapshots.count) events=\(events.count)")
@@ -163,6 +309,7 @@ enum LowBatteryNotifier {
                 content.body = event.percent.map { "Battery has reached \($0)%." } ?? "Battery has finished charging."
             }
             content.sound = .default
+            let notificationTitle = content.title
 
             let request = UNNotificationRequest(
                 identifier: event.notificationIdentifier,
@@ -173,14 +320,41 @@ enum LowBatteryNotifier {
             UNUserNotificationCenter.current().add(request) { error in
                 if let error {
                     logger.error("Notification add failed id=\(requestIdentifier, privacy: .public): \(error.localizedDescription)")
+                    deliveryHandler(.failed(error.localizedDescription))
                 } else {
                     markAlerted(event, defaults: .standard)
                     logger.info("Notification add succeeded id=\(requestIdentifier, privacy: .public)")
+                    deliveryHandler(.queued(notificationTitle))
                 }
             }
         }
 
         return events
+    }
+
+    static func sendTestNotification(
+        deliveryHandler: @escaping @Sendable (NotificationCenterDeliveryResult) -> Void
+    ) {
+        let content = UNMutableNotificationContent()
+        content.title = "BatteryHub Test Notification"
+        content.body = "System notifications are working."
+        content.sound = .default
+        let notificationTitle = content.title
+
+        let request = UNNotificationRequest(
+            identifier: "batteryhub-test-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                logger.error("Test notification add failed: \(error.localizedDescription)")
+                deliveryHandler(.failed(error.localizedDescription))
+            } else {
+                logger.info("Test notification add succeeded")
+                deliveryHandler(.queued(notificationTitle))
+            }
+        }
     }
 
     static func pendingAlertEvents(

@@ -22,7 +22,7 @@ fi
 
 usage() {
   echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--verify-signing|--install]" >&2
-  echo "Set BATTERYHUB_DEVELOPMENT_TEAM=<team id> before --install to build with iCloud-capable Apple Development signing." >&2
+  echo "Set BATTERYHUB_DEVELOPMENT_TEAM=<team id> to build with Apple Development signing." >&2
 }
 
 app_path() {
@@ -56,22 +56,14 @@ signing_details() {
   codesign -dvvv --entitlements :- "$bundle" 2>&1 || true
 }
 
-require_icloud_signed_bundle() {
+require_signed_bundle() {
   local bundle="$1"
   local details
   details="$(signing_details "$bundle")"
 
-  if ! grep -q "com.apple.developer.ubiquity-kvstore-identifier" <<<"$details"; then
-    echo "Built app is missing the iCloud key-value-store entitlement." >&2
-    echo "Refusing formal install because iPhone / Apple Watch sync would not work." >&2
-    echo "Set BATTERYHUB_DEVELOPMENT_TEAM=<team id> and make sure an Apple Development signing identity is installed." >&2
-    echo "$details" >&2
-    exit 1
-  fi
-
   if grep -q "Signature=adhoc" <<<"$details"; then
     echo "Built app is ad-hoc signed. Refusing formal install." >&2
-    echo "Use an Apple Development signed build for iCloud KVS companion sync." >&2
+    echo "Set BATTERYHUB_DEVELOPMENT_TEAM=<team id> and make sure an Apple Development signing identity is installed." >&2
     echo "$details" >&2
     exit 1
   fi
@@ -80,19 +72,19 @@ require_icloud_signed_bundle() {
 install_app() {
   local bundle="$1"
   local staging_path="/Applications/.$APP_NAME.app.installing.$$"
-  require_icloud_signed_bundle "$bundle"
+  require_signed_bundle "$bundle"
   pkill -x "$APP_NAME" >/dev/null 2>&1 || true
   /bin/rm -rf "$staging_path"
   /usr/bin/ditto "$bundle" "$staging_path"
   /usr/bin/xattr -dr com.apple.quarantine "$staging_path" 2>/dev/null || true
-  require_icloud_signed_bundle "$staging_path"
+  require_signed_bundle "$staging_path"
   if [[ -d "$INSTALL_PATH" ]]; then
     local backup_path="/Applications/$APP_NAME.app.backup-$(date +%Y%m%d-%H%M%S)"
     /bin/mv "$INSTALL_PATH" "$backup_path"
     echo "Backed up existing app to $backup_path"
   fi
   /bin/mv "$staging_path" "$INSTALL_PATH"
-  require_icloud_signed_bundle "$INSTALL_PATH"
+  require_signed_bundle "$INSTALL_PATH"
   echo "Installed signed app to $INSTALL_PATH"
 }
 
@@ -132,7 +124,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   --verify-signing|verify-signing)
-    require_icloud_signed_bundle "$APP_BUNDLE"
+    require_signed_bundle "$APP_BUNDLE"
     ;;
   --install|install)
     install_app "$APP_BUNDLE"

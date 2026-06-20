@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 public enum DesignTokens {
     public enum Radius {
@@ -58,13 +61,34 @@ public enum DesignTokens {
         public static let accent = Color(red: 0.0, green: 0.39, blue: 1.0)
 
         #if os(macOS)
-        public static let panel = Color(nsColor: .windowBackgroundColor).opacity(0.92)
-        public static let panelTint = Color(nsColor: .underPageBackgroundColor).opacity(0.62)
-        public static let card = Color(nsColor: .controlBackgroundColor).opacity(0.74)
-        public static let row = Color(nsColor: .controlBackgroundColor)
-        public static let separator = Color(nsColor: .separatorColor).opacity(0.55)
-        public static let glassStroke = Color.white.opacity(0.28)
-        public static let controlPill = Color(nsColor: .controlBackgroundColor).opacity(0.58)
+        public static let panel = macSemanticColor(
+            light: MacSemanticColor(red: 0.965, green: 0.970, blue: 0.976, alpha: 0.96),
+            dark: MacSemanticColor(red: 0.112, green: 0.118, blue: 0.128, alpha: 0.96)
+        )
+        public static let panelTint = macSemanticColor(
+            light: MacSemanticColor(red: 0.925, green: 0.935, blue: 0.948, alpha: 0.92),
+            dark: MacSemanticColor(red: 0.158, green: 0.168, blue: 0.184, alpha: 0.90)
+        )
+        public static let card = macSemanticColor(
+            light: MacSemanticColor(red: 1.000, green: 1.000, blue: 1.000, alpha: 0.92),
+            dark: MacSemanticColor(red: 0.180, green: 0.190, blue: 0.208, alpha: 0.94)
+        )
+        public static let row = macSemanticColor(
+            light: MacSemanticColor(red: 0.982, green: 0.985, blue: 0.990, alpha: 0.95),
+            dark: MacSemanticColor(red: 0.205, green: 0.216, blue: 0.235, alpha: 0.92)
+        )
+        public static let separator = macSemanticColor(
+            light: MacSemanticColor(red: 0.000, green: 0.000, blue: 0.000, alpha: 0.12),
+            dark: MacSemanticColor(red: 1.000, green: 1.000, blue: 1.000, alpha: 0.12)
+        )
+        public static let glassStroke = macSemanticColor(
+            light: MacSemanticColor(red: 0.000, green: 0.000, blue: 0.000, alpha: 0.10),
+            dark: MacSemanticColor(red: 1.000, green: 1.000, blue: 1.000, alpha: 0.16)
+        )
+        public static let controlPill = macSemanticColor(
+            light: MacSemanticColor(red: 0.940, green: 0.947, blue: 0.956, alpha: 0.95),
+            dark: MacSemanticColor(red: 0.245, green: 0.257, blue: 0.278, alpha: 0.90)
+        )
         #elseif os(iOS)
         public static let panel = Color(.systemBackground)
         public static let panelTint = Color(.secondarySystemBackground)
@@ -89,9 +113,34 @@ public enum DesignTokens {
 
         #if os(macOS)
         /// Subtle hover highlight for list rows — matches native macOS selection style.
-        public static let hover = Color(nsColor: .selectedContentBackgroundColor).opacity(0.10)
+        public static let hover = macSemanticColor(
+            light: MacSemanticColor(red: 0.000, green: 0.390, blue: 1.000, alpha: 0.08),
+            dark: MacSemanticColor(red: 0.360, green: 0.610, blue: 1.000, alpha: 0.16)
+        )
         #else
         public static let hover = Color.accentColor.opacity(0.10)
+        #endif
+
+        #if os(macOS)
+        private struct MacSemanticColor {
+            let red: CGFloat
+            let green: CGFloat
+            let blue: CGFloat
+            let alpha: CGFloat
+        }
+
+        private static func macSemanticColor(light: MacSemanticColor, dark: MacSemanticColor) -> Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                let match = appearance.bestMatch(from: [.darkAqua, .aqua])
+                let color = match == .darkAqua ? dark : light
+                return NSColor(
+                    srgbRed: color.red,
+                    green: color.green,
+                    blue: color.blue,
+                    alpha: color.alpha
+                )
+            })
+        }
         #endif
     }
 }
@@ -125,7 +174,7 @@ public enum NativeMacStyle {
 public extension View {
     @ViewBuilder
     func nativeSystemSurface(cornerRadius: CGFloat, strokeOpacity: Double = 0.24) -> some View {
-        if #available(macOS 26.0, iOS 26.0, watchOS 26.0, *) {
+        if #available(macOS 26.0, *) {
             self
                 .background {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

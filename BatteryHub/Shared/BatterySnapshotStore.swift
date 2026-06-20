@@ -55,10 +55,6 @@ public struct BatterySnapshotStore: Sendable {
         }
     }
 
-    public mutating func removeCompanionSyncSnapshots() {
-        snapshotsByID = snapshotsByID.filter { !$0.value.source.isCompanionSync }
-    }
-
     public static func freshness(for snapshot: BatterySnapshot, now: Date) -> Freshness {
         let age = now.timeIntervalSince(snapshot.updatedAt)
         if age >= 1_800 { return .expired }
@@ -134,7 +130,7 @@ private extension BatterySource {
         switch self {
         case .ioRegistry, .coreBluetooth, .ioBluetooth, .systemProfiler, .bluetoothUnsupported:
             return true
-        case .macPowerSource, .iCloud, .watchConnectivity:
+        case .macPowerSource:
             return false
         }
     }

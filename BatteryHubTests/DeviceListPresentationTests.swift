@@ -1195,6 +1195,77 @@ final class DeviceListPresentationTests: XCTestCase {
         ])
     }
 
+    func testNotificationCenterAuthorizationStatePresentationMapsSystemStatuses() {
+        XCTAssertEqual(NotificationCenterAuthorizationState.from(.notDetermined), .notDetermined)
+        XCTAssertEqual(NotificationCenterAuthorizationState.from(.denied), .denied)
+        XCTAssertEqual(NotificationCenterAuthorizationState.from(.authorized), .authorized)
+        XCTAssertEqual(NotificationCenterAuthorizationState.from(.provisional), .provisional)
+
+        XCTAssertEqual(NotificationCenterAuthorizationState.unknown.title, "Checking")
+        XCTAssertEqual(NotificationCenterAuthorizationState.notDetermined.title, "Needs Permission")
+        XCTAssertEqual(NotificationCenterAuthorizationState.denied.title, "Disabled")
+        XCTAssertEqual(NotificationCenterAuthorizationState.authorized.title, "Allowed")
+        XCTAssertEqual(NotificationCenterAuthorizationState.provisional.title, "Limited")
+
+        XCTAssertTrue(NotificationCenterAuthorizationState.notDetermined.canRequestPermission)
+        XCTAssertFalse(NotificationCenterAuthorizationState.denied.canRequestPermission)
+        XCTAssertTrue(NotificationCenterAuthorizationState.denied.canOpenSystemSettings)
+        XCTAssertTrue(NotificationCenterAuthorizationState.authorized.canSendTestNotification)
+    }
+
+    func testNotificationCenterAuthorizationStateTreatsDisabledDeliverySettingsAsDenied() {
+        XCTAssertEqual(
+            NotificationCenterAuthorizationState.from(
+                authorizationStatus: .authorized,
+                alertSetting: .enabled,
+                notificationCenterSetting: .disabled
+            ),
+            .denied
+        )
+        XCTAssertEqual(
+            NotificationCenterAuthorizationState.from(
+                authorizationStatus: .authorized,
+                alertSetting: .disabled,
+                notificationCenterSetting: .enabled
+            ),
+            .denied
+        )
+        XCTAssertEqual(
+            NotificationCenterAuthorizationState.from(
+                authorizationStatus: .authorized,
+                alertSetting: .notSupported,
+                notificationCenterSetting: .enabled
+            ),
+            .denied
+        )
+        XCTAssertEqual(
+            NotificationCenterAuthorizationState.from(
+                authorizationStatus: .authorized,
+                alertSetting: .enabled,
+                notificationCenterSetting: .notSupported
+            ),
+            .denied
+        )
+        XCTAssertEqual(
+            NotificationCenterAuthorizationState.from(
+                authorizationStatus: .provisional,
+                alertSetting: .enabled,
+                notificationCenterSetting: .enabled
+            ),
+            .provisional
+        )
+    }
+
+    func testNotificationCenterDeliveryResultFormatsCompactStatus() {
+        let success = NotificationCenterDeliveryResult.queued("BatteryHub Test Notification")
+        let failure = NotificationCenterDeliveryResult.failed("Notifications are disabled")
+
+        XCTAssertEqual(success.title, "Queued")
+        XCTAssertEqual(success.subtitle, "BatteryHub Test Notification")
+        XCTAssertEqual(failure.title, "Could not send")
+        XCTAssertEqual(failure.subtitle, "Notifications are disabled")
+    }
+
     func testBatteryHUDPreferencesDefaultToEnabled() {
         let defaults = isolatedDefaults()
 
@@ -1522,8 +1593,8 @@ final class DeviceListPresentationTests: XCTestCase {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 82, updatedAt: now),
             makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 24, freshness: .stale, updatedAt: now),
-            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
-            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .iCloud, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .coreBluetooth, updatedAt: now),
+            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .coreBluetooth, updatedAt: now),
         ]
 
         let view = BatteryDesktopWidgetView(snapshots: snapshots, style: .expanded)
@@ -1592,8 +1663,8 @@ final class DeviceListPresentationTests: XCTestCase {
             makeDecorated(deviceID: "mac", displayName: "MacBook Pro", kind: .macBook, percent: nil, source: .macPowerSource, updatedAt: now),
             makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 82, updatedAt: now),
             makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
-            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .iCloud, updatedAt: now),
-            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .coreBluetooth, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .coreBluetooth, updatedAt: now),
             makeDecorated(deviceID: "\(addr)-case", displayName: "Isaac's AirPods Pro Case", kind: .airPods, percent: 90, updatedAt: now),
             makeDecorated(deviceID: "\(addr)-left", displayName: "Isaac's AirPods Pro Left", kind: .airPods, percent: 72, updatedAt: now),
             makeDecorated(deviceID: "\(addr)-right", displayName: "Isaac's AirPods Pro Right", kind: .airPods, percent: 68, updatedAt: now),
@@ -1662,7 +1733,7 @@ final class DeviceListPresentationTests: XCTestCase {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
             makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
-            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .coreBluetooth, updatedAt: now),
         ]
 
         let view = StatusMenuView(
@@ -1694,7 +1765,7 @@ final class DeviceListPresentationTests: XCTestCase {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
             makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
-            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .coreBluetooth, updatedAt: now),
         ]
 
         let view = StatusMenuView(
@@ -1736,8 +1807,8 @@ final class DeviceListPresentationTests: XCTestCase {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
             makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
-            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 100, chargeState: .full, source: .iCloud, updatedAt: now),
-            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .watchConnectivity, updatedAt: now),
+            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 100, chargeState: .full, source: .coreBluetooth, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .coreBluetooth, updatedAt: now),
             makeDecorated(deviceID: "\(addr)-case", displayName: "Isaac's AirPods Pro Case", kind: .airPods, percent: 90, updatedAt: now),
             makeDecorated(deviceID: "\(addr)-left", displayName: "Isaac's AirPods Pro Left", kind: .airPods, percent: 72, updatedAt: now),
             makeDecorated(deviceID: "\(addr)-right", displayName: "Isaac's AirPods Pro Right", kind: .airPods, percent: 68, updatedAt: now),
@@ -1895,6 +1966,33 @@ final class DeviceListPresentationTests: XCTestCase {
         hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
 
         let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-alerts-selected-device-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBatteryHubAlertsRenderNotificationCenterCardWithoutDevices() throws {
+        let view = BatteryHubSettingsView(
+            snapshots: [],
+            notificationAuthorizationState: .denied,
+            latestNotificationDeliveryResult: .failed("Notifications are disabled"),
+            onRefresh: {},
+            initialPane: .alerts
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-alerts-empty-render.png")
         let pngData = bitmap.representation(using: .png, properties: [:])
         XCTAssertNotNil(pngData)
 

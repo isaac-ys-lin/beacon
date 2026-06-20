@@ -50,21 +50,6 @@ sign_app() {
 
 prepare_entitlements() {
   /bin/cp "$ENTITLEMENTS" "$RESOLVED_ENTITLEMENTS"
-
-  if [[ -n "${TEAM_ID:-}" ]]; then
-    /usr/bin/plutil \
-      -replace com.apple.developer.ubiquity-kvstore-identifier \
-      -string "$TEAM_ID.com.isaacyslin.BatteryHub" \
-      "$RESOLVED_ENTITLEMENTS"
-  else
-    echo "No TEAM_ID set; removing iCloud entitlements from this local DMG build."
-    /usr/libexec/PlistBuddy \
-      -c "Delete :com.apple.developer.ubiquity-kvstore-identifier" \
-      "$RESOLVED_ENTITLEMENTS" 2>/dev/null || true
-    /usr/libexec/PlistBuddy \
-      -c "Delete :com.apple.developer.icloud-container-identifiers" \
-      "$RESOLVED_ENTITLEMENTS" 2>/dev/null || true
-  fi
 }
 
 notarize_dmg_if_requested() {

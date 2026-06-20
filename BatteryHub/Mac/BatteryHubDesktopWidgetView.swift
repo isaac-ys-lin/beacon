@@ -31,7 +31,7 @@ enum DesktopWidgetStyle: String, CaseIterable, Identifiable {
         case .compact:
             return resolveSymbol("rectangle.grid.1x2", fallback: "rectangle")
         case .expanded:
-            return resolveSymbol("rectangle.grid.3x2", fallback: BatteryHubSymbols.app)
+            return resolveSymbol("rectangle.grid.3x2", fallback: "rectangle.grid.2x2")
         }
     }
 
@@ -123,15 +123,7 @@ struct BatteryDesktopWidgetView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: BatteryHubSymbols.app)
-                .font(.system(size: 16, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DesignTokens.Palette.accent)
-                .frame(width: 32, height: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
-                )
+            BatteryHubLogoMark(size: 32)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Batteries")

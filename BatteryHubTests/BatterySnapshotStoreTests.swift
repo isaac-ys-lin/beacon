@@ -16,7 +16,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
             kind: .iPhone,
             percent: 42,
             chargeState: .unplugged,
-            source: .iCloud,
+            source: .coreBluetooth,
             updatedAt: Date(timeIntervalSince1970: 100)
         )
         let new = BatterySnapshot(
@@ -25,7 +25,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
             kind: .iPhone,
             percent: 43,
             chargeState: .charging,
-            source: .iCloud,
+            source: .coreBluetooth,
             updatedAt: Date(timeIntervalSince1970: 200)
         )
 
@@ -45,7 +45,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
             kind: .appleWatch,
             percent: 88,
             chargeState: .unplugged,
-            source: .watchConnectivity,
+            source: .coreBluetooth,
             updatedAt: Date(timeIntervalSince1970: 0)
         )
         var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 700) })
@@ -163,7 +163,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots.map(\.percent), [82])
     }
 
-    func testRemoveCompanionSyncSnapshotsKeepsBluetoothDevices() {
+    func testMobileRowsRemainOrdinaryExternalSnapshots() {
         let now = Date(timeIntervalSince1970: 100)
         let keyboard = BatterySnapshot(
             deviceID: "keyboard",
@@ -180,25 +180,14 @@ final class BatterySnapshotStoreTests: XCTestCase {
             kind: .iPhone,
             percent: 52,
             chargeState: .unplugged,
-            source: .iCloud,
+            source: .coreBluetooth,
             updatedAt: now
         )
-        let watch = BatterySnapshot(
-            deviceID: "watch",
-            displayName: "Yi Sung Apple Watch",
-            kind: .appleWatch,
-            percent: 42,
-            chargeState: .charging,
-            source: .watchConnectivity,
-            updatedAt: now
-        )
-
         var store = BatterySnapshotStore(now: { now })
-        store.merge([keyboard, iphone, watch])
-        store.removeCompanionSyncSnapshots()
+        store.merge([keyboard, iphone])
 
-        XCTAssertEqual(store.snapshots.map(\.deviceID), ["keyboard"])
-        XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), ["keyboard"])
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["iphone", "keyboard"])
+        XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), ["iphone", "keyboard"])
     }
 
     func testBatteryHistoryStoreRecordsAndSummarizesPercentTrend() {
@@ -269,7 +258,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
                 kind: .appleWatch,
                 percent: 100 - (index % 50),
                 chargeState: .unplugged,
-                source: .watchConnectivity,
+                source: .coreBluetooth,
                 updatedAt: now
                     .addingTimeInterval(-BatteryHistoryStore.retentionInterval)
                     .addingTimeInterval(Double(index * 600))

@@ -20,19 +20,11 @@ public enum ChargeState: String, Codable, Sendable {
 
 public enum BatterySource: String, Codable, Sendable {
     case macPowerSource
-    case iCloud
-    case watchConnectivity
     case ioRegistry
     case coreBluetooth
     case ioBluetooth
     case systemProfiler
     case bluetoothUnsupported
-}
-
-public extension BatterySource {
-    var isCompanionSync: Bool {
-        self == .iCloud || self == .watchConnectivity
-    }
 }
 
 public enum Freshness: String, Codable, Sendable {

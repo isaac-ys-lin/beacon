@@ -26,11 +26,11 @@ final class BatteryHubMacApp: NSObject, NSApplicationDelegate, UNUserNotificatio
     func applicationDidFinishLaunching(_ notification: Notification) {
         StatusWindowPreferences.applyNativeDefaultIfNeeded()
         UNUserNotificationCenter.current().delegate = self
-        LowBatteryNotifier.requestAuthorization()
 
         let model = BatteryHubModel()
         self.model = model
         statusController = BatteryHubStatusController(model: model)
+        model.refreshNotificationAuthorizationStatus()
         model.start()
     }
 
@@ -56,6 +56,8 @@ final class BatteryHubStatusController: NSObject {
     private var storeObserver: AnyCancellable?
     private var refreshStateObserver: AnyCancellable?
     private var alertEventsObserver: AnyCancellable?
+    private var notificationAuthorizationObserver: AnyCancellable?
+    private var notificationDeliveryObserver: AnyCancellable?
     private var bluetoothPowerStateCancellable: AnyCancellable?
     private var preferencesObservers: [NSObjectProtocol] = []
     private var outsideClickMonitor: Any?
@@ -85,6 +87,13 @@ final class BatteryHubStatusController: NSObject {
         refreshStateObserver = model.$isRefreshing.sink { [weak self] _ in
             self?.updateStatusButton()
             self?.updateStatusMenuContent()
+            self?.settingsWindowController.updateContent()
+        }
+        notificationAuthorizationObserver = model.$notificationAuthorizationState.sink { [weak self] _ in
+            self?.updateStatusMenuContent()
+            self?.settingsWindowController.updateContent()
+        }
+        notificationDeliveryObserver = model.$latestNotificationDeliveryResult.sink { [weak self] _ in
             self?.settingsWindowController.updateContent()
         }
         alertEventsObserver = model.$latestAlertEvents
@@ -148,6 +157,7 @@ final class BatteryHubStatusController: NSObject {
                 isPreviewingData: model.isUsingPreviewData,
                 configuration: configuration,
                 bluetoothPowerState: bluetoothPowerStateObserver.state,
+                notificationAuthorizationState: model.notificationAuthorizationState,
                 onRefresh: { [weak model] in
                     Task { await model?.refresh() }
                 },
@@ -207,6 +217,7 @@ final class BatteryHubStatusController: NSObject {
     }
 
     private func handlePreferencesChanged() {
+        model.refreshNotificationAuthorizationStatus()
         updateStatusButton()
         updateStatusMenuContent()
         registerQuickActions()
@@ -484,9 +495,10 @@ final class BatteryHubSettingsWindowController {
         guard let window else { return }
         let rootView = BatteryHubSettingsView(
             snapshots: model.store.decoratedSnapshots,
-            syncDiagnostics: model.companionSyncDiagnostics,
             isRefreshing: model.isRefreshing,
             isPreviewingData: model.isUsingPreviewData,
+            notificationAuthorizationState: model.notificationAuthorizationState,
+            latestNotificationDeliveryResult: model.latestNotificationDeliveryResult,
             onRefresh: { [weak model] in
                 Task { await model?.refresh() }
             },
@@ -496,8 +508,17 @@ final class BatteryHubSettingsWindowController {
             onOpenSoundSettings: {
                 BatteryHubSystemSettingsActions.openSoundSettings()
             },
-            onClearCompanionSync: { [weak model] in
-                model?.clearCompanionSync()
+            onRefreshNotificationAuthorization: { [weak model] in
+                model?.refreshNotificationAuthorizationStatus()
+            },
+            onRequestNotificationPermission: { [weak model] in
+                model?.requestNotificationAuthorization()
+            },
+            onOpenNotificationSettings: {
+                BatteryHubSystemSettingsActions.openNotificationSettings()
+            },
+            onSendTestNotification: { [weak model] in
+                model?.sendTestNotification()
             },
             onQuit: {
                 NSApp.terminate(nil)
@@ -690,6 +711,11 @@ enum BatteryHubSystemSettingsActions {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") else { return }
         NSWorkspace.shared.open(url)
     }
+
+    static func openNotificationSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") else { return }
+        NSWorkspace.shared.open(url)
+    }
 }
 
 enum MenuBarBatteryFormatter {
@@ -706,10 +732,8 @@ enum MenuBarBatteryFormatter {
 
 private enum BatteryHubStatusIconImage {
     static func make() -> NSImage {
-        let symbolName = BatteryHubSymbols.app
-        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
-        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "BatteryHub")?
-            .withSymbolConfiguration(configuration)
+        let image = NSImage(named: BatteryHubSymbols.statusGlyphAsset)
+            ?? NSImage(systemSymbolName: BatteryHubSymbols.app, accessibilityDescription: "BatteryHub")
             ?? NSImage(size: NSSize(width: 18, height: 18))
 
         image.size = NSSize(width: 18, height: 18)
@@ -724,7 +748,8 @@ final class BatteryHubModel: ObservableObject {
     @Published private(set) var store = BatterySnapshotStore()
     @Published private(set) var isRefreshing = false
     @Published private(set) var latestAlertEvents: [BatteryAlertEvent] = []
-    @Published private(set) var companionSyncDiagnostics = CompanionSyncDiagnostics.empty
+    @Published private(set) var notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown
+    @Published private(set) var latestNotificationDeliveryResult: NotificationCenterDeliveryResult?
 
     private let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "refresh")
     private var refreshLoop: Task<Void, Never>?
@@ -783,40 +808,58 @@ final class BatteryHubModel: ObservableObject {
         let bluetoothSnapshots = await BluetoothBatteryResolver().read()
         logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
         nextStore.merge(bluetoothSnapshots)
-        let cloudSync = CloudBatterySync()
-        let envelope: SyncEnvelope?
-        let syncLoadErrorDescription: String?
-        do {
-            envelope = try cloudSync.load()
-            syncLoadErrorDescription = nil
-        } catch {
-            envelope = nil
-            syncLoadErrorDescription = error.localizedDescription
-            logger.error("iCloud battery sync load failed: \(error.localizedDescription)")
-        }
-        if let envelope {
-            nextStore.merge(envelope.snapshots)
-        } else if syncLoadErrorDescription == nil {
-            nextStore.removeCompanionSyncSnapshots()
-        }
         BatteryHistoryStore.record(nextStore.snapshots)
         store = nextStore
-        companionSyncDiagnostics = CompanionSyncDiagnostics(
-            snapshots: nextStore.snapshots,
-            envelope: envelope,
-            loadErrorDescription: syncLoadErrorDescription
-        )
         logger.info("Visible external snapshots: \(nextStore.externalBatterySnapshots.count)")
-        latestAlertEvents = LowBatteryNotifier.notifyIfNeeded(for: nextStore.externalBatterySnapshots)
+        latestAlertEvents = LowBatteryNotifier.notifyIfNeeded(
+            for: nextStore.externalBatterySnapshots,
+            deliveryHandler: { [weak self] result in
+                Task { @MainActor [weak self] in
+                    self?.setLatestNotificationDeliveryResult(result)
+                    self?.refreshNotificationAuthorizationStatus()
+                }
+            }
+        )
     }
 
-    func clearCompanionSync() {
-        let syncAccepted = CloudBatterySync().clear()
-        var nextStore = store
-        nextStore.removeCompanionSyncSnapshots()
-        store = nextStore
-        companionSyncDiagnostics = CompanionSyncDiagnostics(snapshots: nextStore.snapshots)
-        logger.info("Cleared companion sync snapshots syncAccepted=\(syncAccepted)")
+    func refreshNotificationAuthorizationStatus() {
+        Task { [weak self] in
+            let state = await LowBatteryNotifier.currentAuthorizationState()
+            await MainActor.run {
+                self?.setNotificationAuthorizationState(state)
+            }
+        }
+    }
+
+    func requestNotificationAuthorization() {
+        setNotificationAuthorizationState(.unknown)
+        LowBatteryNotifier.requestAuthorization { [weak self] state, result in
+            Task { @MainActor [weak self] in
+                self?.setNotificationAuthorizationState(state)
+                if let result {
+                    self?.setLatestNotificationDeliveryResult(result)
+                }
+            }
+        }
+    }
+
+    func sendTestNotification() {
+        LowBatteryNotifier.sendTestNotification { [weak self] result in
+            Task { @MainActor [weak self] in
+                self?.setLatestNotificationDeliveryResult(result)
+                self?.refreshNotificationAuthorizationStatus()
+            }
+        }
+    }
+
+    private func setNotificationAuthorizationState(_ state: NotificationCenterAuthorizationState) {
+        guard notificationAuthorizationState != state else { return }
+        notificationAuthorizationState = state
+    }
+
+    private func setLatestNotificationDeliveryResult(_ result: NotificationCenterDeliveryResult?) {
+        guard latestNotificationDeliveryResult != result else { return }
+        latestNotificationDeliveryResult = result
     }
 
     private func seedPreviewData() {
@@ -826,10 +869,6 @@ final class BatteryHubModel: ObservableObject {
         nextStore.merge(previewSnapshots)
         seedPreviewHistory(now: now)
         store = nextStore
-        companionSyncDiagnostics = CompanionSyncDiagnostics(
-            snapshots: nextStore.snapshots,
-            envelope: SyncEnvelope(snapshots: previewSnapshots, publishedAt: now)
-        )
         logger.info("Preview battery data loaded for UI QA")
     }
 
@@ -921,24 +960,6 @@ final class BatteryHubModel: ObservableObject {
                 chargeState: .unplugged,
                 source: .coreBluetooth,
                 updatedAt: now.addingTimeInterval(-720)
-            ),
-            BatterySnapshot(
-                deviceID: "preview-iphone",
-                displayName: "Isaac's iPhone",
-                kind: .iPhone,
-                percent: 64,
-                chargeState: .charging,
-                source: .iCloud,
-                updatedAt: now
-            ),
-            BatterySnapshot(
-                deviceID: "preview-watch",
-                displayName: "Apple Watch",
-                kind: .appleWatch,
-                percent: 18,
-                chargeState: .unplugged,
-                source: .watchConnectivity,
-                updatedAt: now
             ),
             BatterySnapshot(
                 deviceID: "preview-airpods-case",
