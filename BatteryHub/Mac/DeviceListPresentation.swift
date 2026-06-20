@@ -476,6 +476,23 @@ public func dashboardDeviceSections(
         }
 }
 
+public func statusMenuDeviceSections(
+    _ snapshots: [DecoratedBatterySnapshot],
+    preferences: DeviceDisplayPreferences
+) -> [DeviceSection] {
+    let dashboardSections = dashboardDeviceSections(snapshots, preferences: preferences)
+    if !dashboardSections.isEmpty {
+        return dashboardSections
+    }
+
+    return configuredDeviceSections(snapshots, preferences: preferences)
+        .compactMap { section in
+            let connectedItems = section.items.filter(isStatusMenuFallbackVisibleItem)
+            guard !connectedItems.isEmpty else { return nil }
+            return DeviceSection(items: connectedItems)
+        }
+}
+
 public func isDashboardVisibleItem(_ item: DeviceListItem) -> Bool {
     switch item {
     case .device(let decorated):
@@ -483,6 +500,16 @@ public func isDashboardVisibleItem(_ item: DeviceListItem) -> Bool {
             && decorated.snapshot.percent != nil
     case .airPods(_, _, let components):
         return components.contains { $0.percent != nil }
+    }
+}
+
+public func isStatusMenuFallbackVisibleItem(_ item: DeviceListItem) -> Bool {
+    switch item {
+    case .device(let decorated):
+        return decorated.snapshot.kind != .macBook
+            && decorated.snapshot.connectionState == .connected
+    case .airPods:
+        return item.connectionState == .connected
     }
 }
 
@@ -513,7 +540,7 @@ public func deviceInspectorItems(
                 item: item,
                 isPinned: preferences.isPinned(item),
                 isUserHidden: preferences.isHidden(item),
-                isUnavailable: !isDashboardVisibleItem(item)
+                isUnavailable: isConnectionUnavailableItem(item)
             )
         }
 }
@@ -522,7 +549,11 @@ public func isInspectorHiddenItem(
     _ item: DeviceListItem,
     preferences: DeviceDisplayPreferences
 ) -> Bool {
-    preferences.isHidden(item) || !isDashboardVisibleItem(item)
+    preferences.isHidden(item) || isConnectionUnavailableItem(item)
+}
+
+public func isConnectionUnavailableItem(_ item: DeviceListItem) -> Bool {
+    item.connectionState == .disconnected
 }
 
 public func displayedDeviceInspectorItems(

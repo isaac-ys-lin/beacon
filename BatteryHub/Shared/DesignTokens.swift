@@ -98,14 +98,18 @@ public enum DesignTokens {
 
 public enum NativeMacStyle {
     public static let popoverCornerRadius: CGFloat = 26
+    public static let widgetCornerRadius: CGFloat = 22
     public static let panelCornerRadius: CGFloat = 14
     public static let rowCornerRadius: CGFloat = 7
+    public static let dashboardRowCornerRadius: CGFloat = 12
 
     public static var subtleStroke: Color {
         #if os(macOS)
         Color(nsColor: .separatorColor).opacity(0.26)
-        #else
+        #elseif os(iOS)
         Color(.separator).opacity(0.26)
+        #else
+        Color.white.opacity(0.18)
         #endif
     }
 
@@ -121,7 +125,7 @@ public enum NativeMacStyle {
 public extension View {
     @ViewBuilder
     func nativeSystemSurface(cornerRadius: CGFloat, strokeOpacity: Double = 0.24) -> some View {
-        if #available(macOS 26.0, iOS 26.0, *) {
+        if #available(macOS 26.0, iOS 26.0, watchOS 26.0, *) {
             self
                 .background {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -150,10 +154,17 @@ public extension View {
 
     @ViewBuilder
     func nativeSettingsBackground() -> some View {
-        if #available(macOS 26.0, iOS 26.0, *) {
-            self.containerBackground(.regularMaterial, for: .window)
+        #if os(macOS)
+        if #available(macOS 26.0, *) {
+            self
+                .containerBackground(.regularMaterial, for: .window)
         } else {
-            self.background(.regularMaterial)
+            self
+                .background(.regularMaterial)
         }
+        #else
+        self
+            .background(.regularMaterial)
+        #endif
     }
 }

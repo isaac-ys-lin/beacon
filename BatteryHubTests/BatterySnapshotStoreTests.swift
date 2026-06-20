@@ -107,6 +107,100 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.decoratedExternalBatterySnapshots.map(\.snapshot.deviceID), ["keyboard"])
     }
 
+    func testMergeDeduplicatesSameNamedBluetoothDeviceAcrossSources() {
+        let oldUnsupported = BatterySnapshot(
+            deviceID: "bluetooth-AA-BB-CC",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: nil,
+            chargeState: .unknown,
+            source: .bluetoothUnsupported,
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let newerBatteryReport = BatterySnapshot(
+            deviceID: "bluetooth-hid-keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 82,
+            chargeState: .unplugged,
+            source: .ioRegistry,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 140) })
+        store.merge([oldUnsupported])
+        store.merge([newerBatteryReport])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["bluetooth-hid-keyboard"])
+        XCTAssertEqual(store.snapshots.map(\.percent), [82])
+    }
+
+    func testMergeKeepsBatteryReportWhenSameRefreshAlsoHasUnsupportedBluetoothDuplicate() {
+        let now = Date(timeIntervalSince1970: 120)
+        let batteryReport = BatterySnapshot(
+            deviceID: "bluetooth-hid-keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 82,
+            chargeState: .unknown,
+            source: .ioRegistry,
+            updatedAt: now
+        )
+        let unsupportedDuplicate = BatterySnapshot(
+            deviceID: "bluetooth-AA-BB-CC",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: nil,
+            chargeState: .unknown,
+            source: .bluetoothUnsupported,
+            updatedAt: now
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 140) })
+        store.merge([batteryReport, unsupportedDuplicate])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["bluetooth-hid-keyboard"])
+        XCTAssertEqual(store.snapshots.map(\.percent), [82])
+    }
+
+    func testRemoveCompanionSyncSnapshotsKeepsBluetoothDevices() {
+        let now = Date(timeIntervalSince1970: 100)
+        let keyboard = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Keychron K3 Max",
+            kind: .keyboard,
+            percent: 88,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: now
+        )
+        let iphone = BatterySnapshot(
+            deviceID: "iphone",
+            displayName: "YiSungiPhone",
+            kind: .iPhone,
+            percent: 52,
+            chargeState: .unplugged,
+            source: .iCloud,
+            updatedAt: now
+        )
+        let watch = BatterySnapshot(
+            deviceID: "watch",
+            displayName: "Yi Sung Apple Watch",
+            kind: .appleWatch,
+            percent: 42,
+            chargeState: .charging,
+            source: .watchConnectivity,
+            updatedAt: now
+        )
+
+        var store = BatterySnapshotStore(now: { now })
+        store.merge([keyboard, iphone, watch])
+        store.removeCompanionSyncSnapshots()
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["keyboard"])
+        XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), ["keyboard"])
+    }
+
     func testBatteryHistoryStoreRecordsAndSummarizesPercentTrend() {
         let defaults = isolatedDefaults()
         let base = Date(timeIntervalSince1970: 1_000)

@@ -1,10 +1,12 @@
 import AppKit
 import Combine
+import CoreBluetooth
 import SwiftUI
+import UserNotifications
 import os
 
 @main
-final class BatteryHubMacApp: NSObject, NSApplicationDelegate {
+final class BatteryHubMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     nonisolated(unsafe) private static var retainedDelegate: BatteryHubMacApp?
 
     private var model: BatteryHubModel?
@@ -23,6 +25,7 @@ final class BatteryHubMacApp: NSObject, NSApplicationDelegate {
     @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
         StatusWindowPreferences.applyNativeDefaultIfNeeded()
+        UNUserNotificationCenter.current().delegate = self
         LowBatteryNotifier.requestAuthorization()
 
         let model = BatteryHubModel()
@@ -30,22 +33,31 @@ final class BatteryHubMacApp: NSObject, NSApplicationDelegate {
         statusController = BatteryHubStatusController(model: model)
         model.start()
     }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list, .sound])
+    }
 }
 
 @MainActor
-final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
+final class BatteryHubStatusController: NSObject {
     private let model: BatteryHubModel
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-    private let popover = NSPopover()
-    private let popoverContentCoordinator = StatusPopoverContentCoordinator()
+    private let statusMenuPanelController = StatusMenuPanelController()
     private let settingsWindowController: BatteryHubSettingsWindowController
     private let hudController = BatteryHubHUDController()
     private let desktopWidgetController = BatteryHubDesktopWidgetController()
     private let shortcutController = BatteryHubShortcutController()
+    private let bluetoothPowerStateObserver = BluetoothPowerStateObserver()
     private var storeObserver: AnyCancellable?
     private var refreshStateObserver: AnyCancellable?
     private var alertEventsObserver: AnyCancellable?
-    private var preferencesObserver: NSObjectProtocol?
+    private var bluetoothPowerStateCancellable: AnyCancellable?
+    private var preferencesObservers: [NSObjectProtocol] = []
     private var outsideClickMonitor: Any?
 
     init(model: BatteryHubModel) {
@@ -53,11 +65,7 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
         settingsWindowController = BatteryHubSettingsWindowController(model: model)
         super.init()
 
-        popover.behavior = .transient
-        popover.animates = false
-        popover.contentSize = preferredPopoverContentSize()
-        popover.delegate = self
-        updatePopoverContent()
+        updateStatusMenuContent()
 
         if let button = statusItem.button {
             button.target = self
@@ -70,13 +78,13 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
 
         storeObserver = model.$store.sink { [weak self] _ in
             self?.updateStatusButton()
-            self?.updatePopoverContent()
+            self?.updateStatusMenuContent()
             self?.settingsWindowController.updateContent()
             self?.updateDesktopWidget()
         }
         refreshStateObserver = model.$isRefreshing.sink { [weak self] _ in
             self?.updateStatusButton()
-            self?.updatePopoverContent()
+            self?.updateStatusMenuContent()
             self?.settingsWindowController.updateContent()
         }
         alertEventsObserver = model.$latestAlertEvents
@@ -84,18 +92,30 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
             .sink { [weak self] events in
                 self?.hudController.show(event: events[0])
             }
-        preferencesObserver = NotificationCenter.default.addObserver(
-            forName: UserDefaults.didChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.updateStatusButton()
-                self?.updatePopoverContent()
-                self?.registerQuickActions()
-                self?.updateDesktopWidget()
+        bluetoothPowerStateCancellable = bluetoothPowerStateObserver.$state
+            .sink { [weak self] _ in
+                self?.updateStatusMenuContent()
             }
-        }
+        preferencesObservers = [
+            NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.handlePreferencesChanged()
+                }
+            },
+            NotificationCenter.default.addObserver(
+                forName: StatusWindowPreferences.didChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.handlePreferencesChanged()
+                }
+            }
+        ]
         BatteryHubIntentBridge.shared.register(
             handler: { [weak self] action in
                 self?.performQuickAction(action)
@@ -110,28 +130,24 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
-        if popover.isShown {
-            popover.performClose(sender)
+        if statusMenuPanelController.isShown {
+            closeStatusMenu()
         } else {
-            showPopover(relativeTo: sender)
+            showStatusMenu(relativeTo: sender)
         }
     }
 
-    func popoverDidClose(_ notification: Notification) {
-        stopOutsideClickMonitor()
-    }
+    private func updateStatusMenuContent(screen: NSScreen? = NSScreen.main) {
+        let configuration = StatusWindowConfiguration.load()
+        let nextSize = preferredPopoverContentSize(screen: screen, configuration: configuration)
 
-    private func updatePopoverContent(screen: NSScreen? = NSScreen.main) {
-        let nextSize = preferredPopoverContentSize(screen: screen)
-        if !popover.contentSize.isApproximatelyEqual(to: nextSize) {
-            popover.contentSize = nextSize
-        }
-
-        popoverContentCoordinator.install(
+        statusMenuPanelController.install(
             rootView: StatusMenuView(
                 snapshots: model.store.decoratedSnapshots,
                 isRefreshing: model.isRefreshing,
                 isPreviewingData: model.isUsingPreviewData,
+                configuration: configuration,
+                bluetoothPowerState: bluetoothPowerStateObserver.state,
                 onRefresh: { [weak model] in
                     Task { await model?.refresh() }
                 },
@@ -139,7 +155,7 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
                     self?.showSettingsWindow(initialPane: pane, selectedDeviceID: selectedDeviceID)
                 }
             ),
-            in: popover
+            contentSize: nextSize
         )
     }
 
@@ -147,74 +163,54 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
         initialPane: SettingsPane = .devices,
         selectedDeviceID: String? = nil
     ) {
-        popover.performClose(nil)
+        closeStatusMenu()
         settingsWindowController.showWindow(
             initialPane: initialPane,
             initialSelectedDeviceID: selectedDeviceID
         )
     }
 
-    private func showPopover(relativeTo sender: NSStatusBarButton) {
-        updatePopoverContent(screen: sender.window?.screen)
-        let anchor = NSRect(
-            x: sender.bounds.midX - 1,
-            y: sender.bounds.minY,
-            width: 2,
-            height: sender.bounds.height
-        )
-        popover.show(relativeTo: anchor, of: sender, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+    private func showStatusMenu(relativeTo sender: NSStatusBarButton) {
+        updateStatusMenuContent(screen: sender.window?.screen)
+        statusMenuPanelController.show(relativeTo: sender)
         startOutsideClickMonitor()
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func preferredPopoverContentSize(screen: NSScreen? = NSScreen.main) -> NSSize {
+    private func closeStatusMenu() {
+        statusMenuPanelController.close()
+        stopOutsideClickMonitor()
+    }
+
+    private func preferredPopoverContentSize(
+        screen: NSScreen? = NSScreen.main,
+        configuration: StatusWindowConfiguration = .load()
+    ) -> NSSize {
         let defaults = UserDefaults.standard
-        let style = defaults.string(forKey: StatusWindowPreferences.styleKey)
-            .flatMap(StatusWindowStyle.init(rawValue:)) ?? .native
         let preferences = DeviceDisplayPreferences.load(from: defaults)
-        let sections = dashboardDeviceSections(
+        let sections = statusMenuDeviceSections(
             model.store.decoratedSnapshots,
             preferences: preferences
         )
         let dashboardItemCount = sections.reduce(0) { partial, section in
             partial + section.items.count
         }
-        let showsOverview = boolPreference(
-            StatusWindowPreferences.showBatteryOverviewKey,
-            defaultValue: true,
-            defaults: defaults
-        )
-        let showsAirPodsCard = style == .large
-            && boolPreference(
-                StatusWindowPreferences.showAirPodsCardKey,
-                defaultValue: true,
-                defaults: defaults
-            )
-            && sections.contains { section in
-                section.items.contains { item in
-                    if case .airPods = item { return true }
-                    return false
-                }
-            }
         let screenHeight = screen?.visibleFrame.height ?? 900
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: dashboardItemCount,
-            showsOverview: showsOverview,
-            showsAirPodsCard: showsAirPodsCard,
-            style: style,
+            showsOverview: configuration.showsOverviewInDashboard,
+            showsAirPodsCard: configuration.showsAirPodsCard(in: sections),
+            style: configuration.style,
             visibleScreenHeight: screenHeight
         )
         return NSSize(width: size.width, height: size.height)
     }
 
-    private func boolPreference(
-        _ key: String,
-        defaultValue: Bool,
-        defaults: UserDefaults
-    ) -> Bool {
-        guard defaults.object(forKey: key) != nil else { return defaultValue }
-        return defaults.bool(forKey: key)
+    private func handlePreferencesChanged() {
+        updateStatusButton()
+        updateStatusMenuContent()
+        registerQuickActions()
+        updateDesktopWidget()
     }
 
     private func updateDesktopWidget() {
@@ -238,17 +234,17 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
         switch action {
         case .showDashboard:
             guard let button = statusItem.button else { return }
-            if popover.isShown {
-                popover.performClose(nil)
+            if statusMenuPanelController.isShown {
+                closeStatusMenu()
             } else {
-                showPopover(relativeTo: button)
+                showStatusMenu(relativeTo: button)
             }
         case .refreshBatteries:
             Task { await model.refresh() }
         case .openSettings:
             showSettingsWindow()
         case .addDevice:
-            popover.performClose(nil)
+            closeStatusMenu()
             settingsWindowController.showWindow(
                 initialPane: .devices,
                 initiallyShowingAddDeviceGuide: true
@@ -289,7 +285,8 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
 
     private func updateStatusButton() {
         guard let button = statusItem.button else { return }
-        let batteryText = UserDefaults.standard.bool(forKey: StatusWindowPreferences.showMenuBarBatteryKey)
+        let configuration = StatusWindowConfiguration.load()
+        let batteryText = configuration.showsMenuBarBattery
             ? MenuBarBatteryFormatter.menuBarText(for: model.store.decoratedSnapshots)
             : nil
 
@@ -303,7 +300,7 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
             button.title = ""
         }
 
-        button.image = BluetoothStatusIconImage.make()
+        button.image = BatteryHubStatusIconImage.make()
         if model.isRefreshing {
             button.toolTip = "BatteryHub · refreshing"
         } else {
@@ -316,7 +313,7 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) {
             [weak self] _ in
             Task { @MainActor in
-                self?.popover.performClose(nil)
+                self?.closeStatusMenu()
             }
         }
     }
@@ -329,18 +326,124 @@ final class BatteryHubStatusController: NSObject, NSPopoverDelegate {
 }
 
 @MainActor
-final class StatusPopoverContentCoordinator {
+final class StatusMenuPanelController {
     private(set) var hostingController: NSHostingController<StatusMenuView>?
+    private(set) var panel: BatteryHubStatusPanel?
+    private var contentSize: NSSize = StatusMenuSizing.preferredContentSize(
+        dashboardItemCount: 0,
+        showsOverview: false,
+        showsAirPodsCard: false,
+        style: .native,
+        visibleScreenHeight: 900
+    )
 
-    func install(rootView: StatusMenuView, in popover: NSPopover) {
+    var isShown: Bool {
+        panel?.isVisible == true
+    }
+
+    func install(rootView: StatusMenuView, contentSize: NSSize) {
+        self.contentSize = contentSize
         if let hostingController {
             hostingController.rootView = rootView
+            hostingController.view.frame = NSRect(origin: .zero, size: contentSize)
+            applyRoundedMask(to: hostingController.view)
+            applyRoundedMask(to: panel?.contentView)
+            panel?.setContentSize(contentSize)
             return
         }
 
         let hostingController = NSHostingController(rootView: rootView)
         self.hostingController = hostingController
-        popover.contentViewController = hostingController
+        hostingController.view.frame = NSRect(origin: .zero, size: contentSize)
+        applyRoundedMask(to: hostingController.view)
+
+        let panel = BatteryHubStatusPanel(
+            contentRect: NSRect(origin: .zero, size: contentSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        panel.contentViewController = hostingController
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = false
+        panel.isReleasedWhenClosed = false
+        panel.level = .popUpMenu
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        applyRoundedMask(to: panel.contentView)
+        self.panel = panel
+    }
+
+    func show(relativeTo sender: NSStatusBarButton) {
+        guard let panel else { return }
+        guard let window = sender.window else {
+            panel.center()
+            panel.orderFrontRegardless()
+            return
+        }
+
+        let buttonFrame = window.convertToScreen(sender.convert(sender.bounds, to: nil))
+        let screen = window.screen ?? NSScreen.main
+        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let frame = StatusMenuPanelPositioning.frame(
+            contentSize: contentSize,
+            buttonFrame: buttonFrame,
+            visibleFrame: visibleFrame
+        )
+        panel.setFrame(frame, display: true)
+        panel.orderFrontRegardless()
+    }
+
+    func close() {
+        panel?.orderOut(nil)
+    }
+
+    private func applyRoundedMask(to view: NSView?) {
+        guard let view else { return }
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.clear.cgColor
+        view.layer?.cornerRadius = NativeMacStyle.popoverCornerRadius
+        if #available(macOS 10.15, *) {
+            view.layer?.cornerCurve = .continuous
+        }
+        view.layer?.masksToBounds = true
+    }
+}
+
+final class BatteryHubStatusPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+enum StatusMenuPanelPositioning {
+    static let margin: CGFloat = 8
+    static let verticalGap: CGFloat = 6
+
+    static func frame(
+        contentSize: NSSize,
+        buttonFrame: NSRect,
+        visibleFrame: NSRect
+    ) -> NSRect {
+        guard visibleFrame.width > 0, visibleFrame.height > 0 else {
+            return NSRect(
+                x: buttonFrame.midX - contentSize.width / 2,
+                y: buttonFrame.minY - contentSize.height - verticalGap,
+                width: contentSize.width,
+                height: contentSize.height
+            )
+        }
+
+        let minX = visibleFrame.minX + margin
+        let maxX = visibleFrame.maxX - contentSize.width - margin
+        let proposedX = buttonFrame.midX - contentSize.width / 2
+        let x = min(max(proposedX, minX), max(minX, maxX))
+
+        let minY = visibleFrame.minY + margin
+        let maxY = visibleFrame.maxY - contentSize.height - margin
+        let proposedY = buttonFrame.minY - contentSize.height - verticalGap
+        let y = min(max(proposedY, minY), max(minY, maxY))
+
+        return NSRect(x: x, y: y, width: contentSize.width, height: contentSize.height)
     }
 }
 
@@ -381,6 +484,7 @@ final class BatteryHubSettingsWindowController {
         guard let window else { return }
         let rootView = BatteryHubSettingsView(
             snapshots: model.store.decoratedSnapshots,
+            syncDiagnostics: model.companionSyncDiagnostics,
             isRefreshing: model.isRefreshing,
             isPreviewingData: model.isUsingPreviewData,
             onRefresh: { [weak model] in
@@ -391,6 +495,12 @@ final class BatteryHubSettingsWindowController {
             },
             onOpenSoundSettings: {
                 BatteryHubSystemSettingsActions.openSoundSettings()
+            },
+            onClearCompanionSync: { [weak model] in
+                model?.clearCompanionSync()
+            },
+            onQuit: {
+                NSApp.terminate(nil)
             },
             initialPane: initialPane,
             initialSelectedDeviceID: initialSelectedDeviceID,
@@ -438,7 +548,7 @@ final class BatteryHubHUDController {
         guard BatteryHUDPreferences.isEnabled(for: event.kind) else { return }
 
         let window = existingOrNewWindow()
-        window.contentViewController = NSHostingController(
+        let hostingController = NSHostingController(
             rootView: BatteryActionHUDView(
                 event: event,
                 showsDismissButton: BatteryHUDPreferences.showsDismissButton(),
@@ -447,6 +557,10 @@ final class BatteryHubHUDController {
                 }
             )
         )
+        hostingController.view.frame = NSRect(origin: .zero, size: Self.hudSize)
+        window.contentViewController = hostingController
+        applyRoundedTransparentMask(to: hostingController.view)
+        applyRoundedTransparentMask(to: window.contentView)
         position(window)
 
         window.alphaValue = 0
@@ -509,14 +623,60 @@ final class BatteryHubHUDController {
         return window
     }
 
+    private static let hudSize = NSSize(width: 520, height: 92)
+
+    private func applyRoundedTransparentMask(to view: NSView?) {
+        guard let view else { return }
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.clear.cgColor
+        view.layer?.cornerRadius = BatteryActionHUDView.cornerRadius
+        if #available(macOS 10.15, *) {
+            view.layer?.cornerCurve = .continuous
+        }
+        view.layer?.masksToBounds = true
+    }
+
     private func position(_ window: NSWindow) {
         let frame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let size = NSSize(width: 520, height: 92)
+        let size = Self.hudSize
         let origin = NSPoint(
             x: frame.midX - size.width / 2,
             y: frame.maxY - size.height - 42
         )
         window.setFrame(NSRect(origin: origin, size: size), display: true)
+    }
+}
+
+enum BluetoothPowerState: Equatable {
+    case on
+    case off
+    case unknown
+}
+
+@MainActor
+final class BluetoothPowerStateObserver: NSObject, ObservableObject, @preconcurrency CBCentralManagerDelegate {
+    @Published private(set) var state: BluetoothPowerState = .unknown
+
+    private var central: CBCentralManager?
+
+    override init() {
+        super.init()
+        central = CBCentralManager(
+            delegate: self,
+            queue: nil,
+            options: [CBCentralManagerOptionShowPowerAlertKey: false]
+        )
+    }
+
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        switch central.state {
+        case .poweredOn:
+            state = .on
+        case .poweredOff:
+            state = .off
+        default:
+            state = .unknown
+        }
     }
 }
 
@@ -544,10 +704,10 @@ enum MenuBarBatteryFormatter {
     }
 }
 
-private enum BluetoothStatusIconImage {
+private enum BatteryHubStatusIconImage {
     static func make() -> NSImage {
-        let symbolName = BatteryHubSymbols.bluetooth
-        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let symbolName = BatteryHubSymbols.app
+        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
         let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "BatteryHub")?
             .withSymbolConfiguration(configuration)
             ?? NSImage(size: NSSize(width: 18, height: 18))
@@ -564,6 +724,7 @@ final class BatteryHubModel: ObservableObject {
     @Published private(set) var store = BatterySnapshotStore()
     @Published private(set) var isRefreshing = false
     @Published private(set) var latestAlertEvents: [BatteryAlertEvent] = []
+    @Published private(set) var companionSyncDiagnostics = CompanionSyncDiagnostics.empty
 
     private let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "refresh")
     private var refreshLoop: Task<Void, Never>?
@@ -584,13 +745,16 @@ final class BatteryHubModel: ObservableObject {
     func start() {
         guard refreshLoop == nil else { return }
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+            logger.info("Battery refresh loop skipped under XCTest")
             return
         }
         if usesPreviewData {
+            logger.info("Battery refresh loop using preview data")
             seedPreviewData()
             return
         }
 
+        logger.info("Battery refresh loop started")
         refreshLoop = Task { [weak self] in
             await self?.refresh()
             while !Task.isCancelled {
@@ -606,6 +770,7 @@ final class BatteryHubModel: ObservableObject {
 
     func refresh() async {
         guard !isRefreshing else { return }
+        logger.info("Battery refresh started")
         isRefreshing = true
         defer { isRefreshing = false }
 
@@ -618,13 +783,40 @@ final class BatteryHubModel: ObservableObject {
         let bluetoothSnapshots = await BluetoothBatteryResolver().read()
         logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
         nextStore.merge(bluetoothSnapshots)
-        if let envelope = try? CloudBatterySync().load() {
+        let cloudSync = CloudBatterySync()
+        let envelope: SyncEnvelope?
+        let syncLoadErrorDescription: String?
+        do {
+            envelope = try cloudSync.load()
+            syncLoadErrorDescription = nil
+        } catch {
+            envelope = nil
+            syncLoadErrorDescription = error.localizedDescription
+            logger.error("iCloud battery sync load failed: \(error.localizedDescription)")
+        }
+        if let envelope {
             nextStore.merge(envelope.snapshots)
+        } else if syncLoadErrorDescription == nil {
+            nextStore.removeCompanionSyncSnapshots()
         }
         BatteryHistoryStore.record(nextStore.snapshots)
         store = nextStore
+        companionSyncDiagnostics = CompanionSyncDiagnostics(
+            snapshots: nextStore.snapshots,
+            envelope: envelope,
+            loadErrorDescription: syncLoadErrorDescription
+        )
         logger.info("Visible external snapshots: \(nextStore.externalBatterySnapshots.count)")
         latestAlertEvents = LowBatteryNotifier.notifyIfNeeded(for: nextStore.externalBatterySnapshots)
+    }
+
+    func clearCompanionSync() {
+        let syncAccepted = CloudBatterySync().clear()
+        var nextStore = store
+        nextStore.removeCompanionSyncSnapshots()
+        store = nextStore
+        companionSyncDiagnostics = CompanionSyncDiagnostics(snapshots: nextStore.snapshots)
+        logger.info("Cleared companion sync snapshots syncAccepted=\(syncAccepted)")
     }
 
     private func seedPreviewData() {
@@ -634,6 +826,10 @@ final class BatteryHubModel: ObservableObject {
         nextStore.merge(previewSnapshots)
         seedPreviewHistory(now: now)
         store = nextStore
+        companionSyncDiagnostics = CompanionSyncDiagnostics(
+            snapshots: nextStore.snapshots,
+            envelope: SyncEnvelope(snapshots: previewSnapshots, publishedAt: now)
+        )
         logger.info("Preview battery data loaded for UI QA")
     }
 

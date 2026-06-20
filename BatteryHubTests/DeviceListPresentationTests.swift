@@ -167,6 +167,27 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertNotNil(components[1].percent)
     }
 
+    func testDashboardBatteryDeviceKeepsAirPodsComponentsForSplitDisplay() {
+        let addr = "7C-F3-4D-74-56-78"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 53),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 100),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 100),
+        ]
+
+        let sections = groupedDeviceItems(snapshots)
+        guard case .airPods = sections[0].items[0] else {
+            XCTFail("Expected aggregated AirPods item")
+            return
+        }
+
+        let dashboardDevice = DashboardBatteryDevice(item: sections[0].items[0])
+
+        XCTAssertEqual(dashboardDevice.percent, 53)
+        XCTAssertEqual(dashboardDevice.airPodsComponents.map(\.slot), [.case, .left, .right])
+        XCTAssertEqual(dashboardDevice.airPodsComponents.map(\.percent), [53, 100, 100])
+    }
+
     // MARK: - Single-component fallback
 
     func testAirPodsSingleComponentFallsBackToDevice() {
@@ -401,7 +422,7 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(inspectorItems.map(\.isUnavailable), [false, true, true])
     }
 
-    func testInspectorAutoHidesConnectedDevicesWithoutBatteryReport() {
+    func testInspectorKeepsConnectedDevicesWithoutBatteryReportVisible() {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keychron", displayName: "Keychron K3 Max", kind: .keyboard, percent: 89),
             makeDecorated(deviceID: "backlight", displayName: "Keyboard Backlight", kind: .keyboard, percent: nil),
@@ -413,9 +434,66 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(inspectorItems.map(\.displayName), ["Keychron K3 Max", "Keyboard Backlight"])
-        XCTAssertEqual(inspectorItems.map(\.isHidden), [false, true])
+        XCTAssertEqual(inspectorItems.map(\.isHidden), [false, false])
         XCTAssertEqual(inspectorItems.map(\.isUserHidden), [false, false])
-        XCTAssertEqual(inspectorItems.map(\.isUnavailable), [false, true])
+        XCTAssertEqual(inspectorItems.map(\.isUnavailable), [false, false])
+    }
+
+    func testStatusMenuSectionsFallbackToConnectedNoReportDevicesWhenNoBatteryReports() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(
+                deviceID: "keyboard",
+                displayName: "Magic Keyboard",
+                kind: .keyboard,
+                percent: nil,
+                connectionState: .connected,
+                source: .ioBluetooth
+            ),
+            makeDecorated(
+                deviceID: "trackpad",
+                displayName: "Magic Trackpad",
+                kind: .trackpad,
+                percent: nil,
+                connectionState: .connected,
+                source: .ioBluetooth
+            ),
+            makeDecorated(
+                deviceID: "airpods",
+                displayName: "AirPods Pro",
+                kind: .airPods,
+                percent: nil,
+                connectionState: .disconnected,
+                source: .bluetoothUnsupported
+            )
+        ]
+
+        let items = statusMenuDeviceSections(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        ).flatMap(\.items)
+
+        XCTAssertEqual(items.map(\.displayName), ["Magic Keyboard", "Magic Trackpad"])
+    }
+
+    func testStatusMenuSectionsPreferBatteryReportsOverNoReportFallback() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 89),
+            makeDecorated(
+                deviceID: "trackpad",
+                displayName: "Magic Trackpad",
+                kind: .trackpad,
+                percent: nil,
+                connectionState: .connected,
+                source: .ioBluetooth
+            )
+        ]
+
+        let items = statusMenuDeviceSections(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        ).flatMap(\.items)
+
+        XCTAssertEqual(items.map(\.displayName), ["Magic Keyboard"])
     }
 
     func testSettingsDeviceInspectorRowsCanCollapseHiddenUnavailableItems() {
@@ -442,22 +520,22 @@ final class DeviceListPresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             displayedDeviceInspectorItems(inspectorItems, showHiddenUnavailable: false).map(\.displayName),
-            ["Keychron K3 Max"]
+            ["Keychron K3 Max", "Keyboard Backlight"]
         )
     }
 
     func testStatusMenuSizingGrowsWithDashboardDeviceCount() {
         let nativeOneDevice = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 1,
-            showsOverview: true,
+            showsOverview: false,
             showsAirPodsCard: false,
             style: .native,
             visibleScreenHeight: 1_000
         )
         let nativeFiveDevices = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
-            showsOverview: true,
-            showsAirPodsCard: true,
+            showsOverview: false,
+            showsAirPodsCard: false,
             style: .native,
             visibleScreenHeight: 1_000
         )
@@ -488,43 +566,108 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertGreaterThan(nativeFiveDevices.height, nativeOneDevice.height)
         XCTAssertLessThan(nativeFiveDevices.height, fiveDevices.height)
         XCTAssertEqual(oneDevice.width, 430)
-        XCTAssertGreaterThan(oneDevice.height, 600)
+        XCTAssertGreaterThan(oneDevice.height, 300)
+        XCTAssertLessThan(oneDevice.height, 560)
         XCTAssertGreaterThan(fiveDevices.height, oneDevice.height)
-        XCTAssertGreaterThan(withAirPodsCard.height, fiveDevices.height)
+        XCTAssertEqual(withAirPodsCard.height, fiveDevices.height)
     }
 
     func testNativeStatusMenuSizingMatchesRenderedRowChrome() {
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
-            showsOverview: true,
-            showsAirPodsCard: true,
+            showsOverview: false,
+            showsAirPodsCard: false,
             style: .native,
             visibleScreenHeight: 1_000
         )
 
         XCTAssertEqual(size.width, 386)
-        XCTAssertEqual(size.height, 430)
+        // Native widget-led chrome: 28 vertical padding + 58 header
+        // + (18 list padding + 5 * 58 rows + 4 * 8 row gaps),
+        // with settings moved into the header.
+        XCTAssertEqual(size.height, 426)
+    }
+
+    func testStatusWindowConfigurationLoadsDashboardPreferences() {
+        let defaults = isolatedDefaults()
+        defaults.set(StatusWindowStyle.large.rawValue, forKey: StatusWindowPreferences.styleKey)
+        defaults.set(false, forKey: StatusWindowPreferences.showAirPodsCardKey)
+        defaults.set(true, forKey: StatusWindowPreferences.showMenuBarBatteryKey)
+        defaults.set(false, forKey: StatusWindowPreferences.showBatteryOverviewKey)
+
+        let configuration = StatusWindowConfiguration.load(from: defaults)
+
+        XCTAssertEqual(configuration.style, .large)
+        XCTAssertFalse(configuration.showsAirPodsCard)
+        XCTAssertTrue(configuration.showsMenuBarBattery)
+        XCTAssertFalse(configuration.showsBatteryOverview)
+        XCTAssertFalse(configuration.showsOverviewInDashboard)
+    }
+
+    func testWidgetLedStatusMenuSizingUsesSelectedStyleWithoutLegacyCardHeight() {
+        let compact = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 1,
+            showsOverview: false,
+            showsAirPodsCard: false,
+            style: .compact,
+            visibleScreenHeight: 1_000
+        )
+        let large = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 1,
+            showsOverview: true,
+            showsAirPodsCard: true,
+            style: .large,
+            visibleScreenHeight: 1_000
+        )
+
+        XCTAssertEqual(compact.width, 386)
+        XCTAssertEqual(large.width, 430)
+        XCTAssertGreaterThan(large.height, compact.height)
+        XCTAssertLessThan(large.height, 560)
     }
 
     @MainActor
-    func testStatusPopoverContentCoordinatorReusesHostingController() {
-        let popover = NSPopover()
-        let coordinator = StatusPopoverContentCoordinator()
+    func testStatusMenuPanelControllerReusesHostingController() {
+        let coordinator = StatusMenuPanelController()
 
         coordinator.install(
             rootView: StatusMenuView(snapshots: [], onRefresh: {}),
-            in: popover
+            contentSize: NSSize(width: 386, height: 330)
         )
-        let firstController = popover.contentViewController
+        let firstController = coordinator.hostingController
 
         coordinator.install(
             rootView: StatusMenuView(snapshots: [], isRefreshing: true, onRefresh: {}),
-            in: popover
+            contentSize: NSSize(width: 386, height: 360)
         )
 
         XCTAssertNotNil(firstController)
-        XCTAssertTrue(popover.contentViewController === firstController)
         XCTAssertTrue(coordinator.hostingController === firstController)
+    }
+
+    @MainActor
+    func testStatusMenuPanelUsesRoundedContentMaskInsteadOfRectangularShadow() {
+        let coordinator = StatusMenuPanelController()
+        coordinator.install(
+            rootView: StatusMenuView(snapshots: [], onRefresh: {}),
+            contentSize: NSSize(width: 386, height: 330)
+        )
+
+        XCTAssertEqual(coordinator.panel?.hasShadow, false)
+        XCTAssertEqual(coordinator.hostingController?.view.layer?.cornerRadius, NativeMacStyle.popoverCornerRadius)
+        XCTAssertEqual(coordinator.hostingController?.view.layer?.masksToBounds, true)
+    }
+
+    func testStatusMenuPanelPositioningClampsToVisibleFrame() {
+        let frame = StatusMenuPanelPositioning.frame(
+            contentSize: NSSize(width: 386, height: 330),
+            buttonFrame: NSRect(x: 790, y: 870, width: 24, height: 22),
+            visibleFrame: NSRect(x: 0, y: 0, width: 800, height: 900)
+        )
+
+        XCTAssertEqual(frame.maxX, 792)
+        XCTAssertEqual(frame.maxY, 864)
+        XCTAssertEqual(frame.size, NSSize(width: 386, height: 330))
     }
 
     func testStatusMenuSizingCapsToVisibleScreenHeight() {
@@ -881,6 +1024,156 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(nextChargedEvents, firstEvents)
     }
 
+    func testChargedAlertTriggersForUnknownChargeStateAtOneHundredPercent() {
+        let defaults = isolatedDefaults()
+        let snapshot = makeSnapshot(
+            deviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            kind: .keyboard,
+            percent: 100,
+            chargeState: .unknown,
+            source: .systemProfiler
+        )
+
+        LowBatteryNotifier.setChargedAlertEnabled(
+            true,
+            forDeviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            defaults: defaults
+        )
+
+        XCTAssertEqual(LowBatteryNotifier.pendingAlertEvents(for: [snapshot], defaults: defaults), [
+            BatteryAlertEvent(kind: .charged, deviceID: "bluetooth-D1-B3-88-E2-67-CB", displayName: "Keychron K3 Max", percent: 100)
+        ])
+    }
+
+    func testChargedAlertIsNotMarkedAlertedUntilNotificationSucceeds() {
+        let defaults = isolatedDefaults()
+        let snapshot = makeSnapshot(
+            deviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            kind: .keyboard,
+            percent: 100,
+            chargeState: .unknown,
+            source: .systemProfiler
+        )
+        LowBatteryNotifier.setChargedAlertEnabled(
+            true,
+            forDeviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            defaults: defaults
+        )
+
+        let firstEvents = LowBatteryNotifier.pendingAlertEventsWithoutMarking(for: [snapshot], defaults: defaults)
+        let retryEvents = LowBatteryNotifier.pendingAlertEventsWithoutMarking(for: [snapshot], defaults: defaults)
+        _ = LowBatteryNotifier.pendingAlertEvents(for: [snapshot], defaults: defaults)
+        let duplicateEvents = LowBatteryNotifier.pendingAlertEventsWithoutMarking(for: [snapshot], defaults: defaults)
+
+        XCTAssertEqual(firstEvents, [
+            BatteryAlertEvent(kind: .charged, deviceID: "bluetooth-D1-B3-88-E2-67-CB", displayName: "Keychron K3 Max", percent: 100)
+        ])
+        XCTAssertEqual(retryEvents, firstEvents)
+        XCTAssertTrue(duplicateEvents.isEmpty)
+    }
+
+    func testReenablingChargedAlertClearsStaleAlertedState() {
+        let defaults = isolatedDefaults()
+        let snapshot = makeSnapshot(
+            deviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            kind: .keyboard,
+            percent: 100,
+            chargeState: .unknown,
+            source: .systemProfiler
+        )
+
+        LowBatteryNotifier.setChargedAlertEnabled(
+            true,
+            forDeviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            defaults: defaults
+        )
+        _ = LowBatteryNotifier.pendingAlertEvents(for: [snapshot], defaults: defaults)
+        XCTAssertTrue(LowBatteryNotifier.pendingAlertEventsWithoutMarking(for: [snapshot], defaults: defaults).isEmpty)
+
+        LowBatteryNotifier.setChargedAlertEnabled(
+            true,
+            forDeviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            defaults: defaults
+        )
+
+        XCTAssertEqual(LowBatteryNotifier.pendingAlertEventsWithoutMarking(for: [snapshot], defaults: defaults), [
+            BatteryAlertEvent(kind: .charged, deviceID: "bluetooth-D1-B3-88-E2-67-CB", displayName: "Keychron K3 Max", percent: 100)
+        ])
+    }
+
+    func testChargedAlertMigrationClearsPreFixStaleAlertedState() {
+        let defaults = isolatedDefaults()
+        let snapshot = makeSnapshot(
+            deviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            kind: .keyboard,
+            percent: 100,
+            chargeState: .unknown,
+            source: .systemProfiler
+        )
+        LowBatteryNotifier.setChargedAlertEnabled(
+            true,
+            forDeviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            defaults: defaults
+        )
+        defaults.set(true, forKey: "BatteryHub.chargedBatteryAlerted.bluetooth-D1-B3-88-E2-67-CB")
+        defaults.set(1, forKey: LowBatteryNotifier.chargedAlertedStateVersionDefaultsKey)
+
+        XCTAssertEqual(LowBatteryNotifier.pendingAlertEventsWithoutMarking(for: [snapshot], defaults: defaults), [
+            BatteryAlertEvent(kind: .charged, deviceID: "bluetooth-D1-B3-88-E2-67-CB", displayName: "Keychron K3 Max", percent: 100)
+        ])
+        XCTAssertEqual(defaults.integer(forKey: LowBatteryNotifier.chargedAlertedStateVersionDefaultsKey), 2)
+    }
+
+    func testChargedAlertFollowsDisplayNameWhenBluetoothIdentifierChanges() {
+        let defaults = isolatedDefaults()
+        LowBatteryNotifier.setChargedAlertEnabled(
+            true,
+            forDeviceID: "bluetooth-9D520BEC-A95A-D7F0-1F4E-FDBAD0D5D0F0",
+            displayName: "Keychron K3 Max",
+            defaults: defaults
+        )
+        let currentSnapshot = makeSnapshot(
+            deviceID: "bluetooth-D1-B3-88-E2-67-CB",
+            displayName: "Keychron K3 Max",
+            kind: .keyboard,
+            percent: 100,
+            chargeState: .unknown,
+            source: .systemProfiler
+        )
+
+        XCTAssertTrue(LowBatteryNotifier.isChargedAlertEnabled(for: currentSnapshot, defaults: defaults))
+        XCTAssertEqual(LowBatteryNotifier.pendingAlertEvents(for: [currentSnapshot], defaults: defaults), [
+            BatteryAlertEvent(kind: .charged, deviceID: "bluetooth-D1-B3-88-E2-67-CB", displayName: "Keychron K3 Max", percent: 100)
+        ])
+    }
+
+    func testChargedAlertSettingsReadDisplayNameAlias() {
+        let defaults = isolatedDefaults()
+        LowBatteryNotifier.setChargedAlertEnabled(
+            true,
+            forDeviceID: "bluetooth-old-id",
+            displayName: "Keychron K3 Max",
+            defaults: defaults
+        )
+
+        XCTAssertTrue(
+            LowBatteryNotifier.isChargedAlertEnabled(
+                forDeviceID: "bluetooth-current-id",
+                displayName: "Keychron K3 Max",
+                defaults: defaults
+            )
+        )
+    }
+
     func testChargedAlertCanBeDisabledGloballyAndFallsBackToAirPodsPrefix() {
         let defaults = isolatedDefaults()
         defaults.set(false, forKey: LowBatteryNotifier.chargedNotificationsEnabledDefaultsKey)
@@ -1146,6 +1439,14 @@ final class DeviceListPresentationTests: XCTestCase {
         }
     }
 
+    func testBatteryHubPrimarySymbolStaysSeparateFromBluetoothSymbol() {
+        XCTAssertEqual(
+            BatteryHubSymbols.app,
+            resolveSymbol("rectangle.grid.2x2", fallback: "rectangle.grid.3x2")
+        )
+        XCTAssertNotEqual(BatteryHubSymbols.app, BatteryHubSymbols.bluetooth)
+    }
+
     func testKeyboardDevicesUseKeyboardSymbol() {
         XCTAssertEqual(
             deviceSymbolName(for: .keyboard, displayName: "Keychron K3 Max"),
@@ -1300,7 +1601,14 @@ final class DeviceListPresentationTests: XCTestCase {
 
         let view = StatusMenuView(snapshots: snapshots, onRefresh: {})
         let hostingView = NSHostingView(rootView: view)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 386, height: 430)
+        let size = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 5,
+            showsOverview: true,
+            showsAirPodsCard: true,
+            style: .native,
+            visibleScreenHeight: 1_000
+        )
+        hostingView.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height)
         hostingView.layoutSubtreeIfNeeded()
 
         let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)

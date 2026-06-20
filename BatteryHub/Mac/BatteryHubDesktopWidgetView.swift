@@ -19,6 +19,22 @@ enum DesktopWidgetStyle: String, CaseIterable, Identifiable {
         }
     }
 
+    var accessibilityTitle: String {
+        switch self {
+        case .compact: return "Compact widget"
+        case .expanded: return "Expanded widget"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .compact:
+            return resolveSymbol("rectangle.grid.1x2", fallback: "rectangle")
+        case .expanded:
+            return resolveSymbol("rectangle.grid.3x2", fallback: BatteryHubSymbols.app)
+        }
+    }
+
     var width: CGFloat {
         switch self {
         case .compact: return 256
@@ -88,7 +104,7 @@ struct BatteryDesktopWidgetView: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(devices) { device in
-                        DesktopWidgetDeviceRow(device: device)
+                        DashboardBatteryDeviceRow(device: DashboardBatteryDevice(device))
                     }
                 }
             }
@@ -96,19 +112,18 @@ struct BatteryDesktopWidgetView: View {
         .padding(14)
         .frame(width: style.width, alignment: .topLeading)
         .background {
+            let shape = RoundedRectangle(cornerRadius: NativeMacStyle.widgetCornerRadius, style: .continuous)
             DesktopWidgetBackground()
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.8)
-                )
+                .clipShape(shape)
+                .overlay(shape.stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.8))
         }
+        .clipShape(RoundedRectangle(cornerRadius: NativeMacStyle.widgetCornerRadius, style: .continuous))
         .shadow(color: .black.opacity(0.18), radius: 18, x: 0, y: 10)
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: resolveSymbol("rectangle.grid.2x2", fallback: "rectangle"))
+            Image(systemName: BatteryHubSymbols.app)
                 .font(.system(size: 16, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(DesignTokens.Palette.accent)
@@ -176,105 +191,10 @@ struct BatteryDesktopWidgetView: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill)
-        )
+                    RoundedRectangle(cornerRadius: NativeMacStyle.dashboardRowCornerRadius, style: .continuous)
+                        .fill(DesignTokens.Palette.controlPill)
+                )
     }
-}
-
-private struct DesktopWidgetDeviceRow: View {
-    let device: BatteryOverviewDevice
-
-    private var percentRatio: CGFloat {
-        CGFloat(max(0, min(100, device.percent))) / 100
-    }
-
-    private var percentColor: Color {
-        if device.percent <= LowBatteryNotifier.threshold && device.chargeState != .charging {
-            return DesignTokens.Palette.critical
-        }
-        if device.chargeState == .charging || device.chargeState == .full {
-            return DesignTokens.Palette.charging
-        }
-        if device.freshness != .fresh {
-            return DesignTokens.Palette.stale
-        }
-        return DesignTokens.Palette.accent
-    }
-
-    private var iconBadge: DeviceIconBadge? {
-        if device.percent <= LowBatteryNotifier.threshold && device.chargeState != .charging {
-            return .low
-        }
-        if device.chargeState == .charging || device.chargeState == .full {
-            return .charging
-        }
-        if device.freshness != .fresh {
-            return .stale
-        }
-        return nil
-    }
-
-    private var subtitle: String {
-        if device.freshness == .expired { return "Report expired" }
-        if device.freshness == .stale { return "Report stale" }
-        if device.chargeState == .charging { return "Charging" }
-        if device.chargeState == .full { return "Fully charged" }
-        return "Battery"
-    }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            DeviceIconPlate(
-                symbolName: deviceSymbolName(for: device.kind, displayName: device.displayName),
-                color: percentColor,
-                size: 30,
-                badge: iconBadge
-            )
-
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 8) {
-                    Text(device.displayName)
-                        .font(DesignTokens.Typography.controlLabelEmphasis)
-                        .foregroundStyle(DesignTokens.Palette.text)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Spacer(minLength: 0)
-
-                    Text("\(device.percent)%")
-                        .font(DesignTokens.Typography.percentSmall)
-                        .monospacedDigit()
-                        .foregroundStyle(percentColor)
-                }
-
-                HStack(spacing: 8) {
-                    GeometryReader { proxy in
-                        ZStack(alignment: .leading) {
-                            Capsule(style: .continuous)
-                                .fill(DesignTokens.Palette.separator.opacity(0.35))
-                            Capsule(style: .continuous)
-                                .fill(percentColor)
-                                .frame(width: max(4, proxy.size.width * percentRatio))
-                        }
-                    }
-                    .frame(height: 5)
-
-                    Text(subtitle)
-                        .font(DesignTokens.Typography.caption2)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                        .lineLimit(1)
-                        .frame(width: 58, alignment: .trailing)
-                }
-            }
-        }
-        .padding(9)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(DesignTokens.Palette.card.opacity(0.78))
-        )
-    }
-
 }
 
 @MainActor
@@ -294,13 +214,17 @@ final class BatteryHubDesktopWidgetController {
             rawValue: UserDefaults.standard.string(forKey: DesktopWidgetPreferences.widgetStyleKey) ?? ""
         ) ?? .compact
         let window = existingOrNewWindow(for: style)
-        window.contentViewController = NSHostingController(
+        let hostingController = NSHostingController(
             rootView: BatteryDesktopWidgetView(
                 snapshots: snapshots,
                 style: style,
                 onOpenSettings: onOpenSettings
             )
         )
+        hostingController.view.wantsLayer = true
+        hostingController.view.layer?.cornerRadius = NativeMacStyle.widgetCornerRadius
+        hostingController.view.layer?.masksToBounds = false
+        window.contentViewController = hostingController
         positionIfNeeded(window, style: style)
         window.orderFrontRegardless()
     }
@@ -330,6 +254,9 @@ final class BatteryHubDesktopWidgetController {
             backing: .buffered,
             defer: false
         )
+        window.contentView?.wantsLayer = true
+        window.contentView?.layer?.cornerRadius = NativeMacStyle.widgetCornerRadius
+        window.contentView?.layer?.masksToBounds = false
         window.isReleasedWhenClosed = false
         window.backgroundColor = .clear
         window.isOpaque = false

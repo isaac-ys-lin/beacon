@@ -8,9 +8,21 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="$ROOT_DIR/BatteryHub.xcodeproj"
 SCHEME="BatteryHubMac"
 DESTINATION="platform=macOS"
+INSTALL_PATH="/Applications/$APP_NAME.app"
+
+BUILD_SIGNING_ARGS=()
+if [[ -n "${BATTERYHUB_DEVELOPMENT_TEAM:-}" ]]; then
+  BUILD_SIGNING_ARGS+=(
+    CODE_SIGNING_ALLOWED=YES
+    CODE_SIGN_STYLE=Automatic
+    DEVELOPMENT_TEAM="$BATTERYHUB_DEVELOPMENT_TEAM"
+    CODE_SIGN_IDENTITY="Apple Development"
+  )
+fi
 
 usage() {
-  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--verify-signing|--install]" >&2
+  echo "Set BATTERYHUB_DEVELOPMENT_TEAM=<team id> before --install to build with iCloud-capable Apple Development signing." >&2
 }
 
 app_path() {
@@ -39,12 +51,58 @@ open_app() {
   /usr/bin/open -n ${env_args[@]+"${env_args[@]}"} "$bundle"
 }
 
+signing_details() {
+  local bundle="$1"
+  codesign -dvvv --entitlements :- "$bundle" 2>&1 || true
+}
+
+require_icloud_signed_bundle() {
+  local bundle="$1"
+  local details
+  details="$(signing_details "$bundle")"
+
+  if ! grep -q "com.apple.developer.ubiquity-kvstore-identifier" <<<"$details"; then
+    echo "Built app is missing the iCloud key-value-store entitlement." >&2
+    echo "Refusing formal install because iPhone / Apple Watch sync would not work." >&2
+    echo "Set BATTERYHUB_DEVELOPMENT_TEAM=<team id> and make sure an Apple Development signing identity is installed." >&2
+    echo "$details" >&2
+    exit 1
+  fi
+
+  if grep -q "Signature=adhoc" <<<"$details"; then
+    echo "Built app is ad-hoc signed. Refusing formal install." >&2
+    echo "Use an Apple Development signed build for iCloud KVS companion sync." >&2
+    echo "$details" >&2
+    exit 1
+  fi
+}
+
+install_app() {
+  local bundle="$1"
+  local staging_path="/Applications/.$APP_NAME.app.installing.$$"
+  require_icloud_signed_bundle "$bundle"
+  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+  /bin/rm -rf "$staging_path"
+  /usr/bin/ditto "$bundle" "$staging_path"
+  /usr/bin/xattr -dr com.apple.quarantine "$staging_path" 2>/dev/null || true
+  require_icloud_signed_bundle "$staging_path"
+  if [[ -d "$INSTALL_PATH" ]]; then
+    local backup_path="/Applications/$APP_NAME.app.backup-$(date +%Y%m%d-%H%M%S)"
+    /bin/mv "$INSTALL_PATH" "$backup_path"
+    echo "Backed up existing app to $backup_path"
+  fi
+  /bin/mv "$staging_path" "$INSTALL_PATH"
+  require_icloud_signed_bundle "$INSTALL_PATH"
+  echo "Installed signed app to $INSTALL_PATH"
+}
+
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
 xcodebuild -project "$PROJECT" \
   -scheme "$SCHEME" \
   -destination "$DESTINATION" \
   -configuration Debug \
+  ${BUILD_SIGNING_ARGS[@]+"${BUILD_SIGNING_ARGS[@]}"} \
   build
 
 APP_BUNDLE="$(app_path)"
@@ -70,6 +128,15 @@ case "$MODE" in
     ;;
   --verify|verify)
     open_app "$APP_BUNDLE"
+    sleep 1
+    pgrep -x "$APP_NAME" >/dev/null
+    ;;
+  --verify-signing|verify-signing)
+    require_icloud_signed_bundle "$APP_BUNDLE"
+    ;;
+  --install|install)
+    install_app "$APP_BUNDLE"
+    open_app "$INSTALL_PATH"
     sleep 1
     pgrep -x "$APP_NAME" >/dev/null
     ;;

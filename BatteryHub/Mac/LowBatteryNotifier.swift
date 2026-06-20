@@ -1,12 +1,13 @@
 import Foundation
+import os
 import UserNotifications
 
-enum BatteryAlertKind: Equatable {
+enum BatteryAlertKind: Equatable, Sendable {
     case lowBattery
     case charged
 }
 
-struct BatteryAlertEvent: Equatable {
+struct BatteryAlertEvent: Equatable, Sendable {
     let kind: BatteryAlertKind
     let deviceID: String
     let displayName: String
@@ -14,12 +15,16 @@ struct BatteryAlertEvent: Equatable {
 }
 
 enum LowBatteryNotifier {
+    private static let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "notifications")
+
     static let defaultThreshold = 20
     static let thresholdDefaultsKey = "BatteryHub.lowBatteryThreshold"
     static let notificationsEnabledDefaultsKey = "BatteryHub.lowBatteryNotificationsEnabled"
     static let chargedNotificationsEnabledDefaultsKey = "BatteryHub.chargedBatteryNotificationsEnabled"
     static let deviceThresholdDefaultsPrefix = "BatteryHub.lowBatteryThreshold.device."
     static let deviceChargedAlertDefaultsPrefix = "BatteryHub.chargedBatteryAlert.device."
+    static let nameChargedAlertDefaultsPrefix = "BatteryHub.chargedBatteryAlert.name."
+    static let chargedAlertedStateVersionDefaultsKey = "BatteryHub.chargedBatteryAlertedStateVersion"
 
     static var threshold: Int {
         globalThreshold(defaults: .standard)
@@ -81,8 +86,40 @@ enum LowBatteryNotifier {
         return false
     }
 
+    static func isChargedAlertEnabled(
+        forDeviceID deviceID: String,
+        displayName: String,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        if isChargedAlertEnabled(forDeviceID: deviceID, defaults: defaults) {
+            return true
+        }
+        return customChargedAlertSetting(forDisplayName: displayName, defaults: defaults) ?? false
+    }
+
+    static func isChargedAlertEnabled(for snapshot: BatterySnapshot, defaults: UserDefaults = .standard) -> Bool {
+        isChargedAlertEnabled(
+            forDeviceID: snapshot.deviceID,
+            displayName: snapshot.displayName,
+            defaults: defaults
+        )
+    }
+
     static func setChargedAlertEnabled(_ isEnabled: Bool, forDeviceID deviceID: String, defaults: UserDefaults = .standard) {
         defaults.set(isEnabled, forKey: deviceChargedAlertDefaultsPrefix + deviceID)
+        if isEnabled {
+            resetChargedAlerted(forDeviceID: deviceID, defaults: defaults)
+        }
+    }
+
+    static func setChargedAlertEnabled(
+        _ isEnabled: Bool,
+        forDeviceID deviceID: String,
+        displayName: String,
+        defaults: UserDefaults = .standard
+    ) {
+        setChargedAlertEnabled(isEnabled, forDeviceID: deviceID, defaults: defaults)
+        defaults.set(isEnabled, forKey: nameChargedAlertDefaultsPrefix + normalizedAlertName(displayName))
     }
 
     static func resetChargedAlert(forDeviceID deviceID: String, defaults: UserDefaults = .standard) {
@@ -91,17 +128,31 @@ enum LowBatteryNotifier {
 
     private static let lowBatteryAlertedDefaultsPrefix = "BatteryHub.lowBatteryAlerted."
     private static let chargedAlertedDefaultsPrefix = "BatteryHub.chargedBatteryAlerted."
+    private static let currentChargedAlertedStateVersion = 2
 
     static func requestAuthorization() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        migrateChargedAlertedStateIfNeeded(defaults: .standard)
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error {
+                logger.error("Notification authorization failed: \(error.localizedDescription)")
+                resetAllChargedAlertedStates(defaults: .standard)
+            } else {
+                logger.info("Notification authorization granted=\(granted)")
+                if !granted {
+                    resetAllChargedAlertedStates(defaults: .standard)
+                }
+            }
+        }
     }
 
     @discardableResult
     static func notifyIfNeeded(for snapshots: [BatterySnapshot]) -> [BatteryAlertEvent] {
         let defaults = UserDefaults.standard
-        let events = pendingAlertEvents(for: snapshots, defaults: defaults)
+        let events = pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: false)
+        logger.info("Notification check snapshots=\(snapshots.count) events=\(events.count)")
 
         for event in events {
+            logger.info("Queueing \(String(describing: event.kind)) notification for \(event.displayName, privacy: .public) id=\(event.deviceID, privacy: .public) percent=\(event.percent ?? -1)")
             let content = UNMutableNotificationContent()
             switch event.kind {
             case .lowBattery:
@@ -118,7 +169,15 @@ enum LowBatteryNotifier {
                 content: content,
                 trigger: nil
             )
-            UNUserNotificationCenter.current().add(request)
+            let requestIdentifier = request.identifier
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error {
+                    logger.error("Notification add failed id=\(requestIdentifier, privacy: .public): \(error.localizedDescription)")
+                } else {
+                    markAlerted(event, defaults: .standard)
+                    logger.info("Notification add succeeded id=\(requestIdentifier, privacy: .public)")
+                }
+            }
         }
 
         return events
@@ -128,13 +187,30 @@ enum LowBatteryNotifier {
         for snapshots: [BatterySnapshot],
         defaults: UserDefaults = .standard
     ) -> [BatteryAlertEvent] {
+        pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: true)
+    }
+
+    static func pendingAlertEventsWithoutMarking(
+        for snapshots: [BatterySnapshot],
+        defaults: UserDefaults = .standard
+    ) -> [BatteryAlertEvent] {
+        pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: false)
+    }
+
+    private static func pendingAlertEvents(
+        for snapshots: [BatterySnapshot],
+        defaults: UserDefaults,
+        markAsQueued: Bool
+    ) -> [BatteryAlertEvent] {
+        migrateChargedAlertedStateIfNeeded(defaults: defaults)
         var events: [BatteryAlertEvent] = []
 
         for snapshot in snapshots {
-            if let event = lowBatteryEvent(for: snapshot, defaults: defaults) {
+            rememberChargedAlertAliases(for: snapshot, defaults: defaults)
+            if let event = lowBatteryEvent(for: snapshot, defaults: defaults, markAsQueued: markAsQueued) {
                 events.append(event)
             }
-            if let event = chargedEvent(for: snapshot, defaults: defaults) {
+            if let event = chargedEvent(for: snapshot, defaults: defaults, markAsQueued: markAsQueued) {
                 events.append(event)
             }
         }
@@ -144,7 +220,8 @@ enum LowBatteryNotifier {
 
     private static func lowBatteryEvent(
         for snapshot: BatterySnapshot,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        markAsQueued: Bool
     ) -> BatteryAlertEvent? {
         let key = lowBatteryAlertedDefaultsPrefix + snapshot.deviceID
         guard lowBatteryNotificationsEnabled(defaults: defaults) else {
@@ -164,41 +241,82 @@ enum LowBatteryNotifier {
         }
 
         guard defaults.bool(forKey: key) == false else { return nil }
-        defaults.set(true, forKey: key)
-        return BatteryAlertEvent(
+        let event = BatteryAlertEvent(
             kind: .lowBattery,
             deviceID: snapshot.deviceID,
             displayName: snapshot.displayName,
             percent: percent
         )
+        if markAsQueued {
+            markAlerted(event, defaults: defaults)
+        }
+        return event
     }
 
     private static func chargedEvent(
         for snapshot: BatterySnapshot,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        markAsQueued: Bool
     ) -> BatteryAlertEvent? {
         let key = chargedAlertedDefaultsPrefix + snapshot.deviceID
-        guard chargedNotificationsEnabled(defaults: defaults),
-              isChargedAlertEnabled(forDeviceID: snapshot.deviceID, defaults: defaults) else {
+        let globallyEnabled = chargedNotificationsEnabled(defaults: defaults)
+        let deviceEnabled = isChargedAlertEnabled(for: snapshot, defaults: defaults)
+        let complete = isChargeComplete(snapshot)
+        let alreadyAlerted = defaults.bool(forKey: key)
+
+        guard globallyEnabled, deviceEnabled else {
             defaults.removeObject(forKey: key)
             return nil
         }
 
-        guard isChargeComplete(snapshot) else {
+        guard complete else {
             if shouldResetChargedState(snapshot) {
                 defaults.removeObject(forKey: key)
             }
             return nil
         }
 
-        guard defaults.bool(forKey: key) == false else { return nil }
-        defaults.set(true, forKey: key)
-        return BatteryAlertEvent(
+        guard alreadyAlerted == false else { return nil }
+        let event = BatteryAlertEvent(
             kind: .charged,
             deviceID: snapshot.deviceID,
             displayName: snapshot.displayName,
             percent: snapshot.percent
         )
+        if markAsQueued {
+            markAlerted(event, defaults: defaults)
+        }
+        return event
+    }
+
+    private static func markAlerted(_ event: BatteryAlertEvent, defaults: UserDefaults) {
+        switch event.kind {
+        case .lowBattery:
+            defaults.set(true, forKey: lowBatteryAlertedDefaultsPrefix + event.deviceID)
+        case .charged:
+            defaults.set(true, forKey: chargedAlertedDefaultsPrefix + event.deviceID)
+        }
+    }
+
+    private static func resetChargedAlerted(forDeviceID deviceID: String, defaults: UserDefaults) {
+        defaults.removeObject(forKey: chargedAlertedDefaultsPrefix + deviceID)
+    }
+
+    private static func resetAllChargedAlertedStates(defaults: UserDefaults) {
+        let keys = defaults.dictionaryRepresentation().keys.filter {
+            $0.hasPrefix(chargedAlertedDefaultsPrefix)
+        }
+        for key in keys {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    private static func migrateChargedAlertedStateIfNeeded(defaults: UserDefaults) {
+        guard defaults.integer(forKey: chargedAlertedStateVersionDefaultsKey) < currentChargedAlertedStateVersion else {
+            return
+        }
+        resetAllChargedAlertedStates(defaults: defaults)
+        defaults.set(currentChargedAlertedStateVersion, forKey: chargedAlertedStateVersionDefaultsKey)
     }
 
     private static func customThreshold(forDeviceID deviceID: String, defaults: UserDefaults) -> Int? {
@@ -209,6 +327,12 @@ enum LowBatteryNotifier {
 
     private static func customChargedAlertSetting(forDeviceID deviceID: String, defaults: UserDefaults) -> Bool? {
         let key = deviceChargedAlertDefaultsPrefix + deviceID
+        guard defaults.object(forKey: key) != nil else { return nil }
+        return defaults.bool(forKey: key)
+    }
+
+    private static func customChargedAlertSetting(forDisplayName displayName: String, defaults: UserDefaults) -> Bool? {
+        let key = nameChargedAlertDefaultsPrefix + normalizedAlertName(displayName)
         guard defaults.object(forKey: key) != nil else { return nil }
         return defaults.bool(forKey: key)
     }
@@ -224,13 +348,27 @@ enum LowBatteryNotifier {
     }
 
     private static func isChargeComplete(_ snapshot: BatterySnapshot) -> Bool {
-        snapshot.chargeState == .full || (snapshot.chargeState == .charging && (snapshot.percent ?? 0) >= 100)
+        snapshot.chargeState == .full || (snapshot.percent ?? 0) >= 100
     }
 
     private static func shouldResetChargedState(_ snapshot: BatterySnapshot) -> Bool {
         snapshot.chargeState == .unplugged
             || snapshot.chargeState == .unknown
             || (snapshot.percent ?? 100) < 95
+    }
+
+    private static func rememberChargedAlertAliases(for snapshot: BatterySnapshot, defaults: UserDefaults) {
+        guard let value = customChargedAlertSetting(forDeviceID: snapshot.deviceID, defaults: defaults) else {
+            return
+        }
+        defaults.set(value, forKey: nameChargedAlertDefaultsPrefix + normalizedAlertName(snapshot.displayName))
+    }
+
+    private static func normalizedAlertName(_ displayName: String) -> String {
+        displayName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .lowercased()
     }
 }
 

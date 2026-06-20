@@ -29,6 +29,12 @@ public enum BatterySource: String, Codable, Sendable {
     case bluetoothUnsupported
 }
 
+public extension BatterySource {
+    var isCompanionSync: Bool {
+        self == .iCloud || self == .watchConnectivity
+    }
+}
+
 public enum Freshness: String, Codable, Sendable {
     case fresh
     case stale

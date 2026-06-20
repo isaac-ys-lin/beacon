@@ -74,8 +74,19 @@ notarize_dmg_if_requested() {
     return
   fi
 
+  if [[ -n "${NOTARY_PROFILE:-}" ]]; then
+    echo "Submitting DMG for notarization with keychain profile: $NOTARY_PROFILE"
+    /usr/bin/xcrun notarytool submit "$dmg" \
+      --keychain-profile "$NOTARY_PROFILE" \
+      --wait
+
+    echo "Stapling notarization ticket..."
+    /usr/bin/xcrun stapler staple "$dmg"
+    return
+  fi
+
   if [[ -z "${APPLE_ID:-}" || -z "${APPLE_APP_PASSWORD:-}" || -z "${TEAM_ID:-}" ]]; then
-    echo "NOTARIZE=1 requires APPLE_ID, APPLE_APP_PASSWORD, and TEAM_ID." >&2
+    echo "NOTARIZE=1 requires NOTARY_PROFILE, or APPLE_ID, APPLE_APP_PASSWORD, and TEAM_ID." >&2
     exit 1
   fi
 

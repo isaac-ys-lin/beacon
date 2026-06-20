@@ -61,6 +61,8 @@ enum BatteryHUDPreferences {
 }
 
 struct BatteryActionHUDView: View {
+    static let cornerRadius: CGFloat = 24
+
     let event: BatteryAlertEvent
     var showsDismissButton = BatteryHUDPreferences.showsDismissButton()
     var onDismiss: (() -> Void)?
@@ -120,14 +122,15 @@ struct BatteryActionHUDView: View {
         .padding(.horizontal, 18)
         .frame(width: 520, height: 92)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
                 .fill(DesignTokens.Palette.panel)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
                         .stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.8)
                 )
                 .shadow(color: .black.opacity(0.16), radius: 26, x: 0, y: 14)
         )
+        .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
     }
 
     private var title: String {

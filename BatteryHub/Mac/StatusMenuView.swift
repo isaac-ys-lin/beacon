@@ -87,6 +87,25 @@ enum StatusWindowStyle: String, CaseIterable, Identifiable {
         case .compact: return "Compact"
         }
     }
+
+    var accessibilityTitle: String {
+        switch self {
+        case .native: return "Simple dashboard"
+        case .large: return "Detailed dashboard"
+        case .compact: return "Compact dashboard"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .native:
+            return BatteryHubSymbols.app
+        case .large:
+            return resolveSymbol("rectangle.grid.3x2", fallback: BatteryHubSymbols.app)
+        case .compact:
+            return resolveSymbol("rectangle.grid.1x2", fallback: "rectangle")
+        }
+    }
 }
 
 enum StatusWindowPreferences {
@@ -95,6 +114,11 @@ enum StatusWindowPreferences {
     static let showAirPodsCardKey = "BatteryHub.showAirPodsStatusCard"
     static let showMenuBarBatteryKey = "BatteryHub.showMenuBarBattery"
     static let showBatteryOverviewKey = "BatteryHub.showBatteryOverview"
+    static let didChangeNotification = Notification.Name("BatteryHub.statusWindowPreferencesDidChange")
+
+    static func notifyChanged() {
+        NotificationCenter.default.post(name: didChangeNotification, object: nil)
+    }
 
     static func applyNativeDefaultIfNeeded(defaults: UserDefaults = .standard) {
         guard defaults.string(forKey: styleKey) != nil else {
@@ -105,6 +129,61 @@ enum StatusWindowPreferences {
         guard !defaults.bool(forKey: nativeDefaultMigrationKey) else { return }
         defaults.set(StatusWindowStyle.native.rawValue, forKey: styleKey)
         defaults.set(true, forKey: nativeDefaultMigrationKey)
+    }
+}
+
+struct StatusWindowConfiguration: Equatable {
+    var style: StatusWindowStyle
+    var showsAirPodsCard: Bool
+    var showsMenuBarBattery: Bool
+    var showsBatteryOverview: Bool
+
+    static func load(from defaults: UserDefaults = .standard) -> StatusWindowConfiguration {
+        let style = defaults.string(forKey: StatusWindowPreferences.styleKey)
+            .flatMap(StatusWindowStyle.init(rawValue:)) ?? .native
+
+        return StatusWindowConfiguration(
+            style: style,
+            showsAirPodsCard: boolPreference(
+                StatusWindowPreferences.showAirPodsCardKey,
+                defaultValue: true,
+                defaults: defaults
+            ),
+            showsMenuBarBattery: boolPreference(
+                StatusWindowPreferences.showMenuBarBatteryKey,
+                defaultValue: false,
+                defaults: defaults
+            ),
+            showsBatteryOverview: boolPreference(
+                StatusWindowPreferences.showBatteryOverviewKey,
+                defaultValue: true,
+                defaults: defaults
+            )
+        )
+    }
+
+    var showsOverviewInDashboard: Bool {
+        style != .native && showsBatteryOverview
+    }
+
+    func showsAirPodsCard(in sections: [DeviceSection]) -> Bool {
+        style == .large
+            && showsAirPodsCard
+            && sections.contains { section in
+                section.items.contains { item in
+                    if case .airPods = item { return true }
+                    return false
+                }
+            }
+    }
+
+    private static func boolPreference(
+        _ key: String,
+        defaultValue: Bool,
+        defaults: UserDefaults
+    ) -> Bool {
+        guard defaults.object(forKey: key) != nil else { return defaultValue }
+        return defaults.bool(forKey: key)
     }
 }
 
@@ -133,63 +212,28 @@ enum StatusMenuSizing {
         visibleScreenHeight: CGFloat
     ) -> CGSize {
         let width = width(for: style)
-        if style == .native {
-            let panelVerticalPadding: CGFloat = 24
-            let headerHeight: CGFloat = 50
-            let headerDividerHeight: CGFloat = 1
-            let previewHeight: CGFloat = 0
-            let rowHeight: CGFloat = 50
-            let rowSeparatorHeight = CGFloat(max(0, dashboardItemCount - 1))
-            let listVerticalPadding: CGFloat = dashboardItemCount == 0 ? 0 : 16
-            let footerHeight: CGFloat = 85
-            let emptyHeight: CGFloat = 82
-            let contentHeight = dashboardItemCount == 0
-                ? emptyHeight
-                : listVerticalPadding + CGFloat(dashboardItemCount) * rowHeight + rowSeparatorHeight
-            let desiredHeight = panelVerticalPadding
-                + headerHeight
-                + headerDividerHeight
-                + previewHeight
-                + contentHeight
-                + footerHeight
-            let minimumHeight: CGFloat = dashboardItemCount == 0 ? 260 : 248
-            let screenCappedHeight = max(240, visibleScreenHeight - 46)
-            return CGSize(width: width, height: min(max(desiredHeight, minimumHeight), screenCappedHeight))
-        }
-
-        let chromeHeight: CGFloat = 146
-        let overviewHeight: CGFloat = showsOverview ? (style == .large ? 270 : 232) : 0
-        let airPodsHeight: CGFloat = showsAirPodsCard ? 334 : 0
-        let listHeight = listHeight(for: dashboardItemCount, style: style)
-        let contentGaps = CGFloat([
-            showsOverview,
-            showsAirPodsCard,
-            dashboardItemCount > 0
-        ].filter { $0 }.count - 1).clamped(to: 0...3) * 14
-
-        let desiredHeight = chromeHeight + overviewHeight + airPodsHeight + listHeight + contentGaps
+        let panelVerticalPadding: CGFloat = 28
+        let headerHeight: CGFloat = 58
+        let overviewHeight: CGFloat = showsOverview ? 48 : 0
+        let rowHeight: CGFloat = style == .large ? 62 : 58
+        let rowSpacing: CGFloat = dashboardItemCount > 1 ? CGFloat(dashboardItemCount - 1) * 8 : 0
+        let listVerticalPadding: CGFloat = dashboardItemCount == 0 ? 0 : 18
+        let emptyHeight: CGFloat = 82
+        let contentHeight = dashboardItemCount == 0
+            ? emptyHeight
+            : listVerticalPadding + CGFloat(dashboardItemCount) * rowHeight + rowSpacing
+        let desiredHeight = panelVerticalPadding
+            + headerHeight
+            + overviewHeight
+            + contentHeight
         let minimumHeight: CGFloat
         if dashboardItemCount == 0 {
-            minimumHeight = style == .large ? 330 : 300
+            minimumHeight = 260
         } else {
-            minimumHeight = style == .large ? 640 : 560
+            minimumHeight = style == .large ? 340 : 248
         }
-        let screenCappedHeight = max(280, visibleScreenHeight - 46)
-        let height = min(max(desiredHeight, minimumHeight), screenCappedHeight)
-        return CGSize(width: width, height: height)
-    }
-
-    private static func listHeight(for dashboardItemCount: Int, style: StatusWindowStyle) -> CGFloat {
-        guard dashboardItemCount > 0 else { return 0 }
-        let firstRowAllowance: CGFloat = style == .large ? 104 : 90
-        let additionalRowHeight: CGFloat = style == .large ? 72 : 64
-        return firstRowAllowance + CGFloat(max(0, dashboardItemCount - 1)) * additionalRowHeight
-    }
-}
-
-private extension CGFloat {
-    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
+        let screenCappedHeight = max(240, visibleScreenHeight - 46)
+        return CGSize(width: width, height: min(max(desiredHeight, minimumHeight), screenCappedHeight))
     }
 }
 
@@ -237,6 +281,8 @@ struct StatusMenuView: View {
     let snapshots: [DecoratedBatterySnapshot]
     let isRefreshing: Bool
     let isPreviewingData: Bool
+    let configuration: StatusWindowConfiguration
+    let bluetoothPowerState: BluetoothPowerState
     let onRefresh: () -> Void
     let onOpenSettings: (SettingsPane, String?) -> Void
 
@@ -258,6 +304,8 @@ struct StatusMenuView: View {
         snapshots: [DecoratedBatterySnapshot],
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
+        configuration: StatusWindowConfiguration = .load(),
+        bluetoothPowerState: BluetoothPowerState = .on,
         onRefresh: @escaping () -> Void,
         onOpenSettings: @escaping (SettingsPane, String?) -> Void = { _, _ in },
         initiallyShowingSettings: Bool = false,
@@ -267,6 +315,8 @@ struct StatusMenuView: View {
         self.snapshots = snapshots
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
+        self.configuration = configuration
+        self.bluetoothPowerState = bluetoothPowerState
         self.onRefresh = onRefresh
         self.onOpenSettings = onOpenSettings
         _isShowingSettings = State(initialValue: initiallyShowingSettings)
@@ -281,16 +331,33 @@ struct StatusMenuView: View {
         )
         _selectedDeviceChargedAlertEnabled = State(
             initialValue: initialSelectedDeviceConfiguration.map {
-                LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: $0.id)
+                LowBatteryNotifier.isChargedAlertEnabled(
+                    forDeviceID: $0.id,
+                    displayName: $0.displayName
+                )
             } ?? false
         )
     }
 
     var body: some View {
-        if statusWindowStyle == .native, !isShowingSettings {
-            nativeBody
-        } else {
-            detailedBody
+        Group {
+            if isShowingSettings {
+                detailedBody
+            } else {
+                nativeBody
+            }
+        }
+        .onChange(of: statusWindowStyleRawValue) { _, _ in
+            StatusWindowPreferences.notifyChanged()
+        }
+        .onChange(of: showAirPodsStatusCard) { _, _ in
+            StatusWindowPreferences.notifyChanged()
+        }
+        .onChange(of: showMenuBarBattery) { _, _ in
+            StatusWindowPreferences.notifyChanged()
+        }
+        .onChange(of: showBatteryOverview) { _, _ in
+            StatusWindowPreferences.notifyChanged()
         }
     }
 
@@ -366,12 +433,12 @@ struct StatusMenuView: View {
         VStack(spacing: 0) {
             nativeHeader
 
-            Divider()
-                .overlay(NativeMacStyle.subtleStroke)
-                .padding(.horizontal, 16)
-
             if isPreviewingData {
                 nativePreviewNotice
+            }
+
+            if configuration.showsOverviewInDashboard, !sections.isEmpty {
+                nativeOverviewMetrics
             }
 
             if sections.isEmpty {
@@ -380,7 +447,6 @@ struct StatusMenuView: View {
                 nativeDeviceList
             }
 
-            nativeFooter
         }
         .padding(.top, 12)
         .padding(.bottom, 10)
@@ -388,16 +454,71 @@ struct StatusMenuView: View {
         .nativeSystemSurface(cornerRadius: NativeMacStyle.popoverCornerRadius)
     }
 
+    private var nativeOverviewMetrics: some View {
+        HStack(spacing: 8) {
+            nativeMetric(
+                "\(visibleItemCount)",
+                visibleItemCount == 1 ? "Device" : "Devices",
+                color: DesignTokens.Palette.accent
+            )
+
+            nativeMetric(
+                "\(lowBatteryItemCount)",
+                "Low",
+                color: lowBatteryItemCount > 0 ? DesignTokens.Palette.critical : DesignTokens.Palette.secondaryText
+            )
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
+    }
+
+    private func nativeMetric(_ value: String, _ label: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(DesignTokens.Typography.nativePopoverPercent)
+                .monospacedDigit()
+                .foregroundStyle(color)
+
+            Text(label)
+                .font(DesignTokens.Typography.caption2)
+                .foregroundStyle(DesignTokens.Palette.secondaryText)
+        }
+        .padding(.horizontal, 11)
+        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
+                .fill(DesignTokens.Palette.controlPill)
+        )
+    }
+
     private var nativeHeader: some View {
         HStack(alignment: .center, spacing: 12) {
-            BluetoothLogoMark(size: 30)
+            Image(systemName: BatteryHubSymbols.app)
+                .font(.system(size: 16, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(DesignTokens.Palette.accent)
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(DesignTokens.Palette.controlPill)
+                )
 
-            Text("Bluetooth")
-                .font(DesignTokens.Typography.nativePopoverTitle)
-                .foregroundStyle(DesignTokens.Palette.text)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Batteries")
+                    .font(DesignTokens.Typography.nativePopoverTitle)
+                    .foregroundStyle(DesignTokens.Palette.text)
+                    .lineLimit(1)
+
+                Text(nativeHeaderSubtitle)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .lineLimit(1)
+                    .monospacedDigit()
+            }
 
             Spacer()
+
+            nativeSettingsButton
 
             Button(action: onRefresh) {
                 if isRefreshing {
@@ -415,40 +536,98 @@ struct StatusMenuView: View {
             .disabled(isRefreshing)
             .help(isRefreshing ? "Refreshing" : "Refresh")
 
+            nativeLowestBatteryPill
             nativeBluetoothStatusButton
         }
         .padding(.horizontal, 16)
-        .frame(height: 50)
+        .frame(height: 58)
+    }
+
+    private var nativeSettingsButton: some View {
+        Button {
+            onOpenSettings(.devices, nil)
+        } label: {
+            Image(systemName: resolveSymbol("gearshape", fallback: "gearshape.fill"))
+                .font(.system(size: 13, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.primary.opacity(0.62))
+                .frame(width: 28, height: 28)
+                .accessibilityLabel("Open BatteryHub Settings")
+        }
+        .buttonStyle(UtilityIconButtonStyle())
+        .help("Open BatteryHub Settings")
+    }
+
+    private var nativeHeaderSubtitle: String {
+        if isRefreshing {
+            return "Refreshing"
+        }
+        return latestUpdateText
+    }
+
+    @ViewBuilder
+    private var nativeLowestBatteryPill: some View {
+        if let lowest = overviewSummary.lowestPercent {
+            Text("\(lowest)%")
+                .font(DesignTokens.Typography.nativePopoverPill)
+                .monospacedDigit()
+                .foregroundStyle(lowest <= clampedLowBatteryThreshold ? DesignTokens.Palette.critical : DesignTokens.Palette.accent)
+                .padding(.horizontal, 9)
+                .frame(height: 26)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(DesignTokens.Palette.controlPill)
+                )
+                .help("Lowest reported battery")
+        }
     }
 
     private var nativeBluetoothStatusButton: some View {
         Button {
             BatteryHubSystemSettingsActions.openBluetoothSettings()
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: resolveSymbol("checkmark.circle.fill", fallback: "checkmark.circle"))
-                    .font(.system(size: 12, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-
-                Text("On")
-                    .font(DesignTokens.Typography.nativePopoverPill)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(DesignTokens.Palette.accent)
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(DesignTokens.Palette.controlPill)
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
-                    )
-            )
-            .accessibilityLabel("Bluetooth is on. Open Bluetooth Settings.")
+            Image(systemName: BatteryHubSymbols.bluetooth)
+                .font(.system(size: 14, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(bluetoothPowerColor)
+                .frame(width: 30)
+                .accessibilityLabel(bluetoothAccessibilityLabel)
+                .padding(.horizontal, 7)
+                .frame(height: 26)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(DesignTokens.Palette.controlPill)
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
+                        )
+                )
         }
         .buttonStyle(.plain)
-        .help("Open Bluetooth Settings")
+        .help(bluetoothHelpText)
+    }
+
+    private var bluetoothPowerColor: Color {
+        switch bluetoothPowerState {
+        case .on: return DesignTokens.Palette.accent
+        case .off, .unknown: return DesignTokens.Palette.secondaryText
+        }
+    }
+
+    private var bluetoothAccessibilityLabel: String {
+        switch bluetoothPowerState {
+        case .on: return "Bluetooth is on. Open Bluetooth Settings."
+        case .off: return "Bluetooth is off. Open Bluetooth Settings."
+        case .unknown: return "Bluetooth status unavailable. Open Bluetooth Settings."
+        }
+    }
+
+    private var bluetoothHelpText: String {
+        switch bluetoothPowerState {
+        case .on: return "Bluetooth is on"
+        case .off: return "Bluetooth is off"
+        case .unknown: return "Open Bluetooth Settings"
+        }
     }
 
     private var nativePreviewNotice: some View {
@@ -473,28 +652,28 @@ struct StatusMenuView: View {
 
     private var nativeDeviceList: some View {
         ScrollView(showsIndicators: nativeItems.count > 8) {
-            VStack(spacing: 0) {
+            VStack(spacing: 8) {
                 ForEach(nativeItems.indices, id: \.self) { index in
                     let item = nativeItems[index]
 
-                    NativeStatusRow(
-                        item: item,
-                        isPinned: displayPreferences.isPinned(item),
-                        lowBatteryThreshold: clampedLowBatteryThreshold
+                    DashboardBatteryDeviceRow(
+                        device: DashboardBatteryDevice(
+                            item: item,
+                            isPinned: displayPreferences.isPinned(item)
+                        ),
+                        lowBatteryThreshold: clampedLowBatteryThreshold,
+                        iconSize: 30,
+                        horizontalPadding: 10,
+                        verticalPadding: 10,
+                        statusWidth: 68
                     )
                     .contextMenu {
                         deviceContextMenu(for: item, displayName: item.displayName)
                     }
-
-                    if index < nativeItems.count - 1 {
-                        Divider()
-                            .overlay(NativeMacStyle.subtleStroke)
-                            .padding(.leading, 58)
-                            .padding(.trailing, 16)
-                    }
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
         }
         .frame(maxHeight: contentMaxHeight)
     }
@@ -502,7 +681,15 @@ struct StatusMenuView: View {
     private var nativeEmptyState: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                BluetoothLogoMark(size: 30)
+                Image(systemName: "battery.25")
+                    .font(.system(size: 15, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(DesignTokens.Palette.controlPill)
+                    )
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("No reporting devices")
@@ -520,31 +707,10 @@ struct StatusMenuView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var nativeFooter: some View {
-        VStack(spacing: 0) {
-            Divider()
-                .overlay(NativeMacStyle.subtleStroke)
-                .padding(.horizontal, 16)
-
-            NativeFooterButton(
-                title: "BatteryHub Settings...",
-                systemImage: resolveSymbol("gearshape.2.fill", fallback: "gearshape"),
-                usesSettingsLogo: true
-            ) {
-                onOpenSettings(.devices, nil)
-            }
-
-            NativeFooterButton(title: "Bluetooth Settings...", systemImage: BatteryHubSymbols.bluetooth, usesBluetoothLogo: true) {
-                BatteryHubSystemSettingsActions.openBluetoothSettings()
-            }
-        }
-        .padding(.top, 4)
-    }
-
     // MARK: - Computed sections
 
     private var sections: [DeviceSection] {
-        dashboardDeviceSections(snapshots, preferences: displayPreferences)
+        statusMenuDeviceSections(snapshots, preferences: displayPreferences)
     }
 
     private var nativeItems: [DeviceListItem] {
@@ -589,11 +755,15 @@ struct StatusMenuView: View {
     }
 
     private var statusWindowWidth: CGFloat {
-        StatusMenuSizing.width(for: statusWindowStyle)
+        StatusMenuSizing.width(for: renderedStatusWindowStyle)
     }
 
     private var contentMaxHeight: CGFloat {
-        StatusMenuSizing.contentMaxHeight(for: statusWindowStyle)
+        StatusMenuSizing.contentMaxHeight(for: renderedStatusWindowStyle)
+    }
+
+    private var renderedStatusWindowStyle: StatusWindowStyle {
+        isShowingSettings ? statusWindowStyle : configuration.style
     }
 
     private var featuredAirPods: FeaturedAirPodsSummary? {
@@ -822,7 +992,10 @@ struct StatusMenuView: View {
 
             Picker("Window style", selection: $statusWindowStyleRawValue) {
                 ForEach(StatusWindowStyle.allCases) { style in
-                    Text(style.title).tag(style.rawValue)
+                    Image(systemName: style.symbolName)
+                        .tag(style.rawValue)
+                        .accessibilityLabel(style.accessibilityTitle)
+                        .help(style.accessibilityTitle)
                 }
             }
             .pickerStyle(.segmented)
@@ -868,7 +1041,8 @@ struct StatusMenuView: View {
                 style: statusWindowStyle,
                 showsAirPodsCard: showAirPodsStatusCard && statusWindowStyle == .large,
                 showsMenuBarBattery: showMenuBarBattery,
-                showsBatteryOverview: showBatteryOverview
+                showsBatteryOverview: showBatteryOverview,
+                bluetoothPowerState: bluetoothPowerState
             )
         }
         .padding(18)
@@ -1126,7 +1300,7 @@ struct StatusMenuView: View {
 
                 Spacer()
 
-                Toggle("", isOn: selectedDeviceChargedAlertBinding(for: selection.id))
+                Toggle("", isOn: selectedDeviceChargedAlertBinding(for: selection))
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .disabled(!chargedBatteryAlertsEnabled)
@@ -1157,12 +1331,16 @@ struct StatusMenuView: View {
         )
     }
 
-    private func selectedDeviceChargedAlertBinding(for id: String) -> Binding<Bool> {
+    private func selectedDeviceChargedAlertBinding(for selection: SelectedDeviceConfiguration) -> Binding<Bool> {
         Binding(
             get: { selectedDeviceChargedAlertEnabled },
             set: { newValue in
                 selectedDeviceChargedAlertEnabled = newValue
-                LowBatteryNotifier.setChargedAlertEnabled(newValue, forDeviceID: id)
+                LowBatteryNotifier.setChargedAlertEnabled(
+                    newValue,
+                    forDeviceID: selection.id,
+                    displayName: selection.displayName
+                )
             }
         )
     }
@@ -1343,7 +1521,10 @@ struct StatusMenuView: View {
             kind: item.kind
         )
         selectedDeviceAlertThreshold = Double(LowBatteryNotifier.threshold(forDeviceID: item.id))
-        selectedDeviceChargedAlertEnabled = LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: item.id)
+        selectedDeviceChargedAlertEnabled = LowBatteryNotifier.isChargedAlertEnabled(
+            forDeviceID: item.id,
+            displayName: item.displayName
+        )
     }
 
     private func setDisplayPreferences(_ preferences: DeviceDisplayPreferences) {
@@ -1376,7 +1557,10 @@ struct StatusMenuView: View {
 
     private func alertSummary(for item: DeviceListItem) -> String {
         let hasCustomLow = LowBatteryNotifier.hasCustomThreshold(forDeviceID: item.id)
-        let hasCharged = LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: item.id)
+        let hasCharged = LowBatteryNotifier.isChargedAlertEnabled(
+            forDeviceID: item.id,
+            displayName: item.displayName
+        )
 
         switch (hasCustomLow, hasCharged) {
         case (true, true):
@@ -1399,6 +1583,7 @@ struct StatusWindowPreview: View {
     let showsAirPodsCard: Bool
     let showsMenuBarBattery: Bool
     let showsBatteryOverview: Bool
+    var bluetoothPowerState: BluetoothPowerState = .on
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1407,12 +1592,11 @@ struct StatusWindowPreview: View {
                     .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
                 Spacer()
-                Text(style.title)
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .foregroundStyle(DesignTokens.Palette.accent)
-            }
 
-            previewMenuBarItem
+                if showsMenuBarBattery {
+                    previewMenuBarItem
+                }
+            }
 
             VStack(spacing: 4) {
                 previewHeader
@@ -1422,15 +1606,20 @@ struct StatusWindowPreview: View {
                 }
 
                 if style != .native && showsAirPodsCard {
-                    previewRow(symbolName: resolveSymbol("airpodspro", fallback: "airpods"), title: "AirPods Pro", value: "61%")
+                    previewRow(
+                        DashboardBatteryDevice(
+                            id: "preview-airpods",
+                            displayName: "AirPods Pro",
+                            kind: .airPods,
+                            percent: 61,
+                            chargeState: .unplugged,
+                            freshness: .fresh
+                        )
+                    )
                 }
 
                 ForEach(0..<rowCount, id: \.self) { index in
-                    previewRow(
-                        symbolName: previewRowSymbolName(for: index),
-                        title: previewRowTitle(for: index),
-                        value: previewRowValue(for: index)
-                    )
+                    previewRow(previewDevice(for: index))
                 }
             }
         }
@@ -1451,7 +1640,7 @@ struct StatusWindowPreview: View {
 
     private var previewMenuBarItem: some View {
         HStack(spacing: 5) {
-            BluetoothLogoMark(size: 14)
+            BatteryHubLogoMark(size: 14)
 
             if showsMenuBarBattery {
                 Text("42%")
@@ -1470,21 +1659,61 @@ struct StatusWindowPreview: View {
 
     private var previewHeader: some View {
         HStack(spacing: 8) {
-            BluetoothLogoMark(size: 20)
-            Text("Bluetooth")
-                .font(DesignTokens.Typography.nativePopoverRowTitle)
-                .foregroundStyle(DesignTokens.Palette.text)
-            Spacer()
-            Text("On")
-                .font(DesignTokens.Typography.nativePopoverPill)
+            Image(systemName: BatteryHubSymbols.app)
+                .font(.system(size: 13, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(DesignTokens.Palette.accent)
+                .frame(width: 22, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(DesignTokens.Palette.controlPill)
+                )
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Batteries")
+                    .font(DesignTokens.Typography.nativePopoverRowTitle)
+                    .foregroundStyle(DesignTokens.Palette.text)
+                Text("Updated now")
+                    .font(DesignTokens.Typography.caption2)
+                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: resolveSymbol("gearshape", fallback: "gearshape.fill"))
+                .font(.system(size: 11, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.primary.opacity(0.62))
+                .frame(width: 20, height: 20)
+
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.primary.opacity(0.62))
+                .frame(width: 20, height: 20)
+
+            Text("18%")
+                .font(DesignTokens.Typography.nativePopoverPill)
+                .monospacedDigit()
+                .foregroundStyle(DesignTokens.Palette.critical)
+                .padding(.horizontal, 7)
+                .frame(height: 22)
+                .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
+
+            Image(systemName: BatteryHubSymbols.bluetooth)
+                .font(.system(size: 12, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(previewBluetoothPowerColor)
+                .frame(width: 24, height: 22)
+                .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
         }
-        .padding(.horizontal, 9)
-        .frame(height: 30)
-        .background(
-            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill)
-        )
+        .frame(height: 38)
+    }
+
+    private var previewBluetoothPowerColor: Color {
+        switch bluetoothPowerState {
+        case .on: return DesignTokens.Palette.accent
+        case .off, .unknown: return DesignTokens.Palette.secondaryText
+        }
     }
 
     private var previewOverview: some View {
@@ -1512,266 +1741,46 @@ struct StatusWindowPreview: View {
         )
     }
 
-    private func previewRow(symbolName: String, title: String, value: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: symbolName)
-                .font(.system(size: 14, weight: .regular))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.primary.opacity(0.58))
-                .frame(width: 20, height: 20)
-
-            Text(title)
-                .font(DesignTokens.Typography.nativePopoverRowSubtitle)
-                .foregroundStyle(DesignTokens.Palette.text)
-                .lineLimit(1)
-
-            Spacer()
-
-            Text(value)
-                .font(DesignTokens.Typography.nativePopoverRowSubtitle)
-                .monospacedDigit()
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-        }
-        .padding(.horizontal, 9)
-        .frame(height: 28)
-        .background(
-            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill)
+    private func previewRow(_ device: DashboardBatteryDevice) -> some View {
+        DashboardBatteryDeviceRow(
+            device: device,
+            lowBatteryThreshold: 20,
+            iconSize: 22,
+            horizontalPadding: 8,
+            verticalPadding: 7,
+            statusWidth: 48
         )
     }
 
-    private func previewRowSymbolName(for index: Int) -> String {
+    private func previewDevice(for index: Int) -> DashboardBatteryDevice {
         switch index {
-        case 0: return resolveSymbol("keyboard", fallback: "rectangle.grid.3x2")
-        case 1: return resolveSymbol("magicmouse", fallback: "cursorarrow")
-        default: return resolveSymbol("applewatch", fallback: "watch.analog")
-        }
-    }
-
-    private func previewRowTitle(for index: Int) -> String {
-        switch index {
-        case 0: return "Keyboard"
-        case 1: return "Mouse"
-        default: return "Watch"
-        }
-    }
-
-    private func previewRowValue(for index: Int) -> String {
-        switch index {
-        case 0: return "82%"
-        case 1: return "42%"
-        default: return "18%"
-        }
-    }
-}
-
-// MARK: - Native status rows
-
-private struct NativeStatusRow: View {
-    let item: DeviceListItem
-    let isPinned: Bool
-    let lowBatteryThreshold: Int
-    @State private var isHovered = false
-
-    var body: some View {
-        HStack(spacing: 12) {
-            NativeDeviceGlyph(
-                symbolName: deviceSymbolName(for: item.kind, displayName: item.displayName)
+        case 0:
+            return DashboardBatteryDevice(
+                id: "preview-keyboard",
+                displayName: "Keyboard",
+                kind: .keyboard,
+                percent: 82,
+                chargeState: .unplugged,
+                freshness: .fresh
             )
-
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 5) {
-                    Text(item.displayName)
-                        .font(DesignTokens.Typography.nativePopoverRowTitle)
-                        .foregroundStyle(DesignTokens.Palette.text)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-
-                    if isPinned {
-                        Image(systemName: "pin.fill")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(DesignTokens.Palette.accent)
-                    }
-                }
-
-                if let statusText {
-                    Text(statusText)
-                        .font(DesignTokens.Typography.nativePopoverRowSubtitle)
-                        .foregroundStyle(statusColor)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            if let percent {
-                HStack(spacing: 5) {
-                    Text("\(percent)%")
-                        .font(DesignTokens.Typography.nativePopoverPercent)
-                        .foregroundStyle(statusColor)
-                        .monospacedDigit()
-                        .lineLimit(1)
-
-                    NativeBatteryIndicator(percent: percent, chargeState: chargeState, color: statusColor)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 50)
-        .background(
-            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                .fill(isHovered ? NativeMacStyle.rowSelection : Color.clear)
-        )
-        .padding(.horizontal, 8)
-        .contentShape(Rectangle())
-        .onHover { hovering in
-            isHovered = hovering
-        }
-    }
-
-    private var percent: Int? {
-        switch item {
-        case .device(let decorated):
-            return decorated.snapshot.percent
-        case .airPods(_, _, let components):
-            return components.compactMap(\.percent).min()
-        }
-    }
-
-    private var chargeState: ChargeState {
-        switch item {
-        case .device(let decorated):
-            return decorated.snapshot.chargeState
-        case .airPods(_, _, let components):
-            if components.contains(where: { $0.chargeState == .charging }) { return .charging }
-            if !components.isEmpty,
-               components.allSatisfy({ $0.chargeState == .full || $0.percent == 100 }) {
-                return .full
-            }
-            return .unplugged
-        }
-    }
-
-    private var hasStaleSignal: Bool {
-        switch item {
-        case .device(let decorated):
-            return decorated.freshness != .fresh
-        case .airPods(_, _, let components):
-            return components.contains { $0.freshness != .fresh }
-        }
-    }
-
-    private var isLow: Bool {
-        guard let percent else { return false }
-        return percent <= lowBatteryThreshold && chargeState != .charging && chargeState != .full
-    }
-
-    private var statusText: String? {
-        if chargeState == .charging { return "Charging" }
-        if chargeState == .full { return "Full" }
-        if isLow { return "Low battery" }
-        if hasStaleSignal { return "Last report may be stale" }
-        return nil
-    }
-
-    private var statusColor: Color {
-        if isLow { return DesignTokens.Palette.critical }
-        if chargeState == .charging || chargeState == .full { return DesignTokens.Palette.charging }
-        if hasStaleSignal { return DesignTokens.Palette.stale }
-        return DesignTokens.Palette.text
-    }
-}
-
-private struct NativeDeviceGlyph: View {
-    let symbolName: String
-
-    var body: some View {
-        Image(systemName: symbolName)
-            .font(.system(size: 20, weight: .regular))
-            .symbolRenderingMode(.monochrome)
-            .foregroundStyle(Color.primary.opacity(0.58))
-            .frame(width: 32, height: 32)
-            .accessibilityHidden(true)
-    }
-}
-
-private struct NativeBatteryIndicator: View {
-    let percent: Int
-    let chargeState: ChargeState
-    let color: Color
-
-    var body: some View {
-        Image(systemName: symbolName)
-            .font(.system(size: 18, weight: .regular))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(color.opacity(0.86))
-            .frame(width: 28, alignment: .trailing)
-            .accessibilityLabel("\(percent)%")
-    }
-
-    private var symbolName: String {
-        if chargeState == .charging {
-            return resolveSymbol("battery.100percent.bolt", fallback: "battery.100.bolt")
-        }
-        if percent >= 88 {
-            return resolveSymbol("battery.100percent", fallback: "battery.100")
-        }
-        if percent >= 63 {
-            return resolveSymbol("battery.75percent", fallback: "battery.75")
-        }
-        if percent >= 38 {
-            return resolveSymbol("battery.50percent", fallback: "battery.50")
-        }
-        if percent >= 13 {
-            return resolveSymbol("battery.25percent", fallback: "battery.25")
-        }
-        return resolveSymbol("battery.0percent", fallback: "battery.0")
-    }
-}
-
-private struct NativeFooterButton: View {
-    let title: String
-    let systemImage: String
-    var usesBluetoothLogo = false
-    var usesSettingsLogo = false
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                if usesBluetoothLogo {
-                    BluetoothLogoMark(size: 22)
-                        .frame(width: 22)
-                } else if usesSettingsLogo {
-                    SettingsLogoMark(size: 22)
-                        .frame(width: 22)
-                } else {
-                    Image(systemName: resolveSymbol(systemImage, fallback: "circle"))
-                        .font(.system(size: 13, weight: .semibold))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(Color.primary.opacity(0.58))
-                        .frame(width: 20)
-                }
-
-                Text(title)
-                    .font(DesignTokens.Typography.nativePopoverFooter)
-                    .foregroundStyle(DesignTokens.Palette.text)
-                    .lineLimit(1)
-
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 40)
-            .background(
-                RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                    .fill(isHovered ? NativeMacStyle.rowSelection : Color.clear)
+        case 1:
+            return DashboardBatteryDevice(
+                id: "preview-mouse",
+                displayName: "Mouse",
+                kind: .mouse,
+                percent: 42,
+                chargeState: .unplugged,
+                freshness: .fresh
             )
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-        .onHover { hovering in
-            isHovered = hovering
+        default:
+            return DashboardBatteryDevice(
+                id: "preview-watch",
+                displayName: "Watch",
+                kind: .appleWatch,
+                percent: 18,
+                chargeState: .unplugged,
+                freshness: .fresh
+            )
         }
     }
 }

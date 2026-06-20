@@ -41,11 +41,22 @@ public struct BatterySnapshotStore: Sendable {
 
     public mutating func merge(_ incoming: [BatterySnapshot]) {
         for snapshot in incoming {
+            if hasNewerDuplicateBluetoothSnapshot(matching: snapshot) {
+                continue
+            }
+            if hasBetterDuplicateBluetoothSnapshot(matching: snapshot) {
+                continue
+            }
             if let existing = snapshotsByID[snapshot.deviceID], existing.updatedAt > snapshot.updatedAt {
                 continue
             }
+            removeDuplicateBluetoothSnapshots(matching: snapshot)
             snapshotsByID[snapshot.deviceID] = snapshot
         }
+    }
+
+    public mutating func removeCompanionSyncSnapshots() {
+        snapshotsByID = snapshotsByID.filter { !$0.value.source.isCompanionSync }
     }
 
     public static func freshness(for snapshot: BatterySnapshot, now: Date) -> Freshness {
@@ -57,6 +68,49 @@ public struct BatterySnapshotStore: Sendable {
 
     public static func isVisibleExternalBattery(_ snapshot: BatterySnapshot) -> Bool {
         snapshot.kind != .macBook && snapshot.percent != nil
+    }
+
+    private func hasNewerDuplicateBluetoothSnapshot(matching snapshot: BatterySnapshot) -> Bool {
+        guard snapshot.source.isBluetoothRelated else { return false }
+
+        let normalizedName = snapshot.displayName.normalizedDeviceName
+        return snapshotsByID.contains { id, existing in
+            id != snapshot.deviceID
+                && existing.source.isBluetoothRelated
+                && existing.kind == snapshot.kind
+                && existing.displayName.normalizedDeviceName == normalizedName
+                && existing.updatedAt > snapshot.updatedAt
+        }
+    }
+
+    private func hasBetterDuplicateBluetoothSnapshot(matching snapshot: BatterySnapshot) -> Bool {
+        guard snapshot.source.isBluetoothRelated,
+              snapshot.percent == nil
+        else {
+            return false
+        }
+
+        let normalizedName = snapshot.displayName.normalizedDeviceName
+        return snapshotsByID.contains { id, existing in
+            id != snapshot.deviceID
+                && existing.source.isBluetoothRelated
+                && existing.kind == snapshot.kind
+                && existing.displayName.normalizedDeviceName == normalizedName
+                && existing.percent != nil
+                && existing.updatedAt >= snapshot.updatedAt
+        }
+    }
+
+    private mutating func removeDuplicateBluetoothSnapshots(matching snapshot: BatterySnapshot) {
+        guard snapshot.source.isBluetoothRelated else { return }
+
+        let normalizedName = snapshot.displayName.normalizedDeviceName
+        snapshotsByID = snapshotsByID.filter { id, existing in
+            id == snapshot.deviceID
+                || !existing.source.isBluetoothRelated
+                || existing.kind != snapshot.kind
+                || existing.displayName.normalizedDeviceName != normalizedName
+        }
     }
 }
 
@@ -72,5 +126,22 @@ private extension DeviceKind {
         case .trackpad: return 6
         case .bluetoothPeripheral: return 7
         }
+    }
+}
+
+private extension BatterySource {
+    var isBluetoothRelated: Bool {
+        switch self {
+        case .ioRegistry, .coreBluetooth, .ioBluetooth, .systemProfiler, .bluetoothUnsupported:
+            return true
+        case .macPowerSource, .iCloud, .watchConnectivity:
+            return false
+        }
+    }
+}
+
+private extension String {
+    var normalizedDeviceName: String {
+        trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }

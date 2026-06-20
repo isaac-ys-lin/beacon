@@ -11,11 +11,13 @@ public struct BluetoothDeviceScanner {
 
     @MainActor
     public func connectedCandidates() async -> [BluetoothBatteryCandidate] {
-        let hid = readHIDBatteryCandidates()
-        var candidates = hid
-        let knownIDs = Set(candidates.map(\.deviceID))
-        let classic = readPairedIOBluetoothDevices().filter { !knownIDs.contains($0.deviceID) }
-        candidates.append(contentsOf: classic)
+        var candidates = readAppleDeviceManagementBatteryCandidates()
+        for candidate in readHIDBatteryCandidates() {
+            candidates.upsert(candidate)
+        }
+        for candidate in readPairedIOBluetoothDevices() {
+            candidates.upsert(candidate)
+        }
 
         let profiler = await Self.readSystemProfilerBatteryCandidates()
         Self.logger.info("system_profiler returned \(profiler.count) battery candidates")
@@ -23,16 +25,56 @@ public struct BluetoothDeviceScanner {
             candidates.upsert(candidate)
         }
 
-        if CBCentralManager.authorization == .allowedAlways {
-            let ble = await BLEBatteryServiceReader().read(timeout: .seconds(2))
+        switch CBCentralManager.authorization {
+        case .allowedAlways, .notDetermined:
+            let ble = await BLEBatteryServiceReader().read(timeout: .seconds(4))
             Self.logger.info("BLE scan returned \(ble.count) battery candidates")
             for candidate in ble {
                 candidates.upsert(candidate)
             }
-        } else {
-            Self.logger.info("BLE scan skipped because CoreBluetooth is not authorized")
+        case .denied, .restricted:
+            Self.logger.info("BLE scan skipped because CoreBluetooth authorization is \(String(describing: CBCentralManager.authorization))")
+        @unknown default:
+            Self.logger.info("BLE scan skipped because CoreBluetooth authorization is unknown")
         }
         return candidates
+    }
+
+    private func readAppleDeviceManagementBatteryCandidates() -> [BluetoothBatteryCandidate] {
+        let classNames = [
+            "AppleDeviceManagementHIDEventService",
+            "AppleUserHIDEventService",
+            "IOHIDEventService"
+        ]
+
+        var results: [BluetoothBatteryCandidate] = []
+        var seenIDs = Set<String>()
+
+        for className in classNames {
+            var iterator: io_iterator_t = 0
+            let matching = IOServiceMatching(className)
+            guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
+                continue
+            }
+            defer { IOObjectRelease(iterator) }
+
+            while true {
+                let service = IOIteratorNext(iterator)
+                if service == 0 { break }
+                defer { IOObjectRelease(service) }
+
+                let properties = Self.appleDeviceManagementProperties(from: service)
+                guard let candidate = Self.appleDeviceManagementCandidate(from: properties),
+                      !seenIDs.contains(candidate.deviceID)
+                else {
+                    continue
+                }
+                seenIDs.insert(candidate.deviceID)
+                results.append(candidate)
+            }
+        }
+
+        return results
     }
 
     private func readPairedIOBluetoothDevices() -> [BluetoothBatteryCandidate] {
@@ -69,7 +111,10 @@ public struct BluetoothDeviceScanner {
             defer { IOObjectRelease(service) }
 
             let name = property("Product", service: service) ?? property("ProductID", service: service) ?? "Bluetooth Device"
-            let id = property("SerialNumber", service: service) ?? name
+            let id = property("PhysicalDeviceUniqueID", service: service)
+                ?? property("DeviceAddress", service: service)
+                ?? property("SerialNumber", service: service)
+                ?? name
             let percent = intProperty("BatteryPercent", service: service)
             let transport = property("Transport", service: service) ?? ""
             let usagePage = intProperty("PrimaryUsagePage", service: service)
@@ -273,6 +318,82 @@ public struct BluetoothDeviceScanner {
             && kindHint == .keyboard
     }
 
+    static func appleDeviceManagementCandidate(from properties: [String: Any]) -> BluetoothBatteryCandidate? {
+        let name = stringValue(properties["Product"])
+            ?? stringValue(properties["ProductName"])
+            ?? stringValue(properties["DeviceName"])
+            ?? "Bluetooth Device"
+        let transport = stringValue(properties["Transport"]) ?? ""
+        let isBuiltIn = boolValue(properties["Built-In"]) ?? boolValue(properties["BuiltIn"]) ?? false
+        let percent = batteryPercent(fromAppleDeviceProperties: properties)
+        let primaryUsagePage = intValue(properties["PrimaryUsagePage"])
+        let primaryUsage = intValue(properties["PrimaryUsage"])
+        let kindHint = hidKindHint(
+            name: name,
+            transport: transport,
+            primaryUsagePage: primaryUsagePage,
+            primaryUsage: primaryUsage
+        ) ?? kindHint(name: name, minorType: "")
+
+        guard shouldIncludeAppleDeviceManagementCandidate(
+            batteryPercent: percent,
+            transport: transport,
+            isBuiltIn: isBuiltIn,
+            kindHint: kindHint
+        ) else {
+            return nil
+        }
+
+        let id = stringValue(properties["DeviceAddress"])
+            ?? stringValue(properties["BluetoothDeviceAddress"])
+            ?? stringValue(properties["SerialNumber"])
+            ?? stringValue(properties["HIDDeviceID"])
+            ?? stringValue(properties["LocationID"])
+            ?? name
+
+        return BluetoothBatteryCandidate(
+            deviceID: id,
+            displayName: name,
+            transport: .hid,
+            batteryPercent: percent,
+            kindHint: kindHint,
+            connectionState: .connected
+        )
+    }
+
+    static func shouldIncludeAppleDeviceManagementCandidate(
+        batteryPercent: Int?,
+        transport: String,
+        isBuiltIn: Bool,
+        kindHint: DeviceKind?
+    ) -> Bool {
+        if batteryPercent != nil {
+            return !isBuiltIn
+        }
+
+        return !isBuiltIn
+            && transport.localizedCaseInsensitiveContains("bluetooth")
+            && (kindHint == .keyboard || kindHint == .mouse || kindHint == .trackpad)
+    }
+
+    static func mergedCandidate(
+        existing: BluetoothBatteryCandidate,
+        with candidate: BluetoothBatteryCandidate
+    ) -> BluetoothBatteryCandidate {
+        let displayName = candidate.displayName.isGenericBluetoothDisplayName
+            ? existing.displayName
+            : candidate.displayName
+
+        return BluetoothBatteryCandidate(
+            deviceID: candidate.deviceID,
+            displayName: displayName,
+            transport: candidate.transport,
+            batteryPercent: candidate.batteryPercent,
+            kindHint: candidate.kindHint ?? existing.kindHint,
+            connectionState: candidate.connectionState
+        )
+    }
+
     private static func isAirPods(name: String, minorType: String) -> Bool {
         kindHint(name: name, minorType: minorType) == .airPods
     }
@@ -302,6 +423,99 @@ public struct BluetoothDeviceScanner {
         if let string = value as? String { return string }
         if let number = value as? NSNumber { return number.stringValue }
         return nil
+    }
+
+    private static func intValue(_ value: Any?) -> Int? {
+        if let number = value as? NSNumber { return number.intValue }
+        if let int = value as? Int { return int }
+        if let string = stringValue(value) { return Int(string) }
+        return nil
+    }
+
+    private static func boolValue(_ value: Any?) -> Bool? {
+        if let bool = value as? Bool { return bool }
+        if let number = value as? NSNumber { return number.boolValue }
+        if let string = stringValue(value) {
+            switch string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "yes", "true", "1": return true
+            case "no", "false", "0": return false
+            default: return nil
+            }
+        }
+        return nil
+    }
+
+    private static func batteryPercent(fromAppleDeviceProperties properties: [String: Any]) -> Int? {
+        if let percent = batteryPercent(fromTrustedBatteryDictionary: properties) {
+            return percent
+        }
+
+        // IORegistry entries include large descriptor arrays where fields named like
+        // BatteryLevel can mean HID usage metadata instead of current charge.
+        // Only recurse into known state containers, not arbitrary descriptor arrays.
+        for key in ["HIDEventServiceProperties", "DeviceManagement", "PowerSource", "Battery"] {
+            guard let nestedValue = properties[key],
+                  let percent = batteryPercent(fromTrustedBatteryContainer: nestedValue) else {
+                continue
+            }
+            return percent
+        }
+
+        return nil
+    }
+
+    private static func batteryPercent(fromTrustedBatteryContainer value: Any) -> Int? {
+        if let dictionary = value as? [String: Any] {
+            if let percent = batteryPercent(fromTrustedBatteryDictionary: dictionary) {
+                return percent
+            }
+
+            for nestedValue in dictionary.values {
+                if let percent = batteryPercent(fromTrustedBatteryContainer: nestedValue) {
+                    return percent
+                }
+            }
+            return nil
+        }
+
+        return nil
+    }
+
+    private static func batteryPercent(fromTrustedBatteryDictionary dictionary: [String: Any]) -> Int? {
+        for key in trustedBatteryPercentKeys {
+            guard let value = dictionary[key] else { continue }
+            if let percent = percentageValue(value) {
+                return percent
+            }
+        }
+        return nil
+    }
+
+    private static let trustedBatteryPercentKeys: [String] = [
+        "BatteryPercent",
+        "BatteryPercentage",
+        "BatteryLevel",
+        "Battery Level",
+        "DeviceBatteryPercent",
+        "DeviceBatteryPercentage",
+        "DeviceBatteryLevel",
+        "CurrentBatteryPercent",
+        "CurrentBatteryLevel"
+    ]
+
+    private static func appleDeviceManagementProperties(from service: io_object_t) -> [String: Any] {
+        var rawProperties: Unmanaged<CFMutableDictionary>?
+        guard IORegistryEntryCreateCFProperties(
+            service,
+            &rawProperties,
+            kCFAllocatorDefault,
+            0
+        ) == KERN_SUCCESS,
+              let properties = rawProperties?.takeRetainedValue() as? [String: Any]
+        else {
+            return [:]
+        }
+        return properties
     }
 
     private func property(_ key: String, service: io_object_t) -> String? {
@@ -357,14 +571,7 @@ private extension Array where Element == BluetoothBatteryCandidate {
     mutating func upsert(_ candidate: BluetoothBatteryCandidate) {
         if let index = firstIndex(where: { $0.deviceID == candidate.deviceID || $0.displayName.normalizedDeviceName == candidate.displayName.normalizedDeviceName }) {
             let existing = self[index]
-            let resolved = BluetoothBatteryCandidate(
-                deviceID: candidate.deviceID,
-                displayName: candidate.displayName,
-                transport: candidate.transport,
-                batteryPercent: candidate.batteryPercent,
-                kindHint: candidate.kindHint ?? existing.kindHint,
-                connectionState: candidate.connectionState
-            )
+            let resolved = BluetoothDeviceScanner.mergedCandidate(existing: existing, with: candidate)
             if candidate.batteryPercent != nil || self[index].batteryPercent == nil {
                 self[index] = resolved
             }
@@ -377,6 +584,35 @@ private extension Array where Element == BluetoothBatteryCandidate {
 private extension String {
     var normalizedDeviceName: String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    var isGenericBluetoothDisplayName: Bool {
+        let normalized = normalizedDeviceName
+        return normalized.isEmpty
+            || normalized == "bluetooth device"
+            || normalized == "unknown"
+            || normalized == "unknown device"
+    }
+}
+
+enum BLEBatteryScanStateAction: Equatable {
+    case wait
+    case scan
+    case finish
+}
+
+enum BLEBatteryScanStatePolicy {
+    static func action(for state: CBManagerState) -> BLEBatteryScanStateAction {
+        switch state {
+        case .poweredOn:
+            return .scan
+        case .unknown, .resetting:
+            return .wait
+        case .unsupported, .unauthorized, .poweredOff:
+            return .finish
+        @unknown default:
+            return .finish
+        }
     }
 }
 
@@ -403,9 +639,14 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     }
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        guard central.state == .poweredOn else {
+        switch BLEBatteryScanStatePolicy.action(for: central.state) {
+        case .wait:
+            return
+        case .finish:
             finish()
             return
+        case .scan:
+            break
         }
 
         for peripheral in central.retrieveConnectedPeripherals(withServices: [Self.batteryService]) {
@@ -475,9 +716,11 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     private func finish() {
         timeoutTask?.cancel()
         timeoutTask = nil
-        central?.stopScan()
-        for peripheral in peripherals.values where peripheral.state == .connected {
-            central?.cancelPeripheralConnection(peripheral)
+        if central?.state == .poweredOn {
+            central?.stopScan()
+            for peripheral in peripherals.values where peripheral.state == .connected {
+                central?.cancelPeripheralConnection(peripheral)
+            }
         }
         let result = Array(candidates.values)
         continuation?.resume(returning: result)

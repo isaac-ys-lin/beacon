@@ -2,11 +2,14 @@ import SwiftUI
 
 struct BatteryHubSettingsView: View {
     let snapshots: [DecoratedBatterySnapshot]
+    let syncDiagnostics: CompanionSyncDiagnostics
     let isRefreshing: Bool
     let isPreviewingData: Bool
     let onRefresh: () -> Void
     let onOpenBluetoothSettings: () -> Void
     let onOpenSoundSettings: () -> Void
+    let onClearCompanionSync: () -> Void
+    let onQuit: () -> Void
 
     @AppStorage(LowBatteryNotifier.thresholdDefaultsKey) private var lowBatteryThreshold = LowBatteryNotifier.defaultThreshold
     @AppStorage(LowBatteryNotifier.notificationsEnabledDefaultsKey) private var lowBatteryAlertsEnabled = true
@@ -33,21 +36,29 @@ struct BatteryHubSettingsView: View {
 
     init(
         snapshots: [DecoratedBatterySnapshot],
+        syncDiagnostics: CompanionSyncDiagnostics? = nil,
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
         onRefresh: @escaping () -> Void,
         onOpenBluetoothSettings: @escaping () -> Void = {},
         onOpenSoundSettings: @escaping () -> Void = {},
+        onClearCompanionSync: @escaping () -> Void = {},
+        onQuit: @escaping () -> Void = {},
         initialPane: SettingsPane = .devices,
         initialSelectedDeviceID: String? = nil,
         initiallyShowingAddDeviceGuide: Bool = false
     ) {
         self.snapshots = snapshots
+        self.syncDiagnostics = syncDiagnostics ?? CompanionSyncDiagnostics(
+            snapshots: snapshots.map(\.snapshot)
+        )
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
         self.onRefresh = onRefresh
         self.onOpenBluetoothSettings = onOpenBluetoothSettings
         self.onOpenSoundSettings = onOpenSoundSettings
+        self.onClearCompanionSync = onClearCompanionSync
+        self.onQuit = onQuit
         _selectedPane = State(initialValue: initialPane)
         _selectedDeviceID = State(initialValue: initialSelectedDeviceID)
         _isShowingAddDeviceGuide = State(initialValue: initiallyShowingAddDeviceGuide)
@@ -116,6 +127,17 @@ struct BatteryHubSettingsView: View {
             }
 
             Spacer()
+
+            Button(action: onQuit) {
+                Label("Quit BatteryHub", systemImage: "power")
+                    .font(DesignTokens.Typography.controlLabel)
+                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+            }
+            .buttonStyle(.plain)
+            .help("Quit BatteryHub")
         }
         .padding(12)
         .frame(width: 190)
@@ -181,7 +203,7 @@ struct BatteryHubSettingsView: View {
 
     private var devicesTab: some View {
         HStack(spacing: 0) {
-            deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
+            deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle, showsSyncStatus: true)
 
             Divider()
 
@@ -218,7 +240,11 @@ struct BatteryHubSettingsView: View {
         }
     }
 
-    private func deviceSelectionPane(title: String, subtitle: String) -> some View {
+    private func deviceSelectionPane(
+        title: String,
+        subtitle: String,
+        showsSyncStatus: Bool = false
+    ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -243,8 +269,15 @@ struct BatteryHubSettingsView: View {
                     }
                     .controlSize(.small)
                     .buttonStyle(.borderless)
-                    .help(showUnavailableDevices ? "Hide disconnected and no-report devices" : "Show hidden devices")
+                    .help(showUnavailableDevices ? "Hide disconnected devices" : "Show hidden devices")
                 }
+            }
+
+            if showsSyncStatus {
+                CompanionSyncStatusCard(
+                    diagnostics: syncDiagnostics,
+                    onClear: onClearCompanionSync
+                )
             }
 
             ScrollView {
@@ -353,7 +386,7 @@ struct BatteryHubSettingsView: View {
                 .padding(.leading, 50)
 
             HStack(spacing: 12) {
-                Toggle("Notify when charged", isOn: deviceChargedAlertBinding(for: row.id))
+                Toggle("Notify when charged", isOn: deviceChargedAlertBinding(for: row))
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
@@ -619,7 +652,10 @@ struct BatteryHubSettingsView: View {
                 Section {
                     Picker("Dashboard size", selection: $statusWindowStyleRawValue) {
                         ForEach(StatusWindowStyle.allCases) { style in
-                            Text(style.title).tag(style.rawValue)
+                            Image(systemName: style.symbolName)
+                                .tag(style.rawValue)
+                                .accessibilityLabel(style.accessibilityTitle)
+                                .help(style.accessibilityTitle)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -632,7 +668,7 @@ struct BatteryHubSettingsView: View {
                 } header: {
                     Text("Menu Bar Dashboard")
                 } footer: {
-                    Text("Native Compact uses a single system-style connected-device list. Large mode enables overview and AirPods detail cards.")
+                    Text("Choose how much detail appears when the menu bar icon opens the battery dashboard.")
                 }
 
                 Section {
@@ -640,7 +676,10 @@ struct BatteryHubSettingsView: View {
 
                     Picker("Widget size", selection: $desktopWidgetStyleRawValue) {
                         ForEach(DesktopWidgetStyle.allCases) { style in
-                            Text(style.title).tag(style.rawValue)
+                            Image(systemName: style.symbolName)
+                                .tag(style.rawValue)
+                                .accessibilityLabel(style.accessibilityTitle)
+                                .help(style.accessibilityTitle)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -655,50 +694,60 @@ struct BatteryHubSettingsView: View {
             .frame(width: 340)
             .frame(maxHeight: .infinity, alignment: .topLeading)
 
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Preview")
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+            VStack(alignment: .leading, spacing: 14) {
+                StatusWindowPreview(
+                    style: statusWindowStyle,
+                    showsAirPodsCard: showAirPodsStatusCard && statusWindowStyle == .large,
+                    showsMenuBarBattery: showMenuBarBattery,
+                    showsBatteryOverview: showBatteryOverview,
+                    bluetoothPowerState: .on
+                )
+                .frame(width: 292)
 
-                VStack(alignment: .leading, spacing: 14) {
-                    StatusWindowPreview(
-                        style: statusWindowStyle,
-                        showsAirPodsCard: showAirPodsStatusCard && statusWindowStyle == .large,
-                        showsMenuBarBattery: showMenuBarBattery,
-                        showsBatteryOverview: showBatteryOverview
-                    )
-                    .frame(width: 292)
+                Divider()
 
-                    Divider()
-
-                    HStack {
-                        Text("Desktop Widget")
-                            .font(DesignTokens.Typography.captionEmphasis)
-                        Spacer()
-                        Text(desktopWidgetStyle.title)
-                            .font(DesignTokens.Typography.captionEmphasis)
-                            .foregroundStyle(DesignTokens.Palette.accent)
-                    }
-
-                    BatteryDesktopWidgetView(
-                        snapshots: desktopWidgetPreviewSnapshots,
-                        style: desktopWidgetStyle
-                    )
-                    .scaleEffect(0.74, anchor: .topLeading)
-                    .frame(
-                        width: desktopWidgetStyle.width * 0.74,
-                        height: desktopWidgetStyle.height * 0.74,
-                        alignment: .topLeading
-                    )
-                    .opacity(showDesktopWidget ? 1 : 0.5)
+                HStack {
+                    Text("Desktop Widget")
+                        .font(DesignTokens.Typography.captionEmphasis)
+                    Spacer()
+                    Image(systemName: desktopWidgetStyle.symbolName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(DesignTokens.Palette.accent)
+                        .accessibilityLabel(desktopWidgetStyle.accessibilityTitle)
+                        .help(desktopWidgetStyle.accessibilityTitle)
                 }
-                .padding(14)
-                .frame(width: 322, alignment: .topLeading)
-                .background(settingsCardBackground)
+
+                BatteryDesktopWidgetView(
+                    snapshots: desktopWidgetPreviewSnapshots,
+                    style: desktopWidgetStyle
+                )
+                .scaleEffect(0.74, anchor: .topLeading)
+                .frame(
+                    width: desktopWidgetStyle.width * 0.74,
+                    height: desktopWidgetStyle.height * 0.74,
+                    alignment: .topLeading
+                )
+                .opacity(showDesktopWidget ? 1 : 0.5)
             }
+            .padding(14)
+            .frame(width: 322, alignment: .topLeading)
+            .background(settingsCardBackground)
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onChange(of: statusWindowStyleRawValue) { _, _ in
+            StatusWindowPreferences.notifyChanged()
+        }
+        .onChange(of: showAirPodsStatusCard) { _, _ in
+            StatusWindowPreferences.notifyChanged()
+        }
+        .onChange(of: showMenuBarBattery) { _, _ in
+            StatusWindowPreferences.notifyChanged()
+        }
+        .onChange(of: showBatteryOverview) { _, _ in
+            StatusWindowPreferences.notifyChanged()
+        }
     }
 
     private var quickActionsTab: some View {
@@ -782,8 +831,19 @@ struct BatteryHubSettingsView: View {
                     subtitle: "Best for devices that keep reporting while charging.",
                     systemImage: "battery.100",
                     isOn: Binding(
-                        get: { LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: row.id) },
-                        set: { LowBatteryNotifier.setChargedAlertEnabled($0, forDeviceID: row.id) }
+                        get: {
+                            LowBatteryNotifier.isChargedAlertEnabled(
+                                forDeviceID: row.id,
+                                displayName: row.displayName
+                            )
+                        },
+                        set: {
+                            LowBatteryNotifier.setChargedAlertEnabled(
+                                $0,
+                                forDeviceID: row.id,
+                                displayName: row.displayName
+                            )
+                        }
                     )
                 )
                 .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
@@ -1025,10 +1085,21 @@ struct BatteryHubSettingsView: View {
         )
     }
 
-    private func deviceChargedAlertBinding(for deviceID: String) -> Binding<Bool> {
+    private func deviceChargedAlertBinding(for row: DeviceInspectorItem) -> Binding<Bool> {
         Binding(
-            get: { LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: deviceID) },
-            set: { LowBatteryNotifier.setChargedAlertEnabled($0, forDeviceID: deviceID) }
+            get: {
+                LowBatteryNotifier.isChargedAlertEnabled(
+                    forDeviceID: row.id,
+                    displayName: row.displayName
+                )
+            },
+            set: {
+                LowBatteryNotifier.setChargedAlertEnabled(
+                    $0,
+                    forDeviceID: row.id,
+                    displayName: row.displayName
+                )
+            }
         )
     }
 
@@ -1147,6 +1218,7 @@ struct BatteryHubSettingsView: View {
         if row.item.connectionState == .disconnected { return DesignTokens.Palette.secondaryText }
         if !hasBatteryReport(row.item) { return DesignTokens.Palette.stale }
         if row.isHidden { return DesignTokens.Palette.secondaryText }
+        if row.kind == .keyboard { return Color.primary.opacity(0.58) }
         return DesignTokens.Palette.accent
     }
 
@@ -1161,7 +1233,10 @@ struct BatteryHubSettingsView: View {
 
     private func alertSummary(for item: DeviceListItem) -> String {
         let hasCustomLow = LowBatteryNotifier.hasCustomThreshold(forDeviceID: item.id)
-        let hasCharged = LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: item.id)
+        let hasCharged = LowBatteryNotifier.isChargedAlertEnabled(
+            forDeviceID: item.id,
+            displayName: item.displayName
+        )
 
         switch (hasCustomLow, hasCharged) {
         case (true, true):
@@ -1182,6 +1257,158 @@ struct BatteryHubSettingsView: View {
         return "Using the global low-battery threshold."
     }
 
+}
+
+private struct CompanionSyncStatusCard: View {
+    let diagnostics: CompanionSyncDiagnostics
+    let onClear: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Label("Companion Sync", systemImage: "icloud")
+                    .font(DesignTokens.Typography.captionEmphasis)
+                    .foregroundStyle(DesignTokens.Palette.text)
+
+                Spacer(minLength: 0)
+
+                Text(syncStateText)
+                    .font(DesignTokens.Typography.caption2Emphasis)
+                    .foregroundStyle(syncStateColor)
+                    .lineLimit(1)
+            }
+
+            VStack(spacing: 0) {
+                CompanionSyncReportRow(
+                    title: "iPhone",
+                    systemImage: resolveSymbol("iphone.gen3", fallback: "iphone"),
+                    report: diagnostics.iPhone
+                )
+
+                Divider().padding(.leading, 30)
+
+                CompanionSyncReportRow(
+                    title: "Apple Watch",
+                    systemImage: resolveSymbol("applewatch", fallback: "watchface.applewatch.case"),
+                    report: diagnostics.appleWatch
+                )
+            }
+
+            if let helperText {
+                Text(helperText)
+                    .font(DesignTokens.Typography.caption2)
+                    .foregroundStyle(DesignTokens.Palette.tertiaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if canClear {
+                Button(role: .destructive, action: onClear) {
+                    Label("Forget iPhone & Watch", systemImage: "trash")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .help("Clear the last iPhone and Apple Watch companion battery reports from this Mac and iCloud sync.")
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                .fill(.regularMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                        .stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
+                )
+        )
+    }
+
+    private var syncStateText: String {
+        if diagnostics.loadErrorDescription != nil {
+            return "Check signing"
+        }
+        if diagnostics.envelopePublishedAt != nil {
+            return "iCloud seen"
+        }
+        return "No envelope"
+    }
+
+    private var syncStateColor: Color {
+        if diagnostics.loadErrorDescription != nil {
+            return DesignTokens.Palette.warning
+        }
+        if diagnostics.envelopePublishedAt != nil {
+            return DesignTokens.Palette.accent
+        }
+        return DesignTokens.Palette.secondaryText
+    }
+
+    private var helperText: String? {
+        if diagnostics.loadErrorDescription != nil {
+            return "Install with an Apple Development signed build so iCloud KVS can sync companion reports."
+        }
+        if diagnostics.iPhone.hasReport || diagnostics.appleWatch.hasReport {
+            return nil
+        }
+        return "Open the iPhone app once; Watch reports relay through the paired iPhone."
+    }
+
+    private var canClear: Bool {
+        diagnostics.envelopePublishedAt != nil
+            || diagnostics.iPhone.hasReport
+            || diagnostics.appleWatch.hasReport
+    }
+}
+
+private struct CompanionSyncReportRow: View {
+    let title: String
+    let systemImage: String
+    let report: CompanionSyncDiagnostics.Report
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: resolveSymbol(systemImage, fallback: "circle"))
+                .font(.system(size: 12, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(reportColor)
+                .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(DesignTokens.Typography.caption2Emphasis)
+                    .foregroundStyle(DesignTokens.Palette.text)
+                Text(reportText)
+                    .font(DesignTokens.Typography.caption2)
+                    .foregroundStyle(reportColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(height: 34)
+    }
+
+    private var reportText: String {
+        guard let percent = report.percent else {
+            return "No report"
+        }
+        if let updatedAt = report.updatedAt {
+            return "\(percent)% · \(relativeText(for: updatedAt))"
+        }
+        return "\(percent)%"
+    }
+
+    private var reportColor: Color {
+        report.hasReport ? DesignTokens.Palette.accent : DesignTokens.Palette.secondaryText
+    }
+
+    private func relativeText(for date: Date) -> String {
+        let interval = abs(date.timeIntervalSinceNow)
+        if interval < 60 { return "Now" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
 }
 
 struct AddDeviceGuideView: View {
@@ -1360,7 +1587,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .alerts: return "bell.badge"
         case .actionHUD: return "sparkles"
         case .quickActions: return "keyboard"
-        case .dashboard: return resolveSymbol("macwindow", fallback: "rectangle")
+        case .dashboard: return BatteryHubSymbols.app
         }
     }
 }

@@ -1,3 +1,4 @@
+import CoreBluetooth
 import XCTest
 @testable import BatteryHub
 
@@ -78,6 +79,126 @@ final class BluetoothBatteryResolverTests: XCTestCase {
                 kindHint: hint
             )
         )
+    }
+
+    func testAppleDeviceManagementBatteryPercentCreatesMagicKeyboardCandidate() throws {
+        let candidate = try XCTUnwrap(
+            BluetoothDeviceScanner.appleDeviceManagementCandidate(
+                from: [
+                    "Product": "吳郁庭 Fendy 的 Magic Keyboard",
+                    "Transport": "Bluetooth Low Energy",
+                    "DeviceAddress": "AA:BB:CC:DD:EE:FF",
+                    "BatteryPercent": 89,
+                    "PrimaryUsagePage": 1,
+                    "PrimaryUsage": 6
+                ]
+            )
+        )
+
+        XCTAssertEqual(candidate.deviceID, "AA:BB:CC:DD:EE:FF")
+        XCTAssertEqual(candidate.displayName, "吳郁庭 Fendy 的 Magic Keyboard")
+        XCTAssertEqual(candidate.batteryPercent, 89)
+        XCTAssertEqual(candidate.kindHint, .keyboard)
+
+        let snapshot = BluetoothBatteryResolver.snapshot(
+            from: candidate,
+            now: Date(timeIntervalSince1970: 50)
+        )
+        XCTAssertEqual(snapshot.percent, 89)
+        XCTAssertEqual(snapshot.kind, .keyboard)
+        XCTAssertEqual(snapshot.source, .ioRegistry)
+    }
+
+    func testAppleDeviceManagementFindsNestedBatteryPercent() throws {
+        let candidate = try XCTUnwrap(
+            BluetoothDeviceScanner.appleDeviceManagementCandidate(
+                from: [
+                    "Product": "吳郁庭 Fendy 的 Magic Trackpad",
+                    "Transport": "Bluetooth",
+                    "SerialNumber": "trackpad-serial",
+                    "PrimaryUsagePage": 1,
+                    "PrimaryUsage": 5,
+                    "HIDEventServiceProperties": [
+                        "DeviceManagement": [
+                            "BatteryLevel": "88%"
+                        ]
+                    ]
+                ]
+            )
+        )
+
+        XCTAssertEqual(candidate.displayName, "吳郁庭 Fendy 的 Magic Trackpad")
+        XCTAssertEqual(candidate.batteryPercent, 88)
+        XCTAssertEqual(candidate.kindHint, .trackpad)
+    }
+
+    func testAppleDeviceManagementIgnoresDescriptorBatteryLevelMetadata() throws {
+        let candidate = try XCTUnwrap(
+            BluetoothDeviceScanner.appleDeviceManagementCandidate(
+                from: [
+                    "Product": "吳郁庭 Fendy 的 Magic Keyboard",
+                    "Transport": "Bluetooth Low Energy",
+                    "DeviceAddress": "AA:BB:CC:DD:EE:FF",
+                    "PrimaryUsagePage": 1,
+                    "PrimaryUsage": 6,
+                    "Elements": [
+                        [
+                            "Name": "Battery Strength",
+                            "BatteryLevel": 6
+                        ]
+                    ]
+                ]
+            )
+        )
+
+        XCTAssertNil(candidate.batteryPercent)
+        XCTAssertEqual(candidate.kindHint, .keyboard)
+    }
+
+    func testAppleDeviceManagementSkipsBuiltInKeyboardTrackpad() {
+        let candidate = BluetoothDeviceScanner.appleDeviceManagementCandidate(
+            from: [
+                "Product": "Apple Internal Keyboard / Trackpad",
+                "Transport": "FIFO",
+                "Built-In": true,
+                "BatteryPercent": 100,
+                "PrimaryUsagePage": 65280,
+                "PrimaryUsage": 11
+            ]
+        )
+
+        XCTAssertNil(candidate)
+    }
+
+    func testBLEBatteryScanWaitsForTransientCentralStates() {
+        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .unknown), .wait)
+        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .resetting), .wait)
+        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .poweredOn), .scan)
+        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .poweredOff), .finish)
+        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .unauthorized), .finish)
+    }
+
+    func testBLEBatteryMergePreservesHIDDisplayNameForGenericPeripheralName() {
+        let hidCandidate = BluetoothBatteryCandidate(
+            deviceID: "9D520BEC-A95A-D7F0-1F4E-FDBAD0D5D0F0",
+            displayName: "Keychron K3 Max",
+            transport: .hid,
+            batteryPercent: nil,
+            kindHint: .keyboard
+        )
+        let bleCandidate = BluetoothBatteryCandidate(
+            deviceID: "9D520BEC-A95A-D7F0-1F4E-FDBAD0D5D0F0",
+            displayName: "Bluetooth Device",
+            transport: .ble,
+            batteryPercent: 95
+        )
+
+        let merged = BluetoothDeviceScanner.mergedCandidate(existing: hidCandidate, with: bleCandidate)
+
+        XCTAssertEqual(merged.displayName, "Keychron K3 Max")
+        XCTAssertEqual(merged.kindHint, .keyboard)
+        XCTAssertEqual(merged.batteryPercent, 95)
+        XCTAssertEqual(merged.transport, .ble)
     }
 
     func testSystemProfilerParserKeepsOnlyConnectedBatteryDevices() throws {
