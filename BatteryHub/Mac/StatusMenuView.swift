@@ -18,22 +18,32 @@ private struct UtilityIconButtonStyle: ButtonStyle {
 }
 
 private struct BluetoothSettingsIcon: View {
-    let theme: BeaconThemePalette
     let color: Color
     var size: CGFloat = 28
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(theme.raised.opacity(0.90))
-            Circle()
-                .stroke(theme.hairlineDefault, lineWidth: 0.7)
-            Image(systemName: BatteryHubSymbols.bluetoothSettings)
-                .font(.system(size: size * 0.56, weight: .semibold))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(color)
+        Group {
+            if let template = bluetoothTemplateImage {
+                Image(nsImage: template)
+                    .renderingMode(.template)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: BatteryHubSymbols.bluetooth)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            }
         }
+        .foregroundStyle(color)
         .frame(width: size, height: size)
+    }
+
+    private var bluetoothTemplateImage: NSImage? {
+        guard let image = NSImage(named: NSImage.Name("NSBluetoothTemplate"))?.copy() as? NSImage else {
+            return nil
+        }
+        image.isTemplate = true
+        return image
     }
 }
 
@@ -298,7 +308,7 @@ struct StatusMenuView: View {
         Button {
             BatteryHubSystemSettingsActions.openBluetoothSettings()
         } label: {
-            BluetoothSettingsIcon(theme: theme, color: bluetoothPowerColor)
+            BluetoothSettingsIcon(color: bluetoothPowerColor)
                 .accessibilityLabel(bluetoothAccessibilityLabel)
         }
         .buttonStyle(UtilityIconButtonStyle(theme: theme))
@@ -307,7 +317,7 @@ struct StatusMenuView: View {
 
     private var bluetoothPowerColor: Color {
         switch bluetoothPowerState {
-        case .on: return theme.statusOK
+        case .on: return theme.textPrimary
         case .off, .unknown: return theme.textDisabled
         }
     }
@@ -609,15 +619,15 @@ struct StatusWindowPreview: View {
                 .foregroundStyle(previewTheme.textPrimary)
                 .frame(width: 20, height: 20)
 
-            BluetoothSettingsIcon(theme: previewTheme, color: previewBluetoothPowerColor, size: 20)
+            BluetoothSettingsIcon(color: previewBluetoothPowerColor, size: 20)
         }
         .frame(height: 38)
     }
 
     private var previewBluetoothPowerColor: Color {
         switch bluetoothPowerState {
-        case .on: return DesignTokens.Palette.accent
-        case .off, .unknown: return DesignTokens.Palette.secondaryText
+        case .on: return previewTheme.textPrimary
+        case .off, .unknown: return previewTheme.textDisabled
         }
     }
 

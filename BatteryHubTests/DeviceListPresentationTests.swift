@@ -1557,6 +1557,11 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertNotEqual(BatteryHubSymbols.app, BatteryHubSymbols.bluetooth)
     }
 
+    func testBluetoothSettingsTemplateUsesNativeAppKitSymbol() {
+        let template = NSImage(named: NSImage.Name("NSBluetoothTemplate"))
+        XCTAssertNotNil(template)
+    }
+
     func testKeyboardDevicesUseKeyboardSymbol() {
         XCTAssertEqual(
             deviceSymbolName(for: .keyboard, displayName: "Keychron K3 Max"),

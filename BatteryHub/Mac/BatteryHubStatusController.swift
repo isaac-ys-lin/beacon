@@ -271,12 +271,13 @@ final class BatteryHubStatusController: NSObject {
             button.imagePosition = .imageLeft
             button.title = " \(batteryText)"
         } else {
-            statusItem.length = NSStatusItem.squareLength
+            statusItem.length = BatteryHubMenuBarMetrics.imageOnlyLength
             button.imagePosition = .imageOnly
             button.title = ""
         }
 
         button.image = BatteryHubStatusIconImage.make()
+        button.imageScaling = .scaleProportionallyUpOrDown
         if model.isRefreshing {
             button.toolTip = "BatteryHub · refreshing"
         } else {

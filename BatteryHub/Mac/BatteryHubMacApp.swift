@@ -105,7 +105,10 @@ enum MenuBarBatteryFormatter {
 
 enum BatteryHubStatusIconImage {
     static func make() -> NSImage {
-        let statusIconSize = NSSize(width: 20, height: 20)
+        let statusIconSize = NSSize(
+            width: BatteryHubMenuBarMetrics.iconSide,
+            height: BatteryHubMenuBarMetrics.iconSide
+        )
         let image = NSImage(named: BatteryHubSymbols.statusGlyphAsset)
             ?? NSImage(systemSymbolName: BatteryHubSymbols.app, accessibilityDescription: "BatteryHub")
             ?? NSImage(size: statusIconSize)
@@ -115,6 +118,11 @@ enum BatteryHubStatusIconImage {
         image.accessibilityDescription = "BatteryHub"
         return image
     }
+}
+
+enum BatteryHubMenuBarMetrics {
+    static let iconSide: CGFloat = 22
+    static let imageOnlyLength: CGFloat = 30
 }
 
 private enum BatteryRefreshLimits {
