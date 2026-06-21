@@ -1,38 +1,6 @@
 import AppKit
 import SwiftUI
 
-private struct BluetoothSettingsIcon: View {
-    let color: Color
-    var glyphSize: CGFloat = 18
-    var frameSize: CGFloat = 28
-
-    var body: some View {
-        Group {
-            if let template = bluetoothTemplateImage {
-                Image(nsImage: template)
-                    .renderingMode(.template)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } else {
-                Image(systemName: BatteryHubSymbols.bluetooth)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            }
-        }
-        .foregroundStyle(color)
-        .frame(width: glyphSize, height: glyphSize)
-        .frame(width: frameSize, height: frameSize)
-    }
-
-    private var bluetoothTemplateImage: NSImage? {
-        guard let image = NSImage(named: NSImage.Name("NSBluetoothTemplate"))?.copy() as? NSImage else {
-            return nil
-        }
-        image.isTemplate = true
-        return image
-    }
-}
-
 enum StatusWindowPreferences {
     static let showMenuBarBatteryKey = "BatteryHub.showMenuBarBattery"
     static let showBatteryOverviewKey = "BatteryHub.showBatteryOverview"
@@ -232,38 +200,17 @@ struct StatusMenuView: View {
 
             Spacer()
 
-            nativeSettingsButton
-
-            Button(action: onRefresh) {
-                if isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 28, height: 28)
-                } else {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(theme.textPrimary)
-                        .frame(width: 28, height: 28)
-                }
-            }
-            .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
-            .disabled(isRefreshing)
-            .help(isRefreshing ? "Refreshing" : "Refresh")
-
-            nativeBluetoothStatusButton
+            BatteryHubHeaderControls(
+                theme: theme,
+                isRefreshing: isRefreshing,
+                bluetoothPowerState: bluetoothPowerState,
+                onOpenSettings: { onOpenSettings(.devices, nil) },
+                onRefresh: onRefresh,
+                onOpenBluetoothSettings: BatteryHubSystemSettingsActions.openBluetoothSettings
+            )
         }
         .padding(.horizontal, 16)
         .frame(height: 58)
-    }
-
-    private var nativeSettingsButton: some View {
-        Button {
-            onOpenSettings(.devices, nil)
-        } label: {
-            BatteryHubHeaderSettingsIcon(color: theme.textPrimary)
-        }
-        .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
-        .help("Open BatteryHub Settings")
     }
 
     private var nativeHeaderSubtitle: String {
@@ -283,40 +230,6 @@ struct StatusMenuView: View {
 
     private var theme: BeaconThemePalette {
         appearanceTheme.palette(resolvedSystemScheme: colorScheme)
-    }
-
-    private var nativeBluetoothStatusButton: some View {
-        Button {
-            BatteryHubSystemSettingsActions.openBluetoothSettings()
-        } label: {
-            BluetoothSettingsIcon(color: bluetoothPowerColor)
-                .accessibilityLabel(bluetoothAccessibilityLabel)
-        }
-        .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
-        .help(bluetoothHelpText)
-    }
-
-    private var bluetoothPowerColor: Color {
-        switch bluetoothPowerState {
-        case .on: return theme.textPrimary
-        case .off, .unknown: return theme.textDisabled
-        }
-    }
-
-    private var bluetoothAccessibilityLabel: String {
-        switch bluetoothPowerState {
-        case .on: return "Bluetooth is on. Open Bluetooth Settings."
-        case .off: return "Bluetooth is off. Open Bluetooth Settings."
-        case .unknown: return "Bluetooth status unavailable. Open Bluetooth Settings."
-        }
-    }
-
-    private var bluetoothHelpText: String {
-        switch bluetoothPowerState {
-        case .on: return "Bluetooth is on"
-        case .off: return "Bluetooth is off"
-        case .unknown: return "Open Bluetooth Settings"
-        }
     }
 
     private var nativePreviewNotice: some View {
@@ -589,27 +502,22 @@ struct StatusWindowPreview: View {
 
             Spacer(minLength: 0)
 
-            Image(systemName: resolveSymbol("gearshape", fallback: "gearshape.fill"))
-                .font(.system(size: 11, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(previewTheme.textPrimary)
-                .frame(width: 20, height: 20)
-
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(previewTheme.textPrimary)
-                .frame(width: 20, height: 20)
-
-            BluetoothSettingsIcon(color: previewBluetoothPowerColor, glyphSize: 12.5, frameSize: 20)
+            BatteryHubHeaderControls(
+                theme: previewTheme,
+                isRefreshing: false,
+                bluetoothPowerState: bluetoothPowerState,
+                onOpenSettings: {},
+                onRefresh: {},
+                onOpenBluetoothSettings: {},
+                frameSize: 20,
+                settingsGlyphSize: 11,
+                refreshGlyphSize: 11,
+                bluetoothGlyphSize: 12.5,
+                spacing: 4
+            )
+            .allowsHitTesting(false)
         }
         .frame(height: 38)
-    }
-
-    private var previewBluetoothPowerColor: Color {
-        switch bluetoothPowerState {
-        case .on: return previewTheme.textPrimary
-        case .off, .unknown: return previewTheme.textDisabled
-        }
     }
 
     private var previewTheme: BeaconThemePalette {

@@ -81,7 +81,11 @@ struct DashboardSettingsPane: View {
 
                 BatteryDesktopWidgetView(
                     snapshots: desktopWidgetPreviewSnapshots,
-                    style: desktopWidgetStyle
+                    style: desktopWidgetStyle,
+                    bluetoothPowerState: .on,
+                    onRefresh: {},
+                    onOpenSettings: {},
+                    onOpenBluetoothSettings: {}
                 )
                 .scaleEffect(0.74, anchor: .topLeading)
                 .frame(

@@ -87,6 +87,18 @@ enum DesktopWidgetWindowPlacement {
         )
     }
 
+    static func clampedFrame(_ frame: NSRect, in visibleFrame: NSRect) -> NSRect {
+        guard visibleFrame.width > 0, visibleFrame.height > 0 else { return frame }
+        let maxX = max(visibleFrame.minX, visibleFrame.maxX - frame.width)
+        let maxY = max(visibleFrame.minY, visibleFrame.maxY - frame.height)
+        return NSRect(
+            x: min(max(frame.minX, visibleFrame.minX), maxX),
+            y: min(max(frame.minY, visibleFrame.minY), maxY),
+            width: frame.width,
+            height: frame.height
+        )
+    }
+
     private static func isSameSize(_ lhs: NSSize, _ rhs: NSSize) -> Bool {
         abs(lhs.width - rhs.width) < 0.5 && abs(lhs.height - rhs.height) < 0.5
     }
@@ -107,16 +119,16 @@ private struct DesktopWidgetBackground: NSViewRepresentable {
 struct BatteryDesktopWidgetView: View {
     let snapshots: [DecoratedBatterySnapshot]
     let style: DesktopWidgetStyle
+    var isRefreshing = false
+    var bluetoothPowerState: BluetoothPowerState = .on
+    var onRefresh: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var onOpenBluetoothSettings: (() -> Void)?
     @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
 
     private var sections: [DeviceSection] {
         configuredDeviceSections(snapshots, preferences: .load())
-    }
-
-    private var summary: BatteryOverviewSummary {
-        batteryOverviewSummary(for: sections, lowBatteryThreshold: LowBatteryNotifier.threshold)
     }
 
     private var devices: [BatteryOverviewDevice] {
@@ -147,7 +159,7 @@ struct BatteryDesktopWidgetView: View {
             }
         }
         .padding(14)
-        .frame(width: style.width, alignment: .topLeading)
+        .frame(width: style.width, height: style.height, alignment: .topLeading)
         .background {
             let shape = RoundedRectangle(cornerRadius: NativeMacStyle.widgetCornerRadius, style: .continuous)
             DesktopWidgetBackground()
@@ -175,25 +187,15 @@ struct BatteryDesktopWidgetView: View {
 
             Spacer(minLength: 0)
 
-            if let lowest = summary.lowestPercent {
-                Text("\(lowest)%")
-                    .font(DesignTokens.Typography.percentSmall)
-                    .monospacedDigit()
-                    .foregroundStyle(summary.lowBatteryItemCount > 0 ? theme.statusLow : theme.statusOK)
-                    .padding(.horizontal, 8)
-                    .frame(height: 24)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(theme.raised.opacity(0.70))
-                    )
-            }
-
-            if let onOpenSettings {
-                Button(action: onOpenSettings) {
-                    BatteryHubHeaderSettingsIcon(color: theme.textPrimary)
-                }
-                .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
-                .help("Open Dashboard Settings")
+            if let onOpenSettings, let onRefresh, let onOpenBluetoothSettings {
+                BatteryHubHeaderControls(
+                    theme: theme,
+                    isRefreshing: isRefreshing,
+                    bluetoothPowerState: bluetoothPowerState,
+                    onOpenSettings: onOpenSettings,
+                    onRefresh: onRefresh,
+                    onOpenBluetoothSettings: onOpenBluetoothSettings
+                )
             }
         }
     }
@@ -236,10 +238,21 @@ struct BatteryDesktopWidgetView: View {
 final class BatteryHubDesktopWidgetController {
     private let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "widget")
     private var window: NSPanel?
+    private var lastKnownFrame: NSRect?
+
+    #if DEBUG
+    var debugWindowFrame: NSRect? {
+        window?.frame
+    }
+    #endif
 
     func update(
         snapshots: [DecoratedBatterySnapshot],
-        onOpenSettings: @escaping () -> Void
+        isRefreshing: Bool,
+        bluetoothPowerState: BluetoothPowerState,
+        onRefresh: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void,
+        onOpenBluetoothSettings: @escaping () -> Void
     ) {
         guard UserDefaults.standard.bool(forKey: DesktopWidgetPreferences.showDesktopWidgetKey) else {
             close()
@@ -251,18 +264,28 @@ final class BatteryHubDesktopWidgetController {
         ) ?? .compact
         let wasVisible = window?.isVisible == true
         let window = existingOrNewWindow(for: style)
+        let targetFrame = targetFrame(for: window, style: style)
         let hostingController = NSHostingController(
             rootView: BatteryDesktopWidgetView(
                 snapshots: snapshots,
                 style: style,
-                onOpenSettings: onOpenSettings
+                isRefreshing: isRefreshing,
+                bluetoothPowerState: bluetoothPowerState,
+                onRefresh: onRefresh,
+                onOpenSettings: onOpenSettings,
+                onOpenBluetoothSettings: onOpenBluetoothSettings
             )
         )
+        hostingController.sizingOptions = []
+        hostingController.view.frame = NSRect(origin: .zero, size: style.size)
         hostingController.view.wantsLayer = true
         hostingController.view.layer?.cornerRadius = NativeMacStyle.widgetCornerRadius
         hostingController.view.layer?.masksToBounds = false
+        applyFixedContentSize(style.size, to: window)
         window.contentViewController = hostingController
-        positionIfNeeded(window, style: style)
+        window.setContentSize(style.size)
+        window.setFrame(targetFrame, display: true)
+        lastKnownFrame = window.frame
         window.orderFrontRegardless()
         if !wasVisible {
             logger.info("Desktop widget shown style=\(style.rawValue, privacy: .public)")
@@ -271,6 +294,9 @@ final class BatteryHubDesktopWidgetController {
 
     func close() {
         let wasVisible = window?.isVisible == true
+        if let frame = window?.frame {
+            lastKnownFrame = frame
+        }
         window?.orderOut(nil)
         if wasVisible {
             logger.info("Desktop widget hidden")
@@ -279,13 +305,6 @@ final class BatteryHubDesktopWidgetController {
 
     private func existingOrNewWindow(for style: DesktopWidgetStyle) -> NSPanel {
         if let window {
-            let targetFrame = DesktopWidgetWindowPlacement.reusedFrame(
-                currentFrame: window.frame,
-                style: style
-            )
-            if targetFrame != window.frame {
-                window.setFrame(targetFrame, display: true)
-            }
             return window
         }
 
@@ -310,12 +329,19 @@ final class BatteryHubDesktopWidgetController {
         return window
     }
 
-    private func positionIfNeeded(_ window: NSPanel, style: DesktopWidgetStyle) {
-        guard window.frame.origin == .zero else { return }
-        let frame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        window.setFrame(
-            DesktopWidgetWindowPlacement.initialFrame(for: style, in: frame),
-            display: true
-        )
+    private func targetFrame(for window: NSPanel, style: DesktopWidgetStyle) -> NSRect {
+        let visibleFrame = window.screen?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let currentFrame = lastKnownFrame ?? window.frame
+        let targetFrame = currentFrame.origin == .zero
+            ? DesktopWidgetWindowPlacement.initialFrame(for: style, in: visibleFrame)
+            : DesktopWidgetWindowPlacement.reusedFrame(currentFrame: currentFrame, style: style)
+        return DesktopWidgetWindowPlacement.clampedFrame(targetFrame, in: visibleFrame)
+    }
+
+    private func applyFixedContentSize(_ size: NSSize, to window: NSPanel) {
+        window.contentMinSize = size
+        window.contentMaxSize = size
     }
 }

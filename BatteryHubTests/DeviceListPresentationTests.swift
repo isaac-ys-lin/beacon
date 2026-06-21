@@ -1659,6 +1659,84 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(reusedFrame.height, DesktopWidgetStyle.compact.height, accuracy: 0.01)
     }
 
+    func testDesktopWidgetFrameClampKeepsWidgetInsideVisibleFrame() {
+        let visibleFrame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        let offscreenFrame = NSRect(x: 760, y: -48, width: 318, height: 336)
+
+        let clampedFrame = DesktopWidgetWindowPlacement.clampedFrame(
+            offscreenFrame,
+            in: visibleFrame
+        )
+
+        XCTAssertEqual(clampedFrame.maxX, visibleFrame.maxX, accuracy: 0.01)
+        XCTAssertEqual(clampedFrame.minY, visibleFrame.minY, accuracy: 0.01)
+        XCTAssertEqual(clampedFrame.width, offscreenFrame.width, accuracy: 0.01)
+        XCTAssertEqual(clampedFrame.height, offscreenFrame.height, accuracy: 0.01)
+    }
+
+    @MainActor
+    func testDesktopWidgetControllerDoesNotDriftAcrossCloseAndReopen() {
+        let defaults = UserDefaults.standard
+        let showKey = DesktopWidgetPreferences.showDesktopWidgetKey
+        let styleKey = DesktopWidgetPreferences.widgetStyleKey
+        let originalShowValue = defaults.object(forKey: showKey)
+        let originalStyleValue = defaults.object(forKey: styleKey)
+        defaults.set(true, forKey: showKey)
+        defaults.set(DesktopWidgetStyle.expanded.rawValue, forKey: styleKey)
+        defer {
+            if let originalShowValue {
+                defaults.set(originalShowValue, forKey: showKey)
+            } else {
+                defaults.removeObject(forKey: showKey)
+            }
+            if let originalStyleValue {
+                defaults.set(originalStyleValue, forKey: styleKey)
+            } else {
+                defaults.removeObject(forKey: styleKey)
+            }
+        }
+
+        let now = Date()
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 82, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, updatedAt: now),
+        ]
+        let controller = BatteryHubDesktopWidgetController()
+
+        controller.update(
+            snapshots: snapshots,
+            isRefreshing: false,
+            bluetoothPowerState: .on,
+            onRefresh: {},
+            onOpenSettings: {},
+            onOpenBluetoothSettings: {}
+        )
+        guard let firstFrame = controller.debugWindowFrame else {
+            XCTFail("Expected desktop widget window frame")
+            return
+        }
+
+        controller.close()
+        controller.update(
+            snapshots: snapshots,
+            isRefreshing: false,
+            bluetoothPowerState: .on,
+            onRefresh: {},
+            onOpenSettings: {},
+            onOpenBluetoothSettings: {}
+        )
+        guard let secondFrame = controller.debugWindowFrame else {
+            XCTFail("Expected desktop widget window frame after reopening")
+            return
+        }
+        controller.close()
+
+        XCTAssertEqual(secondFrame.origin.x, firstFrame.origin.x, accuracy: 0.01)
+        XCTAssertEqual(secondFrame.origin.y, firstFrame.origin.y, accuracy: 0.01)
+        XCTAssertEqual(secondFrame.width, firstFrame.width, accuracy: 0.01)
+        XCTAssertEqual(secondFrame.height, firstFrame.height, accuracy: 0.01)
+    }
+
     @MainActor
     func testBatteryDesktopWidgetRenderProducesNonBlankImage() throws {
         let now = Date()
@@ -1669,7 +1747,14 @@ final class DeviceListPresentationTests: XCTestCase {
             makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .coreBluetooth, updatedAt: now),
         ]
 
-        let view = BatteryDesktopWidgetView(snapshots: snapshots, style: .expanded, onOpenSettings: {})
+        let view = BatteryDesktopWidgetView(
+            snapshots: snapshots,
+            style: .expanded,
+            bluetoothPowerState: .on,
+            onRefresh: {},
+            onOpenSettings: {},
+            onOpenBluetoothSettings: {}
+        )
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(x: 0, y: 0, width: DesktopWidgetStyle.expanded.width, height: DesktopWidgetStyle.expanded.height)
         hostingView.layoutSubtreeIfNeeded()

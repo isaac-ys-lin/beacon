@@ -50,6 +50,7 @@ final class BatteryHubStatusController: NSObject {
             self?.updateStatusButton()
             self?.updateStatusMenuContent()
             self?.settingsWindowController.updateContent()
+            self?.updateDesktopWidget()
         }
         notificationAuthorizationObserver = model.$notificationAuthorizationState.sink { [weak self] _ in
             self?.updateStatusMenuContent()
@@ -66,6 +67,7 @@ final class BatteryHubStatusController: NSObject {
         bluetoothPowerStateCancellable = bluetoothPowerStateObserver.$state
             .sink { [weak self] _ in
                 self?.updateStatusMenuContent()
+                self?.updateDesktopWidget()
             }
         preferencesObservers = [
             NotificationCenter.default.addObserver(
@@ -191,8 +193,16 @@ final class BatteryHubStatusController: NSObject {
     private func updateDesktopWidget() {
         desktopWidgetController.update(
             snapshots: model.store.decoratedSnapshots,
+            isRefreshing: model.isRefreshing,
+            bluetoothPowerState: bluetoothPowerStateObserver.state,
+            onRefresh: { [weak model] in
+                Task { await model?.refresh() }
+            },
             onOpenSettings: { [weak self] in
                 self?.showSettingsWindow(initialPane: .dashboard)
+            },
+            onOpenBluetoothSettings: {
+                BatteryHubSystemSettingsActions.openBluetoothSettings()
             }
         )
     }

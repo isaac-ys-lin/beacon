@@ -75,20 +75,6 @@ struct BluetoothLogoMark: View {
     }
 }
 
-struct SettingsLogoMark: View {
-    var size: CGFloat = 22
-
-    var body: some View {
-        Image(systemName: resolveSymbol("gearshape.2.fill", fallback: "gearshape.fill"))
-            .font(.system(size: max(12, size * 0.52), weight: .medium))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(Color.primary.opacity(0.62))
-            .frame(width: size, height: size)
-        .frame(width: size, height: size)
-        .accessibilityLabel("Settings")
-    }
-}
-
 struct BatteryHubHeaderSettingsIcon: View {
     let color: Color
     var glyphSize: CGFloat = 13
@@ -101,6 +87,52 @@ struct BatteryHubHeaderSettingsIcon: View {
             .foregroundStyle(color)
             .frame(width: frameSize, height: frameSize)
             .accessibilityLabel("Open BatteryHub Settings")
+    }
+}
+
+struct BatteryHubHeaderRefreshIcon: View {
+    let color: Color
+    var glyphSize: CGFloat = 13
+    var frameSize: CGFloat = 28
+
+    var body: some View {
+        Image(systemName: "arrow.clockwise")
+            .font(.system(size: glyphSize, weight: .semibold))
+            .foregroundStyle(color)
+            .frame(width: frameSize, height: frameSize)
+            .accessibilityLabel("Refresh")
+    }
+}
+
+struct BluetoothSettingsIcon: View {
+    let color: Color
+    var glyphSize: CGFloat = 18
+    var frameSize: CGFloat = 28
+
+    var body: some View {
+        Group {
+            if let template = bluetoothTemplateImage {
+                Image(nsImage: template)
+                    .renderingMode(.template)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: BatteryHubSymbols.bluetooth)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            }
+        }
+        .foregroundStyle(color)
+        .frame(width: glyphSize, height: glyphSize)
+        .frame(width: frameSize, height: frameSize)
+    }
+
+    private var bluetoothTemplateImage: NSImage? {
+        guard let image = NSImage(named: NSImage.Name("NSBluetoothTemplate"))?.copy() as? NSImage else {
+            return nil
+        }
+        image.isTemplate = true
+        return image
     }
 }
 
@@ -117,6 +149,86 @@ struct BatteryHubUtilityIconButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .animation(.easeOut(duration: DesignTokens.Motion.quick), value: configuration.isPressed)
             .contentShape(Circle())
+    }
+}
+
+struct BatteryHubHeaderControls: View {
+    let theme: BeaconThemePalette
+    let isRefreshing: Bool
+    let bluetoothPowerState: BluetoothPowerState
+    let onOpenSettings: () -> Void
+    let onRefresh: () -> Void
+    let onOpenBluetoothSettings: () -> Void
+    var frameSize: CGFloat = 28
+    var settingsGlyphSize: CGFloat = 13
+    var refreshGlyphSize: CGFloat = 13
+    var bluetoothGlyphSize: CGFloat = 18
+    var spacing: CGFloat = 8
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            Button(action: onOpenSettings) {
+                BatteryHubHeaderSettingsIcon(
+                    color: theme.textPrimary,
+                    glyphSize: settingsGlyphSize,
+                    frameSize: frameSize
+                )
+            }
+            .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
+            .help("Open BatteryHub Settings")
+
+            Button(action: onRefresh) {
+                if isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: frameSize, height: frameSize)
+                        .accessibilityLabel("Refreshing")
+                } else {
+                    BatteryHubHeaderRefreshIcon(
+                        color: theme.textPrimary,
+                        glyphSize: refreshGlyphSize,
+                        frameSize: frameSize
+                    )
+                }
+            }
+            .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
+            .disabled(isRefreshing)
+            .help(isRefreshing ? "Refreshing" : "Refresh")
+
+            Button(action: onOpenBluetoothSettings) {
+                BluetoothSettingsIcon(
+                    color: bluetoothPowerColor,
+                    glyphSize: bluetoothGlyphSize,
+                    frameSize: frameSize
+                )
+                .accessibilityLabel(bluetoothAccessibilityLabel)
+            }
+            .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
+            .help(bluetoothHelpText)
+        }
+    }
+
+    private var bluetoothPowerColor: Color {
+        switch bluetoothPowerState {
+        case .on: return theme.textPrimary
+        case .off, .unknown: return theme.textDisabled
+        }
+    }
+
+    private var bluetoothAccessibilityLabel: String {
+        switch bluetoothPowerState {
+        case .on: return "Bluetooth is on. Open Bluetooth Settings."
+        case .off: return "Bluetooth is off. Open Bluetooth Settings."
+        case .unknown: return "Bluetooth status unavailable. Open Bluetooth Settings."
+        }
+    }
+
+    private var bluetoothHelpText: String {
+        switch bluetoothPowerState {
+        case .on: return "Bluetooth is on. Open Bluetooth Settings."
+        case .off: return "Bluetooth is off. Open Bluetooth Settings."
+        case .unknown: return "Bluetooth status unavailable. Open Bluetooth Settings."
+        }
     }
 }
 

@@ -109,7 +109,8 @@ enum BatteryHubStatusIconImage {
             width: BatteryHubMenuBarMetrics.iconSide,
             height: BatteryHubMenuBarMetrics.iconSide
         )
-        let image = NSImage(named: BatteryHubSymbols.statusGlyphAsset)
+        let image = NSImage(named: BatteryHubSymbols.headerLogoAsset)
+            ?? NSImage(named: BatteryHubSymbols.statusGlyphAsset)
             ?? NSImage(systemSymbolName: BatteryHubSymbols.app, accessibilityDescription: "BatteryHub")
             ?? NSImage(size: statusIconSize)
 
