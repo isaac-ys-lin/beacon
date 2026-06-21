@@ -56,6 +56,40 @@ enum DesktopWidgetStyle: String, CaseIterable, Identifiable {
         case .expanded: return 336
         }
     }
+
+    var size: NSSize {
+        NSSize(width: width, height: height)
+    }
+}
+
+enum DesktopWidgetWindowPlacement {
+    static let defaultTrailingInset: CGFloat = 28
+    static let defaultTopInset: CGFloat = 72
+
+    static func reusedFrame(currentFrame: NSRect, style: DesktopWidgetStyle) -> NSRect {
+        let targetSize = style.size
+        guard !isSameSize(currentFrame.size, targetSize) else { return currentFrame }
+        return NSRect(
+            x: currentFrame.maxX - targetSize.width,
+            y: currentFrame.maxY - targetSize.height,
+            width: targetSize.width,
+            height: targetSize.height
+        )
+    }
+
+    static func initialFrame(for style: DesktopWidgetStyle, in visibleFrame: NSRect) -> NSRect {
+        let size = style.size
+        return NSRect(
+            x: visibleFrame.maxX - size.width - defaultTrailingInset,
+            y: visibleFrame.maxY - size.height - defaultTopInset,
+            width: size.width,
+            height: size.height
+        )
+    }
+
+    private static func isSameSize(_ lhs: NSSize, _ rhs: NSSize) -> Bool {
+        abs(lhs.width - rhs.width) < 0.5 && abs(lhs.height - rhs.height) < 0.5
+    }
 }
 
 private struct DesktopWidgetBackground: NSViewRepresentable {
@@ -156,10 +190,9 @@ struct BatteryDesktopWidgetView: View {
 
             if let onOpenSettings {
                 Button(action: onOpenSettings) {
-                    SettingsLogoMark(size: 22)
+                    BatteryHubHeaderSettingsIcon(color: theme.textPrimary)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.textMuted)
+                .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
                 .help("Open Dashboard Settings")
             }
         }
@@ -246,21 +279,18 @@ final class BatteryHubDesktopWidgetController {
 
     private func existingOrNewWindow(for style: DesktopWidgetStyle) -> NSPanel {
         if let window {
-            let frame = window.frame
-            window.setFrame(
-                NSRect(
-                    x: frame.maxX - style.width,
-                    y: frame.maxY - style.height,
-                    width: style.width,
-                    height: style.height
-                ),
-                display: true
+            let targetFrame = DesktopWidgetWindowPlacement.reusedFrame(
+                currentFrame: window.frame,
+                style: style
             )
+            if targetFrame != window.frame {
+                window.setFrame(targetFrame, display: true)
+            }
             return window
         }
 
         let window = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: style.width, height: style.height),
+            contentRect: NSRect(origin: .zero, size: style.size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -283,14 +313,8 @@ final class BatteryHubDesktopWidgetController {
     private func positionIfNeeded(_ window: NSPanel, style: DesktopWidgetStyle) {
         guard window.frame.origin == .zero else { return }
         let frame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let size = NSSize(width: style.width, height: style.height)
         window.setFrame(
-            NSRect(
-                x: frame.maxX - size.width - 28,
-                y: frame.maxY - size.height - 72,
-                width: size.width,
-                height: size.height
-            ),
+            DesktopWidgetWindowPlacement.initialFrame(for: style, in: frame),
             display: true
         )
     }

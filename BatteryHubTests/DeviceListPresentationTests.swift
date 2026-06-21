@@ -1631,6 +1631,34 @@ final class DeviceListPresentationTests: XCTestCase {
 
     // MARK: - Runtime-adjacent render smoke test
 
+    func testDesktopWidgetReuseFrameDoesNotDriftWhenStyleIsUnchanged() {
+        let currentFrame = NSRect(x: 916, y: 492, width: 318, height: 336)
+
+        let reusedFrame = DesktopWidgetWindowPlacement.reusedFrame(
+            currentFrame: currentFrame,
+            style: .expanded
+        )
+
+        XCTAssertEqual(reusedFrame.origin.x, currentFrame.origin.x, accuracy: 0.01)
+        XCTAssertEqual(reusedFrame.origin.y, currentFrame.origin.y, accuracy: 0.01)
+        XCTAssertEqual(reusedFrame.width, currentFrame.width, accuracy: 0.01)
+        XCTAssertEqual(reusedFrame.height, currentFrame.height, accuracy: 0.01)
+    }
+
+    func testDesktopWidgetReuseFramePreservesTopRightWhenStyleChanges() {
+        let currentFrame = NSRect(x: 916, y: 492, width: 318, height: 336)
+
+        let reusedFrame = DesktopWidgetWindowPlacement.reusedFrame(
+            currentFrame: currentFrame,
+            style: .compact
+        )
+
+        XCTAssertEqual(reusedFrame.maxX, currentFrame.maxX, accuracy: 0.01)
+        XCTAssertEqual(reusedFrame.maxY, currentFrame.maxY, accuracy: 0.01)
+        XCTAssertEqual(reusedFrame.width, DesktopWidgetStyle.compact.width, accuracy: 0.01)
+        XCTAssertEqual(reusedFrame.height, DesktopWidgetStyle.compact.height, accuracy: 0.01)
+    }
+
     @MainActor
     func testBatteryDesktopWidgetRenderProducesNonBlankImage() throws {
         let now = Date()
@@ -1641,7 +1669,7 @@ final class DeviceListPresentationTests: XCTestCase {
             makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .coreBluetooth, updatedAt: now),
         ]
 
-        let view = BatteryDesktopWidgetView(snapshots: snapshots, style: .expanded)
+        let view = BatteryDesktopWidgetView(snapshots: snapshots, style: .expanded, onOpenSettings: {})
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(x: 0, y: 0, width: DesktopWidgetStyle.expanded.width, height: DesktopWidgetStyle.expanded.height)
         hostingView.layoutSubtreeIfNeeded()

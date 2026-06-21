@@ -1,22 +1,6 @@
 import AppKit
 import SwiftUI
 
-private struct UtilityIconButtonStyle: ButtonStyle {
-    let theme: BeaconThemePalette
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(theme.textMuted)
-            .background(
-                Circle()
-                    .fill(configuration.isPressed ? theme.hover : Color.clear)
-            )
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .animation(.easeOut(duration: DesignTokens.Motion.quick), value: configuration.isPressed)
-            .contentShape(Circle())
-    }
-}
-
 private struct BluetoothSettingsIcon: View {
     let color: Color
     var glyphSize: CGFloat = 18
@@ -262,7 +246,7 @@ struct StatusMenuView: View {
                         .frame(width: 28, height: 28)
                 }
             }
-            .buttonStyle(UtilityIconButtonStyle(theme: theme))
+            .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
             .disabled(isRefreshing)
             .help(isRefreshing ? "Refreshing" : "Refresh")
 
@@ -276,14 +260,9 @@ struct StatusMenuView: View {
         Button {
             onOpenSettings(.devices, nil)
         } label: {
-            Image(systemName: resolveSymbol("gearshape", fallback: "gearshape.fill"))
-                .font(.system(size: 13, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(theme.textPrimary)
-                .frame(width: 28, height: 28)
-                .accessibilityLabel("Open BatteryHub Settings")
+            BatteryHubHeaderSettingsIcon(color: theme.textPrimary)
         }
-        .buttonStyle(UtilityIconButtonStyle(theme: theme))
+        .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
         .help("Open BatteryHub Settings")
     }
 
@@ -313,7 +292,7 @@ struct StatusMenuView: View {
             BluetoothSettingsIcon(color: bluetoothPowerColor)
                 .accessibilityLabel(bluetoothAccessibilityLabel)
         }
-        .buttonStyle(UtilityIconButtonStyle(theme: theme))
+        .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
         .help(bluetoothHelpText)
     }
 

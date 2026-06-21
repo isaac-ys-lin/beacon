@@ -14,6 +14,7 @@ func resolveSymbol(_ symbol: String, fallback: String) -> String {
 
 enum BatteryHubSymbols {
     static let appIconAsset = "BatteryHubAppIcon"
+    static let headerLogoAsset = "BatteryHubHeaderLogo"
     static let statusGlyphAsset = "BatteryHubStatusGlyph"
 
     static var app: String {
@@ -43,15 +44,13 @@ struct BatteryHubLogoMark: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Image(BatteryHubSymbols.statusGlyphAsset)
+        Image(BatteryHubSymbols.headerLogoAsset)
             .renderingMode(.template)
             .resizable()
             .interpolation(.high)
             .antialiased(true)
             .aspectRatio(1, contentMode: .fit)
             .foregroundStyle(theme.textPrimary)
-            .frame(width: size, height: size)
-            .scaleEffect(1.18)
             .frame(width: size, height: size)
             .accessibilityLabel("BatteryHub")
     }
@@ -87,6 +86,37 @@ struct SettingsLogoMark: View {
             .frame(width: size, height: size)
         .frame(width: size, height: size)
         .accessibilityLabel("Settings")
+    }
+}
+
+struct BatteryHubHeaderSettingsIcon: View {
+    let color: Color
+    var glyphSize: CGFloat = 13
+    var frameSize: CGFloat = 28
+
+    var body: some View {
+        Image(systemName: resolveSymbol("gearshape", fallback: "gearshape.fill"))
+            .font(.system(size: glyphSize, weight: .semibold))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(color)
+            .frame(width: frameSize, height: frameSize)
+            .accessibilityLabel("Open BatteryHub Settings")
+    }
+}
+
+struct BatteryHubUtilityIconButtonStyle: ButtonStyle {
+    let theme: BeaconThemePalette
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(theme.textMuted)
+            .background(
+                Circle()
+                    .fill(configuration.isPressed ? theme.hover : Color.clear)
+            )
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(.easeOut(duration: DesignTokens.Motion.quick), value: configuration.isPressed)
+            .contentShape(Circle())
     }
 }
 
