@@ -36,7 +36,6 @@ public struct BluetoothBatteryCandidate: Sendable {
 public struct BluetoothBatteryResolver {
     public init() {}
 
-    @MainActor
     public func read(now: Date = Date()) async -> [BatterySnapshot] {
         await BluetoothDeviceScanner().connectedCandidates().map {
             Self.snapshot(from: $0, now: now)

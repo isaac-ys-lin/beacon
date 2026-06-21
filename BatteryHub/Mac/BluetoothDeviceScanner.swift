@@ -9,15 +9,8 @@ public struct BluetoothDeviceScanner {
 
     public init() {}
 
-    @MainActor
     public func connectedCandidates() async -> [BluetoothBatteryCandidate] {
-        var candidates = readAppleDeviceManagementBatteryCandidates()
-        for candidate in readHIDBatteryCandidates() {
-            candidates.upsert(candidate)
-        }
-        for candidate in readPairedIOBluetoothDevices() {
-            candidates.upsert(candidate)
-        }
+        var candidates = await readLocalBatteryCandidates()
 
         let profiler = await Self.readSystemProfilerBatteryCandidates()
         Self.logger.info("system_profiler returned \(profiler.count) battery candidates")
@@ -38,6 +31,17 @@ public struct BluetoothDeviceScanner {
             Self.logger.info("BLE scan skipped because CoreBluetooth authorization is unknown")
         }
         return candidates
+    }
+
+    private func readLocalBatteryCandidates() async -> [BluetoothBatteryCandidate] {
+        await Task.detached(priority: .utility) {
+            let scanner = BluetoothDeviceScanner()
+            var candidates = scanner.readAppleDeviceManagementBatteryCandidates()
+            for candidate in scanner.readHIDBatteryCandidates() {
+                candidates.upsert(candidate)
+            }
+            return candidates
+        }.value
     }
 
     private func readAppleDeviceManagementBatteryCandidates() -> [BluetoothBatteryCandidate] {
