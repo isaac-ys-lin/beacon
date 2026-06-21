@@ -104,13 +104,15 @@ enum MenuBarBatteryFormatter {
 }
 
 enum BatteryHubStatusIconImage {
+    static let designReferenceAssetName = BatteryHubSymbols.headerLogoAsset
+
     static func make() -> NSImage {
         let statusIconSize = NSSize(
             width: BatteryHubMenuBarMetrics.iconSide,
             height: BatteryHubMenuBarMetrics.iconSide
         )
-        let image = NSImage(named: BatteryHubSymbols.headerLogoAsset)
-            ?? NSImage(named: BatteryHubSymbols.statusGlyphAsset)
+        let image = beaconTemplateImage(size: statusIconSize)
+            ?? NSImage(named: designReferenceAssetName)
             ?? NSImage(systemSymbolName: BatteryHubSymbols.app, accessibilityDescription: "BatteryHub")
             ?? NSImage(size: statusIconSize)
 
@@ -118,6 +120,87 @@ enum BatteryHubStatusIconImage {
         image.isTemplate = true
         image.accessibilityDescription = "BatteryHub"
         return image
+    }
+
+    private static func beaconTemplateImage(size: NSSize) -> NSImage? {
+        guard size.width > 0, size.height > 0 else { return nil }
+        let image = NSImage(size: size, flipped: true) { _ in
+            let scale = min(size.width, size.height) / 36
+            NSColor.black.setStroke()
+            NSColor.black.setFill()
+
+            let stem = NSBezierPath()
+            stem.lineCapStyle = .round
+            stem.lineJoinStyle = .round
+            stem.lineWidth = 3.0 * scale
+            stem.move(to: scaledPoint(x: 14, y: 17, scale: scale))
+            stem.line(to: scaledPoint(x: 14, y: 28, scale: scale))
+            stem.stroke()
+
+            drawArc(radius: 6, startDegrees: -16, endDegrees: -74, lineWidth: 2.45 * scale, scale: scale)
+            drawArc(radius: 10.5, startDegrees: -12, endDegrees: -78, lineWidth: 2.35 * scale, scale: scale)
+
+            let dotRect = NSRect(x: (14 - 2.85) * scale, y: (15 - 2.85) * scale, width: 5.7 * scale, height: 5.7 * scale)
+            NSBezierPath(ovalIn: dotRect).fill()
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    private static func drawArc(
+        radius: CGFloat,
+        startDegrees: CGFloat,
+        endDegrees: CGFloat,
+        lineWidth: CGFloat,
+        scale: CGFloat
+    ) {
+        let points = cubicArcPoints(
+            center: NSPoint(x: 14, y: 15),
+            radius: radius,
+            startRadians: startDegrees * .pi / 180,
+            endRadians: endDegrees * .pi / 180
+        )
+        let path = NSBezierPath()
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.lineWidth = lineWidth
+        path.move(to: scaledPoint(points.start, scale: scale))
+        path.curve(
+            to: scaledPoint(points.end, scale: scale),
+            controlPoint1: scaledPoint(points.control1, scale: scale),
+            controlPoint2: scaledPoint(points.control2, scale: scale)
+        )
+        path.stroke()
+    }
+
+    private static func cubicArcPoints(
+        center: NSPoint,
+        radius: CGFloat,
+        startRadians: CGFloat,
+        endRadians: CGFloat
+    ) -> (start: NSPoint, control1: NSPoint, control2: NSPoint, end: NSPoint) {
+        let delta = endRadians - startRadians
+        let kappa = 4 / 3 * tan(delta / 4)
+        let start = point(center: center, radius: radius, radians: startRadians)
+        let end = point(center: center, radius: radius, radians: endRadians)
+        let startDerivative = NSPoint(x: -radius * sin(startRadians), y: radius * cos(startRadians))
+        let endDerivative = NSPoint(x: -radius * sin(endRadians), y: radius * cos(endRadians))
+        let control1 = NSPoint(x: start.x + kappa * startDerivative.x, y: start.y + kappa * startDerivative.y)
+        let control2 = NSPoint(x: end.x - kappa * endDerivative.x, y: end.y - kappa * endDerivative.y)
+        return (start, control1, control2, end)
+    }
+
+    private static func point(center: NSPoint, radius: CGFloat, radians: CGFloat) -> NSPoint {
+        NSPoint(x: center.x + radius * cos(radians), y: center.y + radius * sin(radians))
+    }
+
+    private static func scaledPoint(x: CGFloat, y: CGFloat, scale: CGFloat) -> NSPoint {
+        NSPoint(x: x * scale, y: y * scale)
+    }
+
+    private static func scaledPoint(_ point: NSPoint, scale: CGFloat) -> NSPoint {
+        scaledPoint(x: point.x, y: point.y, scale: scale)
     }
 }
 

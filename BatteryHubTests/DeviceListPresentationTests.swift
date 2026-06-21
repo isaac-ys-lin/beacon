@@ -1629,6 +1629,16 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertNil(MenuBarBatteryFormatter.menuBarText(for: snapshots))
     }
 
+    func testMenuBarStatusIconKeepsCurrentBeaconDesignReference() {
+        XCTAssertEqual(BatteryHubStatusIconImage.designReferenceAssetName, BatteryHubSymbols.headerLogoAsset)
+        XCTAssertNotEqual(BatteryHubStatusIconImage.designReferenceAssetName, BatteryHubSymbols.statusGlyphAsset)
+
+        let image = BatteryHubStatusIconImage.make()
+        XCTAssertEqual(image.size.width, BatteryHubMenuBarMetrics.iconSide, accuracy: 0.01)
+        XCTAssertEqual(image.size.height, BatteryHubMenuBarMetrics.iconSide, accuracy: 0.01)
+        XCTAssertTrue(image.isTemplate)
+    }
+
     // MARK: - Runtime-adjacent render smoke test
 
     func testDesktopWidgetReuseFrameDoesNotDriftWhenStyleIsUnchanged() {
@@ -1715,6 +1725,8 @@ final class DeviceListPresentationTests: XCTestCase {
             XCTFail("Expected desktop widget window frame")
             return
         }
+        XCTAssertTrue(controller.debugContentViewMasksToBounds)
+        XCTAssertTrue(controller.debugHostingViewMasksToBounds)
 
         controller.close()
         controller.update(
@@ -1729,6 +1741,8 @@ final class DeviceListPresentationTests: XCTestCase {
             XCTFail("Expected desktop widget window frame after reopening")
             return
         }
+        XCTAssertTrue(controller.debugContentViewMasksToBounds)
+        XCTAssertTrue(controller.debugHostingViewMasksToBounds)
         controller.close()
 
         XCTAssertEqual(secondFrame.origin.x, firstFrame.origin.x, accuracy: 0.01)

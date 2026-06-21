@@ -244,6 +244,15 @@ final class BatteryHubDesktopWidgetController {
     var debugWindowFrame: NSRect? {
         window?.frame
     }
+
+    var debugContentViewMasksToBounds: Bool {
+        window?.contentView?.layer?.masksToBounds == true
+    }
+
+    var debugHostingViewMasksToBounds: Bool {
+        (window?.contentViewController as? NSHostingController<BatteryDesktopWidgetView>)?
+            .view.layer?.masksToBounds == true
+    }
     #endif
 
     func update(
@@ -278,11 +287,10 @@ final class BatteryHubDesktopWidgetController {
         )
         hostingController.sizingOptions = []
         hostingController.view.frame = NSRect(origin: .zero, size: style.size)
-        hostingController.view.wantsLayer = true
-        hostingController.view.layer?.cornerRadius = NativeMacStyle.widgetCornerRadius
-        hostingController.view.layer?.masksToBounds = false
+        applyRoundedTransparentMask(to: hostingController.view)
         applyFixedContentSize(style.size, to: window)
         window.contentViewController = hostingController
+        applyRoundedTransparentMask(to: window.contentView)
         window.setContentSize(style.size)
         window.setFrame(targetFrame, display: true)
         lastKnownFrame = window.frame
@@ -314,9 +322,6 @@ final class BatteryHubDesktopWidgetController {
             backing: .buffered,
             defer: false
         )
-        window.contentView?.wantsLayer = true
-        window.contentView?.layer?.cornerRadius = NativeMacStyle.widgetCornerRadius
-        window.contentView?.layer?.masksToBounds = false
         window.isReleasedWhenClosed = false
         window.backgroundColor = .clear
         window.isOpaque = false
@@ -326,6 +331,7 @@ final class BatteryHubDesktopWidgetController {
         window.isMovableByWindowBackground = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         self.window = window
+        applyRoundedTransparentMask(to: window.contentView)
         return window
     }
 
@@ -343,5 +349,16 @@ final class BatteryHubDesktopWidgetController {
     private func applyFixedContentSize(_ size: NSSize, to window: NSPanel) {
         window.contentMinSize = size
         window.contentMaxSize = size
+    }
+
+    private func applyRoundedTransparentMask(to view: NSView?) {
+        guard let view else { return }
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.clear.cgColor
+        view.layer?.cornerRadius = NativeMacStyle.widgetCornerRadius
+        if #available(macOS 10.15, *) {
+            view.layer?.cornerCurve = .continuous
+        }
+        view.layer?.masksToBounds = true
     }
 }
