@@ -277,16 +277,20 @@ struct BatteryHubSettingsView: View {
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 10) {
-                compactNotificationCenterCard
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 10) {
+                    compactNotificationCenterCard
 
-                if let selectedDevice {
-                    alertDetail(for: selectedDevice)
-                } else {
-                    emptyAlertDetail
+                    if let selectedDevice {
+                        alertDetail(for: selectedDevice)
+                    } else {
+                        emptyAlertDetail
+                    }
                 }
+                .padding(.top, 6)
+                .padding(1)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(.top, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.leading, 22)
         }
@@ -353,7 +357,7 @@ struct BatteryHubSettingsView: View {
             compactGlobalAlertCard
             compactAlertPreviewCard
         }
-        .frame(maxWidth: 560, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: 560, alignment: .topLeading)
     }
 
     private func compactAlertHeader(for row: DeviceInspectorItem) -> some View {

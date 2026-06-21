@@ -43,7 +43,7 @@ struct BatteryHubLogoMark: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Image(BatteryHubSymbols.headerLogoAsset)
+        Image(nsImage: BatteryHubStatusIconImage.make(size: NSSize(width: size, height: size)))
             .renderingMode(.template)
             .resizable()
             .interpolation(.high)

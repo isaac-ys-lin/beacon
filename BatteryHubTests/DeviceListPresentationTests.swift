@@ -65,6 +65,13 @@ final class DeviceListPresentationTests: XCTestCase {
         return defaults
     }
 
+    private func scrollViews(in view: NSView) -> [NSScrollView] {
+        let current = view as? NSScrollView
+        return view.subviews.reduce(current.map { [$0] } ?? []) { partial, subview in
+            partial + scrollViews(in: subview)
+        }
+    }
+
     // MARK: - airPodsPrefix
 
     func testAirPodsPrefixStripsCase() {
@@ -1629,8 +1636,10 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertNil(MenuBarBatteryFormatter.menuBarText(for: snapshots))
     }
 
-    func testMenuBarStatusIconKeepsCurrentBeaconDesignReference() {
+    func testMenuBarStatusIconUsesReadableMenuBarSizing() {
         XCTAssertEqual(BatteryHubStatusIconImage.designReferenceAssetName, BatteryHubSymbols.headerLogoAsset)
+        XCTAssertEqual(BatteryHubMenuBarMetrics.iconSide, 24)
+        XCTAssertEqual(BatteryHubMenuBarMetrics.imageOnlyLength, 32)
 
         let image = BatteryHubStatusIconImage.make()
         XCTAssertEqual(image.size.width, BatteryHubMenuBarMetrics.iconSide, accuracy: 0.01)
@@ -2138,6 +2147,24 @@ final class DeviceListPresentationTests: XCTestCase {
 
         try pngData?.write(to: outputURL, options: .atomic)
         XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBatteryHubAlertsDetailPaneIsScrollable() throws {
+        let view = BatteryHubSettingsView(
+            snapshots: [
+                makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 35),
+            ],
+            notificationAuthorizationState: .authorized,
+            onRefresh: {},
+            initialPane: .alerts,
+            initialSelectedDeviceID: "keyboard"
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        XCTAssertGreaterThanOrEqual(scrollViews(in: hostingView).count, 2)
     }
 
     @MainActor

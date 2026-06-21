@@ -106,10 +106,13 @@ enum MenuBarBatteryFormatter {
 enum BatteryHubStatusIconImage {
     static let designReferenceAssetName = BatteryHubSymbols.headerLogoAsset
 
-    static func make() -> NSImage {
+    static func make(size: NSSize = NSSize(
+        width: BatteryHubMenuBarMetrics.iconSide,
+        height: BatteryHubMenuBarMetrics.iconSide
+    )) -> NSImage {
         let statusIconSize = NSSize(
-            width: BatteryHubMenuBarMetrics.iconSide,
-            height: BatteryHubMenuBarMetrics.iconSide
+            width: size.width,
+            height: size.height
         )
         let image = beaconTemplateImage(size: statusIconSize)
             ?? NSImage(named: designReferenceAssetName)
@@ -125,22 +128,48 @@ enum BatteryHubStatusIconImage {
     private static func beaconTemplateImage(size: NSSize) -> NSImage? {
         guard size.width > 0, size.height > 0 else { return nil }
         let image = NSImage(size: size, flipped: true) { _ in
-            let scale = min(size.width, size.height) / 36
+            let scale = min(size.width, size.height)
+                / BatteryHubStatusIconDrawingMetrics.canvasSide
+                * BatteryHubStatusIconDrawingMetrics.artworkScale
+            let origin = NSPoint(
+                x: (size.width - BatteryHubStatusIconDrawingMetrics.canvasSide * scale) / 2,
+                y: (size.height - BatteryHubStatusIconDrawingMetrics.canvasSide * scale) / 2
+            )
             NSColor.black.setStroke()
             NSColor.black.setFill()
 
             let stem = NSBezierPath()
             stem.lineCapStyle = .round
             stem.lineJoinStyle = .round
-            stem.lineWidth = 3.0 * scale
-            stem.move(to: scaledPoint(x: 14, y: 17, scale: scale))
-            stem.line(to: scaledPoint(x: 14, y: 28, scale: scale))
+            stem.lineWidth = BatteryHubStatusIconDrawingMetrics.stemLineWidth * scale
+            stem.move(to: scaledPoint(x: 14, y: 17, scale: scale, origin: origin))
+            stem.line(to: scaledPoint(x: 14, y: 28, scale: scale, origin: origin))
             stem.stroke()
 
-            drawArc(radius: 6, startDegrees: -16, endDegrees: -74, lineWidth: 2.45 * scale, scale: scale)
-            drawArc(radius: 10.5, startDegrees: -12, endDegrees: -78, lineWidth: 2.35 * scale, scale: scale)
+            drawArc(
+                radius: 6,
+                startDegrees: -16,
+                endDegrees: -74,
+                lineWidth: BatteryHubStatusIconDrawingMetrics.innerArcLineWidth * scale,
+                scale: scale,
+                origin: origin
+            )
+            drawArc(
+                radius: 10.5,
+                startDegrees: -12,
+                endDegrees: -78,
+                lineWidth: BatteryHubStatusIconDrawingMetrics.outerArcLineWidth * scale,
+                scale: scale,
+                origin: origin
+            )
 
-            let dotRect = NSRect(x: (14 - 2.85) * scale, y: (15 - 2.85) * scale, width: 5.7 * scale, height: 5.7 * scale)
+            let dotRadius = BatteryHubStatusIconDrawingMetrics.dotDiameter / 2
+            let dotRect = NSRect(
+                x: origin.x + (14 - dotRadius) * scale,
+                y: origin.y + (15 - dotRadius) * scale,
+                width: BatteryHubStatusIconDrawingMetrics.dotDiameter * scale,
+                height: BatteryHubStatusIconDrawingMetrics.dotDiameter * scale
+            )
             NSBezierPath(ovalIn: dotRect).fill()
             return true
         }
@@ -153,7 +182,8 @@ enum BatteryHubStatusIconImage {
         startDegrees: CGFloat,
         endDegrees: CGFloat,
         lineWidth: CGFloat,
-        scale: CGFloat
+        scale: CGFloat,
+        origin: NSPoint
     ) {
         let points = cubicArcPoints(
             center: NSPoint(x: 14, y: 15),
@@ -165,11 +195,11 @@ enum BatteryHubStatusIconImage {
         path.lineCapStyle = .round
         path.lineJoinStyle = .round
         path.lineWidth = lineWidth
-        path.move(to: scaledPoint(points.start, scale: scale))
+        path.move(to: scaledPoint(points.start, scale: scale, origin: origin))
         path.curve(
-            to: scaledPoint(points.end, scale: scale),
-            controlPoint1: scaledPoint(points.control1, scale: scale),
-            controlPoint2: scaledPoint(points.control2, scale: scale)
+            to: scaledPoint(points.end, scale: scale, origin: origin),
+            controlPoint1: scaledPoint(points.control1, scale: scale, origin: origin),
+            controlPoint2: scaledPoint(points.control2, scale: scale, origin: origin)
         )
         path.stroke()
     }
@@ -195,18 +225,27 @@ enum BatteryHubStatusIconImage {
         NSPoint(x: center.x + radius * cos(radians), y: center.y + radius * sin(radians))
     }
 
-    private static func scaledPoint(x: CGFloat, y: CGFloat, scale: CGFloat) -> NSPoint {
-        NSPoint(x: x * scale, y: y * scale)
+    private static func scaledPoint(x: CGFloat, y: CGFloat, scale: CGFloat, origin: NSPoint) -> NSPoint {
+        NSPoint(x: origin.x + x * scale, y: origin.y + y * scale)
     }
 
-    private static func scaledPoint(_ point: NSPoint, scale: CGFloat) -> NSPoint {
-        scaledPoint(x: point.x, y: point.y, scale: scale)
+    private static func scaledPoint(_ point: NSPoint, scale: CGFloat, origin: NSPoint) -> NSPoint {
+        scaledPoint(x: point.x, y: point.y, scale: scale, origin: origin)
     }
 }
 
+private enum BatteryHubStatusIconDrawingMetrics {
+    static let canvasSide: CGFloat = 36
+    static let artworkScale: CGFloat = 1.04
+    static let stemLineWidth: CGFloat = 3.25
+    static let innerArcLineWidth: CGFloat = 2.75
+    static let outerArcLineWidth: CGFloat = 2.65
+    static let dotDiameter: CGFloat = 6.2
+}
+
 enum BatteryHubMenuBarMetrics {
-    static let iconSide: CGFloat = 22
-    static let imageOnlyLength: CGFloat = 30
+    static let iconSide: CGFloat = 24
+    static let imageOnlyLength: CGFloat = 32
 }
 
 private enum BatteryRefreshLimits {

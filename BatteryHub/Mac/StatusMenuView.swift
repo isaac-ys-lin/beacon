@@ -183,7 +183,7 @@ struct StatusMenuView: View {
 
     private var nativeHeader: some View {
         HStack(alignment: .center, spacing: 12) {
-            BatteryHubLogoMark(size: 32)
+            BatteryHubLogoMark(size: 34)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("BatteryHub")
@@ -291,7 +291,7 @@ struct StatusMenuView: View {
     private var nativeEmptyState: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                BatteryHubLogoMark(size: 30)
+                BatteryHubLogoMark(size: 32)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(theme.raised.opacity(0.72))
@@ -470,7 +470,7 @@ struct StatusWindowPreview: View {
 
     private var previewMenuBarItem: some View {
         HStack(spacing: 5) {
-            BatteryHubLogoMark(size: 14)
+            BatteryHubLogoMark(size: 15)
 
             if showsMenuBarBattery {
                 Text("42%")
@@ -489,7 +489,7 @@ struct StatusWindowPreview: View {
 
     private var previewHeader: some View {
         HStack(spacing: 8) {
-            BatteryHubLogoMark(size: 22)
+            BatteryHubLogoMark(size: 24)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Batteries")
