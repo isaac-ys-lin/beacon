@@ -19,7 +19,8 @@ private struct UtilityIconButtonStyle: ButtonStyle {
 
 private struct BluetoothSettingsIcon: View {
     let color: Color
-    var size: CGFloat = 28
+    var glyphSize: CGFloat = 16.5
+    var frameSize: CGFloat = 28
 
     var body: some View {
         Group {
@@ -35,7 +36,8 @@ private struct BluetoothSettingsIcon: View {
             }
         }
         .foregroundStyle(color)
-        .frame(width: size, height: size)
+        .frame(width: glyphSize, height: glyphSize)
+        .frame(width: frameSize, height: frameSize)
     }
 
     private var bluetoothTemplateImage: NSImage? {
@@ -619,7 +621,7 @@ struct StatusWindowPreview: View {
                 .foregroundStyle(previewTheme.textPrimary)
                 .frame(width: 20, height: 20)
 
-            BluetoothSettingsIcon(color: previewBluetoothPowerColor, size: 20)
+            BluetoothSettingsIcon(color: previewBluetoothPowerColor, glyphSize: 12.5, frameSize: 20)
         }
         .frame(height: 38)
     }
