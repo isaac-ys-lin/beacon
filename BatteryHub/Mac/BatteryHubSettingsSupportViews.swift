@@ -869,6 +869,8 @@ struct SettingsDeviceSidebarRow: View {
     let iconBadge: DeviceIconBadge?
     let alertSummary: String
     let action: () -> Void
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: action) {
@@ -882,7 +884,7 @@ struct SettingsDeviceSidebarRow: View {
                         if let iconBadge {
                             Image(systemName: iconBadge.symbolName)
                                 .font(.system(size: 7, weight: .bold))
-                                .foregroundStyle(iconBadge.color)
+                                .foregroundStyle(iconBadge.color(in: theme))
                                 .offset(x: 5, y: 4)
                         }
                     }
@@ -909,6 +911,11 @@ struct SettingsDeviceSidebarRow: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var theme: BeaconThemePalette {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+            .palette(resolvedSystemScheme: colorScheme)
     }
 
     private var rowSubtitle: String {

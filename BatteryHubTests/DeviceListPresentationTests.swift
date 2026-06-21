@@ -1731,6 +1731,55 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testStatusMenuViewDarkThemeRenderProducesNonBlankImage() throws {
+        let previousTheme = UserDefaults.standard.string(forKey: BatteryHubAppearanceTheme.defaultsKey)
+        UserDefaults.standard.set(BatteryHubAppearanceTheme.dark.rawValue, forKey: BatteryHubAppearanceTheme.defaultsKey)
+        defer {
+            if let previousTheme {
+                UserDefaults.standard.set(previousTheme, forKey: BatteryHubAppearanceTheme.defaultsKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: BatteryHubAppearanceTheme.defaultsKey)
+            }
+        }
+
+        let addr = "AA-BB-CC-DD-EE-FF"
+        let now = Date()
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "mac", displayName: "MacBook Pro", kind: .macBook, percent: nil, source: .macPowerSource, updatedAt: now),
+            makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 82, updatedAt: now),
+            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
+            makeDecorated(deviceID: "iphone", displayName: "Isaac's iPhone", kind: .iPhone, percent: 64, chargeState: .charging, source: .coreBluetooth, updatedAt: now),
+            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .coreBluetooth, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Isaac's AirPods Pro Case", kind: .airPods, percent: 90, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Isaac's AirPods Pro Left", kind: .airPods, percent: 72, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Isaac's AirPods Pro Right", kind: .airPods, percent: 68, updatedAt: now),
+        ]
+
+        let view = StatusMenuView(snapshots: snapshots, onRefresh: {})
+        let hostingView = NSHostingView(rootView: view)
+        let size = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 5,
+            showsOverview: true,
+            visibleScreenHeight: 1_000
+        )
+        hostingView.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-status-menu-render-dark.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
+    }
+
+    @MainActor
     func testStatusMenuViewRefreshingRenderProducesNonBlankImage() throws {
         let view = StatusMenuView(
             snapshots: [],

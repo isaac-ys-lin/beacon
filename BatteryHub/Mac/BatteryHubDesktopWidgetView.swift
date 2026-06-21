@@ -74,6 +74,8 @@ struct BatteryDesktopWidgetView: View {
     let snapshots: [DecoratedBatterySnapshot]
     let style: DesktopWidgetStyle
     var onOpenSettings: (() -> Void)?
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     private var sections: [DeviceSection] {
         configuredDeviceSections(snapshots, preferences: .load())
@@ -116,10 +118,12 @@ struct BatteryDesktopWidgetView: View {
             let shape = RoundedRectangle(cornerRadius: NativeMacStyle.widgetCornerRadius, style: .continuous)
             DesktopWidgetBackground()
                 .clipShape(shape)
-                .overlay(shape.stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.8))
+                .overlay(shape.fill(theme.panel.opacity(0.66)))
+                .overlay(shape.stroke(theme.hairlineDefault, lineWidth: 0.8))
         }
         .clipShape(RoundedRectangle(cornerRadius: NativeMacStyle.widgetCornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.18), radius: 18, x: 0, y: 10)
+        .shadow(color: theme.shadow, radius: 18, x: 0, y: 10)
+        .preferredColorScheme(appearanceTheme.colorSchemeOverride)
     }
 
     private var header: some View {
@@ -129,10 +133,10 @@ struct BatteryDesktopWidgetView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Batteries")
                     .font(DesignTokens.Typography.sectionTitle)
-                    .foregroundStyle(DesignTokens.Palette.text)
+                    .foregroundStyle(theme.textPrimary)
                 Text(latestUpdateText)
                     .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .foregroundStyle(theme.textMuted)
             }
 
             Spacer(minLength: 0)
@@ -141,12 +145,12 @@ struct BatteryDesktopWidgetView: View {
                 Text("\(lowest)%")
                     .font(DesignTokens.Typography.percentSmall)
                     .monospacedDigit()
-                    .foregroundStyle(summary.lowBatteryItemCount > 0 ? DesignTokens.Palette.critical : DesignTokens.Palette.accent)
+                    .foregroundStyle(summary.lowBatteryItemCount > 0 ? theme.statusLow : theme.statusOK)
                     .padding(.horizontal, 8)
                     .frame(height: 24)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(DesignTokens.Palette.controlPill)
+                            .fill(theme.raised.opacity(0.70))
                     )
             }
 
@@ -155,7 +159,7 @@ struct BatteryDesktopWidgetView: View {
                     SettingsLogoMark(size: 22)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .foregroundStyle(theme.textMuted)
                 .help("Open Dashboard Settings")
             }
         }
@@ -163,30 +167,35 @@ struct BatteryDesktopWidgetView: View {
 
     private var emptyState: some View {
         HStack(spacing: 10) {
-            Image(systemName: "battery.25")
-                .font(.system(size: 15, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-                .frame(width: 30, height: 30)
+            BatteryHubLogoMark(size: 30)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
+                        .fill(theme.raised.opacity(0.72))
                 )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("No battery reports")
                     .font(DesignTokens.Typography.controlLabelEmphasis)
+                    .foregroundStyle(theme.textPrimary)
                 Text("Refresh or pair a nearby device.")
                     .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .foregroundStyle(theme.textMuted)
             }
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
                     RoundedRectangle(cornerRadius: NativeMacStyle.dashboardRowCornerRadius, style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
+                        .fill(theme.raised.opacity(0.70))
                 )
+    }
+
+    private var appearanceTheme: BatteryHubAppearanceTheme {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+    }
+
+    private var theme: BeaconThemePalette {
+        appearanceTheme.palette(resolvedSystemScheme: colorScheme)
     }
 }
 

@@ -2,12 +2,14 @@ import AppKit
 import SwiftUI
 
 private struct UtilityIconButtonStyle: ButtonStyle {
+    let theme: BeaconThemePalette
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(DesignTokens.Palette.secondaryText)
+            .foregroundStyle(theme.textMuted)
             .background(
                 Circle()
-                    .fill(configuration.isPressed ? DesignTokens.Palette.hover : Color.clear)
+                    .fill(configuration.isPressed ? theme.hover : Color.clear)
             )
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .animation(.easeOut(duration: DesignTokens.Motion.quick), value: configuration.isPressed)
@@ -100,6 +102,8 @@ struct StatusMenuView: View {
     let onOpenSettings: (SettingsPane, String?) -> Void
 
     @AppStorage(LowBatteryNotifier.thresholdDefaultsKey) private var lowBatteryThreshold = LowBatteryNotifier.defaultThreshold
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
     @State private var displayPreferences = DeviceDisplayPreferences.load()
 
     init(
@@ -146,9 +150,10 @@ struct StatusMenuView: View {
 
         }
         .padding(.top, 12)
-        .padding(.bottom, 10)
+        .padding(.bottom, 12)
         .frame(width: statusWindowWidth)
-        .nativeSystemSurface(cornerRadius: NativeMacStyle.popoverCornerRadius)
+        .beaconPopoverSurface(cornerRadius: NativeMacStyle.popoverCornerRadius, theme: theme)
+        .preferredColorScheme(appearanceTheme.colorSchemeOverride)
     }
 
     private var nativeOverviewMetrics: some View {
@@ -156,13 +161,13 @@ struct StatusMenuView: View {
             nativeMetric(
                 "\(visibleItemCount)",
                 visibleItemCount == 1 ? "Device" : "Devices",
-                color: DesignTokens.Palette.accent
+                color: theme.statusOK
             )
 
             nativeMetric(
                 "\(lowBatteryItemCount)",
                 "Low",
-                color: lowBatteryItemCount > 0 ? DesignTokens.Palette.critical : DesignTokens.Palette.secondaryText
+                color: lowBatteryItemCount > 0 ? theme.statusLow : theme.textMuted
             )
         }
         .padding(.horizontal, 14)
@@ -178,13 +183,17 @@ struct StatusMenuView: View {
 
             Text(label)
                 .font(DesignTokens.Typography.caption2)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .foregroundStyle(theme.textTertiary)
         }
         .padding(.horizontal, 11)
         .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill)
+                .fill(theme.raised.opacity(0.72))
+                .overlay(
+                    RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
+                        .stroke(theme.hairlineSubtle, lineWidth: 0.7)
+                )
         )
     }
 
@@ -193,14 +202,14 @@ struct StatusMenuView: View {
             BatteryHubLogoMark(size: 32)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Batteries")
+                Text("BatteryHub")
                     .font(DesignTokens.Typography.nativePopoverTitle)
-                    .foregroundStyle(DesignTokens.Palette.text)
+                    .foregroundStyle(theme.textPrimary)
                     .lineLimit(1)
 
                 Text(nativeHeaderSubtitle)
                     .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .foregroundStyle(theme.textTertiary)
                     .lineLimit(1)
                     .monospacedDigit()
             }
@@ -217,15 +226,15 @@ struct StatusMenuView: View {
                 } else {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.primary.opacity(0.62))
+                        .foregroundStyle(theme.textPrimary)
                         .frame(width: 28, height: 28)
                 }
             }
-            .buttonStyle(UtilityIconButtonStyle())
+            .buttonStyle(UtilityIconButtonStyle(theme: theme))
             .disabled(isRefreshing)
             .help(isRefreshing ? "Refreshing" : "Refresh")
 
-            nativeLowestBatteryPill
+            nativeBatteryStatusBadge
             nativeBluetoothStatusButton
         }
         .padding(.horizontal, 16)
@@ -239,36 +248,51 @@ struct StatusMenuView: View {
             Image(systemName: resolveSymbol("gearshape", fallback: "gearshape.fill"))
                 .font(.system(size: 13, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.primary.opacity(0.62))
+                .foregroundStyle(theme.textPrimary)
                 .frame(width: 28, height: 28)
                 .accessibilityLabel("Open BatteryHub Settings")
         }
-        .buttonStyle(UtilityIconButtonStyle())
+        .buttonStyle(UtilityIconButtonStyle(theme: theme))
         .help("Open BatteryHub Settings")
     }
 
     private var nativeHeaderSubtitle: String {
         if isRefreshing {
-            return "Refreshing"
+            return "Scanning nearby"
         }
-        return latestUpdateText
+        if visibleItemCount == 0 {
+            return "No reporting devices"
+        }
+        let deviceLabel = visibleItemCount == 1 ? "device" : "devices"
+        return "\(visibleItemCount) \(deviceLabel)"
+    }
+
+    private var appearanceTheme: BatteryHubAppearanceTheme {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+    }
+
+    private var theme: BeaconThemePalette {
+        appearanceTheme.palette(resolvedSystemScheme: colorScheme)
     }
 
     @ViewBuilder
-    private var nativeLowestBatteryPill: some View {
-        if let lowest = overviewSummary.lowestPercent {
-            Text("\(lowest)%")
-                .font(DesignTokens.Typography.nativePopoverPill)
-                .monospacedDigit()
-                .foregroundStyle(lowest <= clampedLowBatteryThreshold ? DesignTokens.Palette.critical : DesignTokens.Palette.accent)
-                .padding(.horizontal, 9)
-                .frame(height: 26)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
-                )
-                .help("Lowest reported battery")
-        }
+    private var nativeBatteryStatusBadge: some View {
+        Text(lowBatteryItemCount > 0 ? "\(lowBatteryItemCount) low" : "All good")
+            .font(DesignTokens.Typography.caption2Emphasis)
+            .textCase(.uppercase)
+            .tracking(0.6)
+            .foregroundStyle(lowBatteryItemCount > 0 ? theme.statusLow : theme.statusOK)
+            .padding(.horizontal, 8)
+            .frame(height: 20)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(lowBatteryItemCount > 0 ? theme.statusLow.opacity(0.16) : theme.accentSoft)
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(lowBatteryItemCount > 0 ? theme.statusLow.opacity(0.38) : theme.accent.opacity(0.35), lineWidth: 0.7)
+                    )
+            )
+            .help(lowBatteryItemCount > 0 ? "\(lowBatteryItemCount) low battery devices" : "All monitored devices are okay")
     }
 
     private var nativeBluetoothStatusButton: some View {
@@ -285,10 +309,10 @@ struct StatusMenuView: View {
                 .frame(height: 26)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
+                        .fill(theme.raised.opacity(0.72))
                         .overlay(
                             Capsule(style: .continuous)
-                                .stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
+                                .stroke(theme.hairlineSubtle, lineWidth: 0.7)
                         )
                 )
         }
@@ -298,8 +322,8 @@ struct StatusMenuView: View {
 
     private var bluetoothPowerColor: Color {
         switch bluetoothPowerState {
-        case .on: return DesignTokens.Palette.accent
-        case .off, .unknown: return DesignTokens.Palette.secondaryText
+        case .on: return theme.statusOK
+        case .off, .unknown: return theme.textDisabled
         }
     }
 
@@ -323,15 +347,15 @@ struct StatusMenuView: View {
         HStack(spacing: 8) {
             Image(systemName: resolveSymbol("eye", fallback: "info.circle"))
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(DesignTokens.Palette.warning)
+                .foregroundStyle(theme.statusLow)
 
             Text("Preview data")
                 .font(DesignTokens.Typography.captionEmphasis)
-                .foregroundStyle(DesignTokens.Palette.text)
+                .foregroundStyle(theme.textPrimary)
 
             Text("Sample devices, not live Bluetooth.")
                 .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .foregroundStyle(theme.textMuted)
                 .lineLimit(1)
         }
         .padding(.horizontal, 16)
@@ -341,7 +365,15 @@ struct StatusMenuView: View {
 
     private var nativeDeviceList: some View {
         ScrollView(showsIndicators: nativeItems.count > 8) {
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Monitored devices")
+                    .font(DesignTokens.Typography.caption2Emphasis)
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .foregroundStyle(theme.textTertiary)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 1)
+
                 ForEach(nativeItems.indices, id: \.self) { index in
                     let item = nativeItems[index]
 
@@ -362,7 +394,7 @@ struct StatusMenuView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.vertical, 10)
         }
         .frame(maxHeight: contentMaxHeight)
     }
@@ -370,23 +402,19 @@ struct StatusMenuView: View {
     private var nativeEmptyState: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                Image(systemName: "battery.25")
-                    .font(.system(size: 15, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .frame(width: 30, height: 30)
+                BatteryHubLogoMark(size: 30)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(DesignTokens.Palette.controlPill)
+                            .fill(theme.raised.opacity(0.72))
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("No reporting devices")
                         .font(DesignTokens.Typography.nativePopoverRowTitle)
-                        .foregroundStyle(DesignTokens.Palette.text)
-                    Text(isRefreshing ? "Scanning connected devices now." : "No connected devices are reporting battery levels.")
+                        .foregroundStyle(theme.textPrimary)
+                    Text(isRefreshing ? "Scanning nearby." : "No connected devices are reporting battery levels.")
                         .font(DesignTokens.Typography.nativePopoverRowSubtitle)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
+                        .foregroundStyle(theme.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -512,6 +540,8 @@ struct StatusWindowPreview: View {
     let showsMenuBarBattery: Bool
     let showsBatteryOverview: Bool
     var bluetoothPowerState: BluetoothPowerState = .on
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -586,12 +616,12 @@ struct StatusWindowPreview: View {
             Image(systemName: resolveSymbol("gearshape", fallback: "gearshape.fill"))
                 .font(.system(size: 11, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.primary.opacity(0.62))
+                .foregroundStyle(previewTheme.textPrimary)
                 .frame(width: 20, height: 20)
 
             Image(systemName: "arrow.clockwise")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.primary.opacity(0.62))
+                .foregroundStyle(previewTheme.textPrimary)
                 .frame(width: 20, height: 20)
 
             Text("18%")
@@ -617,6 +647,11 @@ struct StatusWindowPreview: View {
         case .on: return DesignTokens.Palette.accent
         case .off, .unknown: return DesignTokens.Palette.secondaryText
         }
+    }
+
+    private var previewTheme: BeaconThemePalette {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+            .palette(resolvedSystemScheme: colorScheme)
     }
 
     private var previewOverview: some View {

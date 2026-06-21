@@ -66,6 +66,8 @@ struct BatteryActionHUDView: View {
     let event: BatteryAlertEvent
     var showsDismissButton = BatteryHUDPreferences.showsDismissButton()
     var onDismiss: (() -> Void)?
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 14) {
@@ -74,21 +76,18 @@ struct BatteryActionHUDView: View {
                     .fill(iconBackground)
                     .frame(width: 52, height: 52)
 
-                Image(systemName: systemImage)
-                    .font(.system(size: 24, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(iconColor)
+                BatteryHubLogoMark(size: 30)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(DesignTokens.Typography.rowTitleEmphasis)
-                    .foregroundStyle(DesignTokens.Palette.text)
+                    .foregroundStyle(theme.textPrimary)
                     .lineLimit(1)
 
                 Text(subtitle)
                     .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .foregroundStyle(theme.textMuted)
                     .lineLimit(1)
             }
 
@@ -108,11 +107,11 @@ struct BatteryActionHUDView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
+                        .foregroundStyle(theme.textMuted)
                         .frame(width: 24, height: 24)
                         .background(
                             Circle()
-                                .fill(DesignTokens.Palette.controlPill)
+                                .fill(theme.hover.opacity(0.70))
                         )
                 }
                 .buttonStyle(.plain)
@@ -123,20 +122,21 @@ struct BatteryActionHUDView: View {
         .frame(width: 520, height: 92)
         .background(
             RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-                .fill(DesignTokens.Palette.panel)
+                .fill(theme.panel.opacity(0.96))
                 .overlay(
                     RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-                        .stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.8)
+                        .stroke(theme.hairlineDefault, lineWidth: 0.8)
                 )
-                .shadow(color: .black.opacity(0.16), radius: 26, x: 0, y: 14)
+                .shadow(color: theme.shadow, radius: 32, x: 0, y: 16)
         )
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
+        .preferredColorScheme(appearanceTheme.colorSchemeOverride)
     }
 
     private var title: String {
         switch event.kind {
         case .lowBattery:
-            return "\(event.displayName) needs charging"
+            return "\(event.displayName) is running low"
         case .charged:
             return "\(event.displayName) is charged"
         }
@@ -145,36 +145,39 @@ struct BatteryActionHUDView: View {
     private var subtitle: String {
         switch event.kind {
         case .lowBattery:
+            if let percent = event.percent {
+                return "Down to \(percent)%. Charge it soon."
+            }
             return "Battery below alert level."
         case .charged:
             return "Charged alert point reached."
         }
     }
 
-    private var systemImage: String {
-        switch event.kind {
-        case .lowBattery:
-            return resolveSymbol("battery.25", fallback: "battery.0")
-        case .charged:
-            return resolveSymbol("battery.100.bolt", fallback: "battery.100")
-        }
-    }
-
     private var iconColor: Color {
         switch event.kind {
         case .lowBattery:
-            return DesignTokens.Palette.critical
+            guard let percent = event.percent else { return theme.statusLow }
+            return percent <= 10 ? theme.statusCritical : theme.statusLow
         case .charged:
-            return DesignTokens.Palette.charging
+            return theme.statusOK
         }
     }
 
     private var iconBackground: Color {
         switch event.kind {
         case .lowBattery:
-            return DesignTokens.Palette.critical.opacity(0.14)
+            return iconColor.opacity(0.16)
         case .charged:
-            return DesignTokens.Palette.charging.opacity(0.16)
+            return theme.accentSoft
         }
+    }
+
+    private var appearanceTheme: BatteryHubAppearanceTheme {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+    }
+
+    private var theme: BeaconThemePalette {
+        appearanceTheme.palette(resolvedSystemScheme: colorScheme)
     }
 }

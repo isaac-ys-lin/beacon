@@ -62,6 +62,7 @@ struct BatteryHubSettingsView: View {
     @AppStorage(StatusWindowPreferences.showBatteryOverviewKey) private var showBatteryOverview = true
     @AppStorage(DesktopWidgetPreferences.showDesktopWidgetKey) private var showDesktopWidget = false
     @AppStorage(DesktopWidgetPreferences.widgetStyleKey) private var desktopWidgetStyleRawValue = DesktopWidgetStyle.compact.rawValue
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
     @AppStorage("BatteryHub.settings.showUnavailableDevices") private var showUnavailableDevices = true
 
     @State private var displayPreferences = DeviceDisplayPreferences.load()
@@ -123,6 +124,7 @@ struct BatteryHubSettingsView: View {
         }
         .frame(width: 900, height: 620)
         .background(.regularMaterial)
+        .preferredColorScheme(appearanceTheme.colorSchemeOverride)
         .onAppear {
             reconcileSelectedDeviceSelection()
             onRefreshNotificationAuthorization()
@@ -133,6 +135,10 @@ struct BatteryHubSettingsView: View {
                 onDismiss: { isShowingAddDeviceGuide = false }
             )
         }
+    }
+
+    private var appearanceTheme: BatteryHubAppearanceTheme {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
     }
 
     private var settingsSidebar: some View {

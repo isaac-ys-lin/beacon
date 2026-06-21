@@ -6,10 +6,25 @@ struct DashboardSettingsPane: View {
     @Binding var showMenuBarBattery: Bool
     @Binding var showDesktopWidget: Bool
     @Binding var desktopWidgetStyleRawValue: String
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
 
     var body: some View {
         HStack(alignment: .top, spacing: 18) {
             Form {
+                Section {
+                    Picker("Theme", selection: $appearanceThemeRawValue) {
+                        ForEach(BatteryHubAppearanceTheme.allCases) { theme in
+                            Text(theme.title)
+                                .tag(theme.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("System follows your current macOS appearance. Dark and Light keep BatteryHub fixed.")
+                }
+
                 Section {
                     Toggle("Show battery overview", isOn: $showBatteryOverview)
                     Toggle("Show lowest battery in menu bar", isOn: $showMenuBarBattery)

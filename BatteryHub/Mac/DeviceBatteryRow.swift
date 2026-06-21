@@ -39,15 +39,26 @@ enum BatteryHubSymbols {
 
 struct BatteryHubLogoMark: View {
     var size: CGFloat = 28
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Image(BatteryHubSymbols.appIconAsset)
+        Image(BatteryHubSymbols.statusGlyphAsset)
+            .renderingMode(.template)
             .resizable()
             .interpolation(.high)
             .antialiased(true)
             .aspectRatio(1, contentMode: .fit)
+            .foregroundStyle(theme.textPrimary)
+            .frame(width: size, height: size)
+            .scaleEffect(1.18)
             .frame(width: size, height: size)
             .accessibilityLabel("BatteryHub")
+    }
+
+    private var theme: BeaconThemePalette {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+            .palette(resolvedSystemScheme: colorScheme)
     }
 }
 
@@ -157,13 +168,13 @@ enum DeviceIconBadge: Equatable {
         }
     }
 
-    var color: Color {
+    func color(in theme: BeaconThemePalette) -> Color {
         switch self {
-        case .connected: return DesignTokens.Palette.charging
-        case .charging: return DesignTokens.Palette.charging
-        case .low: return DesignTokens.Palette.critical
+        case .connected: return theme.statusOK
+        case .charging: return theme.statusOK
+        case .low: return theme.statusLow
         case .stale: return DesignTokens.Palette.stale
-        case .disconnected: return DesignTokens.Palette.secondaryText
+        case .disconnected: return theme.statusOffline
         }
     }
 }
@@ -173,6 +184,8 @@ struct DeviceIconPlate: View {
     let color: Color
     var size: CGFloat = 34
     var badge: DeviceIconBadge?
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         symbolName: String,
@@ -188,6 +201,13 @@ struct DeviceIconPlate: View {
 
     var body: some View {
         ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(theme.active.opacity(0.54))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(theme.hairlineSubtle, lineWidth: 0.6)
+                )
+
             Image(systemName: symbolName)
                 .font(.system(size: max(12, size * 0.54), weight: .medium))
                 .symbolRenderingMode(.hierarchical)
@@ -199,12 +219,17 @@ struct DeviceIconPlate: View {
                 Image(systemName: resolveSymbol(badge.symbolName, fallback: "circle.fill"))
                     .font(.system(size: max(9, size * 0.27), weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(badge.color)
+                    .foregroundStyle(badge.color(in: theme))
                     .frame(width: max(13, size * 0.36), height: max(13, size * 0.36))
                     .offset(x: size * 0.31, y: -size * 0.31)
             }
         }
         .frame(width: size, height: size)
+    }
+
+    private var theme: BeaconThemePalette {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+            .palette(resolvedSystemScheme: colorScheme)
     }
 }
 
@@ -294,6 +319,8 @@ struct DashboardBatteryProgressBar: View {
     let percent: Int
     let color: Color
     var height: CGFloat = 5
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     private var ratio: CGFloat {
         CGFloat(max(0, min(100, percent))) / 100
@@ -303,14 +330,36 @@ struct DashboardBatteryProgressBar: View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Capsule(style: .continuous)
-                    .fill(DesignTokens.Palette.separator.opacity(0.35))
+                    .fill(theme.active.opacity(0.78))
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(theme.hairlineSubtle, lineWidth: 0.6)
+                    )
                 Capsule(style: .continuous)
                     .fill(color)
                     .frame(width: max(height, proxy.size.width * ratio))
+                    .shadow(color: color.opacity(0.42), radius: 8, x: 0, y: 0)
             }
         }
         .frame(height: height)
         .accessibilityLabel("\(percent)%")
+    }
+
+    private var theme: BeaconThemePalette {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+            .palette(resolvedSystemScheme: colorScheme)
+    }
+}
+
+private struct BeaconStatusDot: View {
+    let color: Color
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
+            .shadow(color: color.opacity(0.36), radius: 5, x: 0, y: 0)
+            .accessibilityHidden(true)
     }
 }
 
@@ -321,6 +370,8 @@ struct DashboardBatteryDeviceRow: View {
     var horizontalPadding: CGFloat = 9
     var verticalPadding: CGFloat = 9
     var statusWidth: CGFloat = 58
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 10) {
@@ -333,9 +384,11 @@ struct DashboardBatteryDeviceRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
+                    BeaconStatusDot(color: statusColor)
+
                     Text(device.displayName)
                         .font(DesignTokens.Typography.controlLabelEmphasis)
-                        .foregroundStyle(DesignTokens.Palette.text)
+                        .foregroundStyle(theme.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
@@ -343,7 +396,7 @@ struct DashboardBatteryDeviceRow: View {
                         Image(systemName: resolveSymbol("pin.fill", fallback: "pin"))
                             .font(.system(size: 8, weight: .bold))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(DesignTokens.Palette.accent)
+                            .foregroundStyle(theme.statusOK)
                     }
 
                     Spacer(minLength: 0)
@@ -368,7 +421,7 @@ struct DashboardBatteryDeviceRow: View {
                         DashboardBatteryProgressBar(percent: percent, color: statusColor)
                     } else {
                         Capsule(style: .continuous)
-                            .fill(DesignTokens.Palette.separator.opacity(0.28))
+                            .fill(theme.active.opacity(0.58))
                             .frame(height: 5)
                     }
 
@@ -385,7 +438,11 @@ struct DashboardBatteryDeviceRow: View {
         .padding(.vertical, verticalPadding)
         .background(
             RoundedRectangle(cornerRadius: NativeMacStyle.dashboardRowCornerRadius, style: .continuous)
-                .fill(DesignTokens.Palette.card.opacity(0.78))
+                .fill(theme.raised.opacity(0.58))
+                .overlay(
+                    RoundedRectangle(cornerRadius: NativeMacStyle.dashboardRowCornerRadius, style: .continuous)
+                        .stroke(theme.hairlineSubtle, lineWidth: 0.7)
+                )
         )
     }
 
@@ -401,30 +458,33 @@ struct DashboardBatteryDeviceRow: View {
     }
 
     private var statusColor: Color {
-        if isLow { return DesignTokens.Palette.critical }
+        if isLow {
+            guard let percent = device.percent else { return theme.statusLow }
+            return percent <= 10 ? theme.statusCritical : theme.statusLow
+        }
         if device.chargeState == .charging || device.chargeState == .full {
-            return DesignTokens.Palette.charging
+            return theme.statusOK
         }
         if device.freshness != .fresh { return DesignTokens.Palette.stale }
-        return DesignTokens.Palette.accent
+        return theme.statusOK
     }
 
     private var statusTextColor: Color {
         switch (isLow, device.chargeState, device.freshness) {
         case (true, _, _):
-            return DesignTokens.Palette.critical
+            return statusColor
         case (_, .charging, _), (_, .full, _):
-            return DesignTokens.Palette.charging
+            return theme.statusOK
         case (_, _, .stale), (_, _, .expired):
             return DesignTokens.Palette.stale
         default:
-            return DesignTokens.Palette.secondaryText
+            return theme.textMuted
         }
     }
 
     private var iconColor: Color {
         if device.kind == .keyboard {
-            return Color.primary.opacity(0.58)
+            return theme.textMuted
         }
         return statusColor
     }
@@ -448,16 +508,23 @@ struct DashboardBatteryDeviceRow: View {
         if showsAirPodsComponents { return "Parts" }
         return "Battery"
     }
+
+    private var theme: BeaconThemePalette {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+            .palette(resolvedSystemScheme: colorScheme)
+    }
 }
 
 private struct AirPodsDashboardComponentChip: View {
     let component: AirPodsComponent
+    @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 3) {
             Text(slotLabel)
                 .font(DesignTokens.Typography.caption2)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .foregroundStyle(theme.textTertiary)
                 .lineLimit(1)
 
             Text(percentText)
@@ -470,7 +537,11 @@ private struct AirPodsDashboardComponentChip: View {
         .frame(height: 19)
         .background(
             Capsule(style: .continuous)
-                .fill(DesignTokens.Palette.controlPill)
+                .fill(theme.hover.opacity(0.66))
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(theme.hairlineSubtle, lineWidth: 0.6)
+                )
         )
         .accessibilityLabel(accessibilityLabel)
     }
@@ -482,12 +553,19 @@ private struct AirPodsDashboardComponentChip: View {
 
     private var chipColor: Color {
         guard let percent = component.percent else { return DesignTokens.Palette.tertiaryText }
-        if percent <= LowBatteryNotifier.threshold { return DesignTokens.Palette.critical }
+        if percent <= LowBatteryNotifier.threshold {
+            return percent <= 10 ? theme.statusCritical : theme.statusLow
+        }
         if component.chargeState == .charging || component.chargeState == .full {
-            return DesignTokens.Palette.charging
+            return theme.statusOK
         }
         if component.freshness != .fresh { return DesignTokens.Palette.stale }
-        return DesignTokens.Palette.secondaryText
+        return theme.textMuted
+    }
+
+    private var theme: BeaconThemePalette {
+        BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+            .palette(resolvedSystemScheme: colorScheme)
     }
 
     private var slotLabel: String {
