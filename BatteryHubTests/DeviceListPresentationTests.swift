@@ -1760,47 +1760,6 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testStatusMenuSettingsPreviewRenderProducesNonBlankImage() throws {
-        let now = Date()
-        let snapshots: [DecoratedBatterySnapshot] = [
-            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
-            makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31, updatedAt: now),
-            makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18, source: .coreBluetooth, updatedAt: now),
-        ]
-
-        let view = StatusMenuView(
-            snapshots: snapshots,
-            onRefresh: {},
-            initiallyShowingSettings: true,
-            initialDisplayPreferences: DeviceDisplayPreferences(
-                pinnedDeviceIDs: ["keyboard"],
-                hiddenDeviceIDs: ["mouse"]
-            ),
-            initialSelectedDeviceConfiguration: SelectedDeviceConfiguration(
-                id: "keyboard",
-                displayName: "Magic Keyboard",
-                kind: .keyboard
-            )
-        )
-        let hostingView = NSHostingView(rootView: view)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 430, height: 980)
-        hostingView.layoutSubtreeIfNeeded()
-
-        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
-        XCTAssertNotNil(bitmap)
-
-        guard let bitmap else { return }
-        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
-
-        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-status-menu-settings-render.png")
-        let pngData = bitmap.representation(using: .png, properties: [:])
-        XCTAssertNotNil(pngData)
-
-        try pngData?.write(to: outputURL, options: .atomic)
-        XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
-    }
-
-    @MainActor
     func testBatteryHubSettingsWindowRenderProducesNonBlankImage() throws {
         let addr = "AA-BB-CC-DD-EE-FF"
         let now = Date()

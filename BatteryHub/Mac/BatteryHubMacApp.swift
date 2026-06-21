@@ -157,7 +157,6 @@ final class BatteryHubStatusController: NSObject {
                 isPreviewingData: model.isUsingPreviewData,
                 configuration: configuration,
                 bluetoothPowerState: bluetoothPowerStateObserver.state,
-                notificationAuthorizationState: model.notificationAuthorizationState,
                 onRefresh: { [weak model] in
                     Task { await model?.refresh() }
                 },
