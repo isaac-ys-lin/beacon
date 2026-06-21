@@ -19,7 +19,7 @@ private struct UtilityIconButtonStyle: ButtonStyle {
 
 private struct BluetoothSettingsIcon: View {
     let color: Color
-    var glyphSize: CGFloat = 16.5
+    var glyphSize: CGFloat = 18
     var frameSize: CGFloat = 28
 
     var body: some View {
