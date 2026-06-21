@@ -1,5 +1,14 @@
 import SwiftUI
 
+enum NotificationPermissionRequestPolicy {
+    static func shouldRequestAuthorization(
+        afterEnablingAlertPreference isEnabled: Bool,
+        authorizationState: NotificationCenterAuthorizationState
+    ) -> Bool {
+        isEnabled && authorizationState.canRequestPermission
+    }
+}
+
 struct BatteryHubSettingsView: View {
     let snapshots: [DecoratedBatterySnapshot]
     let isRefreshing: Bool
@@ -502,6 +511,9 @@ struct BatteryHubSettingsView: View {
                 Toggle("Low battery alerts", isOn: $lowBatteryAlertsEnabled)
                     .toggleStyle(.switch)
                     .controlSize(.small)
+                    .onChange(of: lowBatteryAlertsEnabled) { _, isEnabled in
+                        requestNotificationAuthorizationIfNeeded(afterEnablingAlertPreference: isEnabled)
+                    }
 
                 Spacer(minLength: 8)
 
@@ -534,6 +546,9 @@ struct BatteryHubSettingsView: View {
             Toggle("Charged alerts", isOn: $chargedBatteryAlertsEnabled)
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .onChange(of: chargedBatteryAlertsEnabled) { _, isEnabled in
+                    requestNotificationAuthorizationIfNeeded(afterEnablingAlertPreference: isEnabled)
+                }
                 .font(DesignTokens.Typography.controlLabel)
                 .padding(.horizontal, 12)
                 .frame(height: 40, alignment: .leading)
@@ -671,21 +686,7 @@ struct BatteryHubSettingsView: View {
                     title: "Notify when charged",
                     subtitle: "Best for devices that keep reporting while charging.",
                     systemImage: "battery.100",
-                    isOn: Binding(
-                        get: {
-                            LowBatteryNotifier.isChargedAlertEnabled(
-                                forDeviceID: row.id,
-                                displayName: row.displayName
-                            )
-                        },
-                        set: {
-                            LowBatteryNotifier.setChargedAlertEnabled(
-                                $0,
-                                forDeviceID: row.id,
-                                displayName: row.displayName
-                            )
-                        }
-                    )
+                    isOn: deviceChargedAlertBinding(for: row)
                 )
                 .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
                 .opacity(row.isHidden || !chargedBatteryAlertsEnabled ? 0.45 : 1)
@@ -944,8 +945,18 @@ struct BatteryHubSettingsView: View {
                     forDeviceID: row.id,
                     displayName: row.displayName
                 )
+                requestNotificationAuthorizationIfNeeded(afterEnablingAlertPreference: $0)
             }
         )
+    }
+
+    private func requestNotificationAuthorizationIfNeeded(afterEnablingAlertPreference isEnabled: Bool) {
+        guard NotificationPermissionRequestPolicy.shouldRequestAuthorization(
+            afterEnablingAlertPreference: isEnabled,
+            authorizationState: notificationAuthorizationState
+        ) else { return }
+
+        onRequestNotificationPermission()
     }
 
     @ViewBuilder

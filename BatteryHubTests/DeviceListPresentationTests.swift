@@ -1237,6 +1237,33 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(failure.subtitle, "Notifications are disabled")
     }
 
+    func testNotificationPermissionRequestPolicyPromptsWhenAlertPreferenceTurnsOnBeforeAuthorization() {
+        XCTAssertTrue(
+            NotificationPermissionRequestPolicy.shouldRequestAuthorization(
+                afterEnablingAlertPreference: true,
+                authorizationState: .notDetermined
+            )
+        )
+        XCTAssertFalse(
+            NotificationPermissionRequestPolicy.shouldRequestAuthorization(
+                afterEnablingAlertPreference: false,
+                authorizationState: .notDetermined
+            )
+        )
+        XCTAssertFalse(
+            NotificationPermissionRequestPolicy.shouldRequestAuthorization(
+                afterEnablingAlertPreference: true,
+                authorizationState: .authorized
+            )
+        )
+        XCTAssertFalse(
+            NotificationPermissionRequestPolicy.shouldRequestAuthorization(
+                afterEnablingAlertPreference: true,
+                authorizationState: .denied
+            )
+        )
+    }
+
     func testBatteryHUDPreferencesDefaultToEnabled() {
         let defaults = isolatedDefaults()
 
