@@ -528,56 +528,38 @@ final class DeviceListPresentationTests: XCTestCase {
         let nativeOneDevice = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 1,
             showsOverview: false,
-            showsAirPodsCard: false,
-            style: .native,
             visibleScreenHeight: 1_000
         )
         let nativeFiveDevices = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
             showsOverview: false,
-            showsAirPodsCard: false,
-            style: .native,
             visibleScreenHeight: 1_000
         )
-        let oneDevice = StatusMenuSizing.preferredContentSize(
+        let oneDeviceWithOverview = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 1,
             showsOverview: true,
-            showsAirPodsCard: false,
-            style: .large,
             visibleScreenHeight: 1_000
         )
-        let fiveDevices = StatusMenuSizing.preferredContentSize(
+        let fiveDevicesWithOverview = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
             showsOverview: true,
-            showsAirPodsCard: false,
-            style: .large,
-            visibleScreenHeight: 1_000
-        )
-        let withAirPodsCard = StatusMenuSizing.preferredContentSize(
-            dashboardItemCount: 5,
-            showsOverview: true,
-            showsAirPodsCard: true,
-            style: .large,
             visibleScreenHeight: 1_000
         )
 
         XCTAssertEqual(nativeOneDevice.width, 386)
         XCTAssertGreaterThan(nativeOneDevice.height, 240)
         XCTAssertGreaterThan(nativeFiveDevices.height, nativeOneDevice.height)
-        XCTAssertLessThan(nativeFiveDevices.height, fiveDevices.height)
-        XCTAssertEqual(oneDevice.width, 430)
-        XCTAssertGreaterThan(oneDevice.height, 300)
-        XCTAssertLessThan(oneDevice.height, 560)
-        XCTAssertGreaterThan(fiveDevices.height, oneDevice.height)
-        XCTAssertEqual(withAirPodsCard.height, fiveDevices.height)
+        XCTAssertEqual(oneDeviceWithOverview.width, 386)
+        XCTAssertEqual(oneDeviceWithOverview.height, nativeOneDevice.height)
+        XCTAssertGreaterThan(fiveDevicesWithOverview.height, nativeFiveDevices.height)
+        XCTAssertGreaterThan(fiveDevicesWithOverview.height, oneDeviceWithOverview.height)
+        XCTAssertLessThan(fiveDevicesWithOverview.height, 560)
     }
 
     func testNativeStatusMenuSizingMatchesRenderedRowChrome() {
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
             showsOverview: false,
-            showsAirPodsCard: false,
-            style: .native,
             visibleScreenHeight: 1_000
         )
 
@@ -590,40 +572,31 @@ final class DeviceListPresentationTests: XCTestCase {
 
     func testStatusWindowConfigurationLoadsDashboardPreferences() {
         let defaults = isolatedDefaults()
-        defaults.set(StatusWindowStyle.large.rawValue, forKey: StatusWindowPreferences.styleKey)
-        defaults.set(false, forKey: StatusWindowPreferences.showAirPodsCardKey)
         defaults.set(true, forKey: StatusWindowPreferences.showMenuBarBatteryKey)
         defaults.set(false, forKey: StatusWindowPreferences.showBatteryOverviewKey)
 
         let configuration = StatusWindowConfiguration.load(from: defaults)
 
-        XCTAssertEqual(configuration.style, .large)
-        XCTAssertFalse(configuration.showsAirPodsCard)
         XCTAssertTrue(configuration.showsMenuBarBattery)
         XCTAssertFalse(configuration.showsBatteryOverview)
-        XCTAssertFalse(configuration.showsOverviewInDashboard)
     }
 
-    func testWidgetLedStatusMenuSizingUsesSelectedStyleWithoutLegacyCardHeight() {
-        let compact = StatusMenuSizing.preferredContentSize(
+    func testStatusMenuSizingUsesNativeWidthWithoutLegacyCardHeight() {
+        let withoutOverview = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 1,
             showsOverview: false,
-            showsAirPodsCard: false,
-            style: .compact,
             visibleScreenHeight: 1_000
         )
-        let large = StatusMenuSizing.preferredContentSize(
+        let withOverview = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 1,
             showsOverview: true,
-            showsAirPodsCard: true,
-            style: .large,
             visibleScreenHeight: 1_000
         )
 
-        XCTAssertEqual(compact.width, 386)
-        XCTAssertEqual(large.width, 430)
-        XCTAssertGreaterThan(large.height, compact.height)
-        XCTAssertLessThan(large.height, 560)
+        XCTAssertEqual(withoutOverview.width, 386)
+        XCTAssertEqual(withOverview.width, 386)
+        XCTAssertEqual(withOverview.height, withoutOverview.height)
+        XCTAssertLessThan(withOverview.height, 560)
     }
 
     @MainActor
@@ -674,8 +647,6 @@ final class DeviceListPresentationTests: XCTestCase {
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 12,
             showsOverview: true,
-            showsAirPodsCard: true,
-            style: .large,
             visibleScreenHeight: 720
         )
 
@@ -1654,9 +1625,6 @@ final class DeviceListPresentationTests: XCTestCase {
 
     @MainActor
     func testStatusMenuViewPreviewRenderProducesNonBlankImage() throws {
-        UserDefaults.standard.set(StatusWindowStyle.native.rawValue, forKey: StatusWindowPreferences.styleKey)
-        defer { UserDefaults.standard.removeObject(forKey: StatusWindowPreferences.styleKey) }
-
         let addr = "AA-BB-CC-DD-EE-FF"
         let now = Date()
         let snapshots: [DecoratedBatterySnapshot] = [
@@ -1675,8 +1643,6 @@ final class DeviceListPresentationTests: XCTestCase {
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
             showsOverview: true,
-            showsAirPodsCard: true,
-            style: .native,
             visibleScreenHeight: 1_000
         )
         hostingView.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height)
@@ -1698,9 +1664,6 @@ final class DeviceListPresentationTests: XCTestCase {
 
     @MainActor
     func testStatusMenuViewRefreshingRenderProducesNonBlankImage() throws {
-        UserDefaults.standard.set(StatusWindowStyle.native.rawValue, forKey: StatusWindowPreferences.styleKey)
-        defer { UserDefaults.standard.removeObject(forKey: StatusWindowPreferences.styleKey) }
-
         let view = StatusMenuView(
             snapshots: [],
             isRefreshing: true,
@@ -1726,9 +1689,6 @@ final class DeviceListPresentationTests: XCTestCase {
 
     @MainActor
     func testStatusMenuViewPreviewDataModeRenderProducesNonBlankImage() throws {
-        UserDefaults.standard.set(StatusWindowStyle.native.rawValue, forKey: StatusWindowPreferences.styleKey)
-        defer { UserDefaults.standard.removeObject(forKey: StatusWindowPreferences.styleKey) }
-
         let now = Date()
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),

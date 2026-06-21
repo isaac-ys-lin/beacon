@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import os
 
 enum DesktopWidgetPreferences {
     static let showDesktopWidgetKey = "BatteryHub.desktopWidget.show"
@@ -191,6 +192,7 @@ struct BatteryDesktopWidgetView: View {
 
 @MainActor
 final class BatteryHubDesktopWidgetController {
+    private let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "widget")
     private var window: NSPanel?
 
     func update(
@@ -205,6 +207,7 @@ final class BatteryHubDesktopWidgetController {
         let style = DesktopWidgetStyle(
             rawValue: UserDefaults.standard.string(forKey: DesktopWidgetPreferences.widgetStyleKey) ?? ""
         ) ?? .compact
+        let wasVisible = window?.isVisible == true
         let window = existingOrNewWindow(for: style)
         let hostingController = NSHostingController(
             rootView: BatteryDesktopWidgetView(
@@ -219,10 +222,17 @@ final class BatteryHubDesktopWidgetController {
         window.contentViewController = hostingController
         positionIfNeeded(window, style: style)
         window.orderFrontRegardless()
+        if !wasVisible {
+            logger.info("Desktop widget shown style=\(style.rawValue, privacy: .public)")
+        }
     }
 
     func close() {
+        let wasVisible = window?.isVisible == true
         window?.orderOut(nil)
+        if wasVisible {
+            logger.info("Desktop widget hidden")
+        }
     }
 
     private func existingOrNewWindow(for style: DesktopWidgetStyle) -> NSPanel {

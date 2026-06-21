@@ -7,7 +7,7 @@ BUNDLE_ID="com.isaacyslin.BatteryHub.mac"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="$ROOT_DIR/BatteryHub.xcodeproj"
 SCHEME="BatteryHubMac"
-DESTINATION="platform=macOS"
+DESTINATION="platform=macOS,arch=arm64"
 INSTALL_PATH="/Applications/$APP_NAME.app"
 
 BUILD_SIGNING_ARGS=()

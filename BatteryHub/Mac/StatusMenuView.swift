@@ -15,45 +15,7 @@ private struct UtilityIconButtonStyle: ButtonStyle {
     }
 }
 
-enum StatusWindowStyle: String, CaseIterable, Identifiable {
-    case native
-    case large
-    case compact
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .native: return "Native"
-        case .large: return "Large"
-        case .compact: return "Compact"
-        }
-    }
-
-    var accessibilityTitle: String {
-        switch self {
-        case .native: return "Simple dashboard"
-        case .large: return "Detailed dashboard"
-        case .compact: return "Compact dashboard"
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .native:
-            return resolveSymbol("rectangle.grid.2x2", fallback: "rectangle.grid.3x2")
-        case .large:
-            return resolveSymbol("rectangle.grid.3x2", fallback: "rectangle.grid.2x2")
-        case .compact:
-            return resolveSymbol("rectangle.grid.1x2", fallback: "rectangle")
-        }
-    }
-}
-
 enum StatusWindowPreferences {
-    static let styleKey = "BatteryHub.statusWindowStyle"
-    static let nativeDefaultMigrationKey = "BatteryHub.statusWindowStyle.nativeDefaultApplied"
-    static let showAirPodsCardKey = "BatteryHub.showAirPodsStatusCard"
     static let showMenuBarBatteryKey = "BatteryHub.showMenuBarBattery"
     static let showBatteryOverviewKey = "BatteryHub.showBatteryOverview"
     static let didChangeNotification = Notification.Name("BatteryHub.statusWindowPreferencesDidChange")
@@ -61,36 +23,14 @@ enum StatusWindowPreferences {
     static func notifyChanged() {
         NotificationCenter.default.post(name: didChangeNotification, object: nil)
     }
-
-    static func applyNativeDefaultIfNeeded(defaults: UserDefaults = .standard) {
-        guard defaults.string(forKey: styleKey) != nil else {
-            defaults.set(StatusWindowStyle.native.rawValue, forKey: styleKey)
-            defaults.set(true, forKey: nativeDefaultMigrationKey)
-            return
-        }
-        guard !defaults.bool(forKey: nativeDefaultMigrationKey) else { return }
-        defaults.set(StatusWindowStyle.native.rawValue, forKey: styleKey)
-        defaults.set(true, forKey: nativeDefaultMigrationKey)
-    }
 }
 
 struct StatusWindowConfiguration: Equatable {
-    var style: StatusWindowStyle
-    var showsAirPodsCard: Bool
     var showsMenuBarBattery: Bool
     var showsBatteryOverview: Bool
 
     static func load(from defaults: UserDefaults = .standard) -> StatusWindowConfiguration {
-        let style = defaults.string(forKey: StatusWindowPreferences.styleKey)
-            .flatMap(StatusWindowStyle.init(rawValue:)) ?? .native
-
         return StatusWindowConfiguration(
-            style: style,
-            showsAirPodsCard: boolPreference(
-                StatusWindowPreferences.showAirPodsCardKey,
-                defaultValue: true,
-                defaults: defaults
-            ),
             showsMenuBarBattery: boolPreference(
                 StatusWindowPreferences.showMenuBarBatteryKey,
                 defaultValue: false,
@@ -104,21 +44,6 @@ struct StatusWindowConfiguration: Equatable {
         )
     }
 
-    var showsOverviewInDashboard: Bool {
-        style != .native && showsBatteryOverview
-    }
-
-    func showsAirPodsCard(in sections: [DeviceSection]) -> Bool {
-        style == .large
-            && showsAirPodsCard
-            && sections.contains { section in
-                section.items.contains { item in
-                    if case .airPods = item { return true }
-                    return false
-                }
-            }
-    }
-
     private static func boolPreference(
         _ key: String,
         defaultValue: Bool,
@@ -130,34 +55,18 @@ struct StatusWindowConfiguration: Equatable {
 }
 
 enum StatusMenuSizing {
-    static func width(for style: StatusWindowStyle) -> CGFloat {
-        switch style {
-        case .native: return 386
-        case .large: return 430
-        case .compact: return 386
-        }
-    }
-
-    static func contentMaxHeight(for style: StatusWindowStyle) -> CGFloat {
-        switch style {
-        case .native: return 620
-        case .large: return 760
-        case .compact: return 620
-        }
-    }
+    static let width: CGFloat = 386
+    static let contentMaxHeight: CGFloat = 620
 
     static func preferredContentSize(
         dashboardItemCount: Int,
         showsOverview: Bool,
-        showsAirPodsCard: Bool,
-        style: StatusWindowStyle,
         visibleScreenHeight: CGFloat
     ) -> CGSize {
-        let width = width(for: style)
         let panelVerticalPadding: CGFloat = 28
         let headerHeight: CGFloat = 58
         let overviewHeight: CGFloat = showsOverview ? 48 : 0
-        let rowHeight: CGFloat = style == .large ? 62 : 58
+        let rowHeight: CGFloat = 58
         let rowSpacing: CGFloat = dashboardItemCount > 1 ? CGFloat(dashboardItemCount - 1) * 8 : 0
         let listVerticalPadding: CGFloat = dashboardItemCount == 0 ? 0 : 18
         let emptyHeight: CGFloat = 82
@@ -172,7 +81,7 @@ enum StatusMenuSizing {
         if dashboardItemCount == 0 {
             minimumHeight = 260
         } else {
-            minimumHeight = style == .large ? 340 : 248
+            minimumHeight = 248
         }
         let screenCappedHeight = max(240, visibleScreenHeight - 46)
         return CGSize(width: width, height: min(max(desiredHeight, minimumHeight), screenCappedHeight))
@@ -225,7 +134,7 @@ struct StatusMenuView: View {
                 nativePreviewNotice
             }
 
-            if configuration.showsOverviewInDashboard, !sections.isEmpty {
+            if configuration.showsBatteryOverview, !sections.isEmpty {
                 nativeOverviewMetrics
             }
 
@@ -521,11 +430,11 @@ struct StatusMenuView: View {
     }
 
     private var statusWindowWidth: CGFloat {
-        StatusMenuSizing.width(for: configuration.style)
+        StatusMenuSizing.width
     }
 
     private var contentMaxHeight: CGFloat {
-        StatusMenuSizing.contentMaxHeight(for: configuration.style)
+        StatusMenuSizing.contentMaxHeight
     }
 
     private func isLowBatteryItem(_ item: DeviceListItem) -> Bool {
@@ -600,8 +509,6 @@ struct StatusMenuView: View {
 // MARK: - Settings preview
 
 struct StatusWindowPreview: View {
-    let style: StatusWindowStyle
-    let showsAirPodsCard: Bool
     let showsMenuBarBattery: Bool
     let showsBatteryOverview: Bool
     var bluetoothPowerState: BluetoothPowerState = .on
@@ -622,21 +529,8 @@ struct StatusWindowPreview: View {
             VStack(spacing: 4) {
                 previewHeader
 
-                if style != .native && showsBatteryOverview {
+                if showsBatteryOverview {
                     previewOverview
-                }
-
-                if style != .native && showsAirPodsCard {
-                    previewRow(
-                        DashboardBatteryDevice(
-                            id: "preview-airpods",
-                            displayName: "AirPods Pro",
-                            kind: .airPods,
-                            percent: 61,
-                            chargeState: .unplugged,
-                            freshness: .fresh
-                        )
-                    )
                 }
 
                 ForEach(0..<rowCount, id: \.self) { index in
@@ -652,11 +546,7 @@ struct StatusWindowPreview: View {
     }
 
     private var rowCount: Int {
-        switch style {
-        case .native: return 2
-        case .large: return 3
-        case .compact: return 2
-        }
+        2
     }
 
     private var previewMenuBarItem: some View {
