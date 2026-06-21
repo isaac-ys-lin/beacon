@@ -1238,10 +1238,51 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     func testNotificationPermissionRequestPolicyPromptsWhenAlertPreferenceTurnsOnBeforeAuthorization() {
+        XCTAssertEqual(
+            NotificationPermissionRequestPolicy.activationAction(
+                afterEnablingAlertPreference: true,
+                authorizationState: .notDetermined
+            ),
+            .requestAuthorization
+        )
+        XCTAssertEqual(
+            NotificationPermissionRequestPolicy.activationAction(
+                afterEnablingAlertPreference: true,
+                authorizationState: .unknown
+            ),
+            .requestAuthorization
+        )
+        XCTAssertEqual(
+            NotificationPermissionRequestPolicy.activationAction(
+                afterEnablingAlertPreference: true,
+                authorizationState: .denied
+            ),
+            .openSystemSettings
+        )
+        XCTAssertEqual(
+            NotificationPermissionRequestPolicy.activationAction(
+                afterEnablingAlertPreference: true,
+                authorizationState: .authorized
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            NotificationPermissionRequestPolicy.activationAction(
+                afterEnablingAlertPreference: false,
+                authorizationState: .notDetermined
+            ),
+            .none
+        )
         XCTAssertTrue(
             NotificationPermissionRequestPolicy.shouldRequestAuthorization(
                 afterEnablingAlertPreference: true,
                 authorizationState: .notDetermined
+            )
+        )
+        XCTAssertTrue(
+            NotificationPermissionRequestPolicy.shouldRequestAuthorization(
+                afterEnablingAlertPreference: true,
+                authorizationState: .unknown
             )
         )
         XCTAssertFalse(

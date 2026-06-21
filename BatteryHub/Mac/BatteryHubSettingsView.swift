@@ -1,11 +1,36 @@
 import SwiftUI
 
+enum NotificationPermissionActivationAction: Equatable {
+    case none
+    case requestAuthorization
+    case openSystemSettings
+}
+
 enum NotificationPermissionRequestPolicy {
+    static func activationAction(
+        afterEnablingAlertPreference isEnabled: Bool,
+        authorizationState: NotificationCenterAuthorizationState
+    ) -> NotificationPermissionActivationAction {
+        guard isEnabled else { return .none }
+
+        switch authorizationState {
+        case .unknown, .notDetermined:
+            return .requestAuthorization
+        case .denied:
+            return .openSystemSettings
+        case .authorized, .provisional:
+            return .none
+        }
+    }
+
     static func shouldRequestAuthorization(
         afterEnablingAlertPreference isEnabled: Bool,
         authorizationState: NotificationCenterAuthorizationState
     ) -> Bool {
-        isEnabled && authorizationState.canRequestPermission
+        activationAction(
+            afterEnablingAlertPreference: isEnabled,
+            authorizationState: authorizationState
+        ) == .requestAuthorization
     }
 }
 
@@ -512,7 +537,7 @@ struct BatteryHubSettingsView: View {
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .onChange(of: lowBatteryAlertsEnabled) { _, isEnabled in
-                        requestNotificationAuthorizationIfNeeded(afterEnablingAlertPreference: isEnabled)
+                        handleNotificationAlertPreferenceActivation(isEnabled)
                     }
 
                 Spacer(minLength: 8)
@@ -547,7 +572,7 @@ struct BatteryHubSettingsView: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .onChange(of: chargedBatteryAlertsEnabled) { _, isEnabled in
-                    requestNotificationAuthorizationIfNeeded(afterEnablingAlertPreference: isEnabled)
+                    handleNotificationAlertPreferenceActivation(isEnabled)
                 }
                 .font(DesignTokens.Typography.controlLabel)
                 .padding(.horizontal, 12)
@@ -945,18 +970,23 @@ struct BatteryHubSettingsView: View {
                     forDeviceID: row.id,
                     displayName: row.displayName
                 )
-                requestNotificationAuthorizationIfNeeded(afterEnablingAlertPreference: $0)
+                handleNotificationAlertPreferenceActivation($0)
             }
         )
     }
 
-    private func requestNotificationAuthorizationIfNeeded(afterEnablingAlertPreference isEnabled: Bool) {
-        guard NotificationPermissionRequestPolicy.shouldRequestAuthorization(
+    private func handleNotificationAlertPreferenceActivation(_ isEnabled: Bool) {
+        switch NotificationPermissionRequestPolicy.activationAction(
             afterEnablingAlertPreference: isEnabled,
             authorizationState: notificationAuthorizationState
-        ) else { return }
-
-        onRequestNotificationPermission()
+        ) {
+        case .none:
+            break
+        case .requestAuthorization:
+            onRequestNotificationPermission()
+        case .openSystemSettings:
+            onOpenNotificationSettings()
+        }
     }
 
     @ViewBuilder
