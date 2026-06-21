@@ -234,7 +234,6 @@ struct StatusMenuView: View {
             .disabled(isRefreshing)
             .help(isRefreshing ? "Refreshing" : "Refresh")
 
-            nativeBatteryStatusBadge
             nativeBluetoothStatusButton
         }
         .padding(.horizontal, 16)
@@ -275,26 +274,6 @@ struct StatusMenuView: View {
         appearanceTheme.palette(resolvedSystemScheme: colorScheme)
     }
 
-    @ViewBuilder
-    private var nativeBatteryStatusBadge: some View {
-        Text(lowBatteryItemCount > 0 ? "\(lowBatteryItemCount) low" : "All good")
-            .font(DesignTokens.Typography.caption2Emphasis)
-            .textCase(.uppercase)
-            .tracking(0.6)
-            .foregroundStyle(lowBatteryItemCount > 0 ? theme.statusLow : theme.statusOK)
-            .padding(.horizontal, 8)
-            .frame(height: 20)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(lowBatteryItemCount > 0 ? theme.statusLow.opacity(0.16) : theme.accentSoft)
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(lowBatteryItemCount > 0 ? theme.statusLow.opacity(0.38) : theme.accent.opacity(0.35), lineWidth: 0.7)
-                    )
-            )
-            .help(lowBatteryItemCount > 0 ? "\(lowBatteryItemCount) low battery devices" : "All monitored devices are okay")
-    }
-
     private var nativeBluetoothStatusButton: some View {
         Button {
             BatteryHubSystemSettingsActions.openBluetoothSettings()
@@ -303,20 +282,10 @@ struct StatusMenuView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(bluetoothPowerColor)
-                .frame(width: 30)
+                .frame(width: 28, height: 28)
                 .accessibilityLabel(bluetoothAccessibilityLabel)
-                .padding(.horizontal, 7)
-                .frame(height: 26)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(theme.raised.opacity(0.72))
-                        .overlay(
-                            Capsule(style: .continuous)
-                                .stroke(theme.hairlineSubtle, lineWidth: 0.7)
-                        )
-                )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(UtilityIconButtonStyle(theme: theme))
         .help(bluetoothHelpText)
     }
 
@@ -624,20 +593,11 @@ struct StatusWindowPreview: View {
                 .foregroundStyle(previewTheme.textPrimary)
                 .frame(width: 20, height: 20)
 
-            Text("18%")
-                .font(DesignTokens.Typography.nativePopoverPill)
-                .monospacedDigit()
-                .foregroundStyle(DesignTokens.Palette.critical)
-                .padding(.horizontal, 7)
-                .frame(height: 22)
-                .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
-
             Image(systemName: BatteryHubSymbols.bluetooth)
                 .font(.system(size: 12, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(previewBluetoothPowerColor)
-                .frame(width: 24, height: 22)
-                .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
+                .frame(width: 20, height: 20)
         }
         .frame(height: 38)
     }
