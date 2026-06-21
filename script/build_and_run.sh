@@ -79,9 +79,8 @@ install_app() {
   /usr/bin/xattr -dr com.apple.quarantine "$staging_path" 2>/dev/null || true
   require_signed_bundle "$staging_path"
   if [[ -d "$INSTALL_PATH" ]]; then
-    local backup_path="/Applications/$APP_NAME.app.backup-$(date +%Y%m%d-%H%M%S)"
-    /bin/mv "$INSTALL_PATH" "$backup_path"
-    echo "Backed up existing app to $backup_path"
+    /bin/rm -rf "$INSTALL_PATH"
+    echo "Removed existing app at $INSTALL_PATH"
   fi
   /bin/mv "$staging_path" "$INSTALL_PATH"
   require_signed_bundle "$INSTALL_PATH"
