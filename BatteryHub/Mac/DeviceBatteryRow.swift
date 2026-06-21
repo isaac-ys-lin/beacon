@@ -27,8 +27,14 @@ enum BatteryHubSymbols {
         )
     }
 
+    static var bluetoothSettings: String {
+        resolveSymbol("bluetooth", fallback: bluetooth)
+    }
+
     static func resolved(_ systemImage: String, fallback: String = "circle") -> String {
         switch systemImage {
+        case "bluetooth":
+            return bluetoothSettings
         case "antenna.radiowaves.left.and.right", "dot.radiowaves.left.and.right":
             return bluetooth
         default:

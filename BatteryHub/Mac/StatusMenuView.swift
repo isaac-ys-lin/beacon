@@ -17,6 +17,26 @@ private struct UtilityIconButtonStyle: ButtonStyle {
     }
 }
 
+private struct BluetoothSettingsIcon: View {
+    let theme: BeaconThemePalette
+    let color: Color
+    var size: CGFloat = 28
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(theme.raised.opacity(0.90))
+            Circle()
+                .stroke(theme.hairlineDefault, lineWidth: 0.7)
+            Image(systemName: BatteryHubSymbols.bluetoothSettings)
+                .font(.system(size: size * 0.56, weight: .semibold))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(color)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 enum StatusWindowPreferences {
     static let showMenuBarBatteryKey = "BatteryHub.showMenuBarBattery"
     static let showBatteryOverviewKey = "BatteryHub.showBatteryOverview"
@@ -278,11 +298,7 @@ struct StatusMenuView: View {
         Button {
             BatteryHubSystemSettingsActions.openBluetoothSettings()
         } label: {
-            Image(systemName: BatteryHubSymbols.bluetooth)
-                .font(.system(size: 14, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(bluetoothPowerColor)
-                .frame(width: 28, height: 28)
+            BluetoothSettingsIcon(theme: theme, color: bluetoothPowerColor)
                 .accessibilityLabel(bluetoothAccessibilityLabel)
         }
         .buttonStyle(UtilityIconButtonStyle(theme: theme))
@@ -593,11 +609,7 @@ struct StatusWindowPreview: View {
                 .foregroundStyle(previewTheme.textPrimary)
                 .frame(width: 20, height: 20)
 
-            Image(systemName: BatteryHubSymbols.bluetooth)
-                .font(.system(size: 12, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(previewBluetoothPowerColor)
-                .frame(width: 20, height: 20)
+            BluetoothSettingsIcon(theme: previewTheme, color: previewBluetoothPowerColor, size: 20)
         }
         .frame(height: 38)
     }

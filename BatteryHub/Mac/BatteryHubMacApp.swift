@@ -105,14 +105,33 @@ enum MenuBarBatteryFormatter {
 
 enum BatteryHubStatusIconImage {
     static func make() -> NSImage {
+        let statusIconSize = NSSize(width: 20, height: 20)
         let image = NSImage(named: BatteryHubSymbols.statusGlyphAsset)
             ?? NSImage(systemSymbolName: BatteryHubSymbols.app, accessibilityDescription: "BatteryHub")
-            ?? NSImage(size: NSSize(width: 18, height: 18))
+            ?? NSImage(size: statusIconSize)
 
-        image.size = NSSize(width: 18, height: 18)
+        image.size = statusIconSize
         image.isTemplate = true
         image.accessibilityDescription = "BatteryHub"
         return image
+    }
+}
+
+private enum BatteryRefreshLimits {
+    static let timeout: Duration = .seconds(8)
+}
+
+private actor RefreshRaceGate<Value: Sendable> {
+    private var continuation: CheckedContinuation<Value, Never>?
+
+    init(_ continuation: CheckedContinuation<Value, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning value: Value) {
+        guard let continuation else { return }
+        self.continuation = nil
+        continuation.resume(returning: value)
     }
 }
 
@@ -178,7 +197,10 @@ final class BatteryHubModel: ObservableObject {
         }
 
         var nextStore = store
-        let bluetoothSnapshots = await BluetoothBatteryResolver().read()
+        guard let bluetoothSnapshots = await readBluetoothSnapshotsWithTimeout() else {
+            logger.error("Bluetooth refresh timed out after 8 seconds")
+            return
+        }
         logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
         nextStore.merge(bluetoothSnapshots)
         BatteryHistoryStore.record(nextStore.snapshots)
@@ -193,6 +215,31 @@ final class BatteryHubModel: ObservableObject {
                 }
             }
         )
+    }
+
+    private func readBluetoothSnapshotsWithTimeout() async -> [BatterySnapshot]? {
+        let resolverTask = Task.detached(priority: .utility) {
+            await BluetoothBatteryResolver().read()
+        }
+
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let gate = RefreshRaceGate<[BatterySnapshot]?>(continuation)
+
+                Task {
+                    let snapshots = await resolverTask.value
+                    await gate.resume(returning: snapshots)
+                }
+
+                Task {
+                    try? await Task.sleep(for: BatteryRefreshLimits.timeout)
+                    resolverTask.cancel()
+                    await gate.resume(returning: nil)
+                }
+            }
+        } onCancel: {
+            resolverTask.cancel()
+        }
     }
 
     func refreshNotificationAuthorizationStatus() {

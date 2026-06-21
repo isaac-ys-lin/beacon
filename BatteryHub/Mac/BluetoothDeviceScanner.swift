@@ -6,6 +6,7 @@ import os
 
 public struct BluetoothDeviceScanner {
     private static let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "bluetooth")
+    private static let systemProfilerTimeout: TimeInterval = 5
 
     public init() {}
 
@@ -163,12 +164,23 @@ public struct BluetoothDeviceScanner {
         process.standardOutput = pipe
         process.standardError = Pipe()
 
+        let timeoutWorkItem = DispatchWorkItem {
+            guard process.isRunning else { return }
+            process.terminate()
+        }
+
         do {
             try process.run()
+            DispatchQueue.global(qos: .utility).asyncAfter(
+                deadline: .now() + systemProfilerTimeout,
+                execute: timeoutWorkItem
+            )
             process.waitUntilExit()
         } catch {
+            timeoutWorkItem.cancel()
             return []
         }
+        timeoutWorkItem.cancel()
 
         guard process.terminationStatus == 0 else { return [] }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
