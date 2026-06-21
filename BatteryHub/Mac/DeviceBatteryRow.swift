@@ -15,7 +15,6 @@ func resolveSymbol(_ symbol: String, fallback: String) -> String {
 enum BatteryHubSymbols {
     static let appIconAsset = "BatteryHubAppIcon"
     static let headerLogoAsset = "BatteryHubHeaderLogo"
-    static let statusGlyphAsset = "BatteryHubStatusGlyph"
 
     static var app: String {
         resolveSymbol("rectangle.grid.2x2", fallback: "rectangle.grid.3x2")

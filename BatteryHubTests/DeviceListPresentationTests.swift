@@ -1631,7 +1631,6 @@ final class DeviceListPresentationTests: XCTestCase {
 
     func testMenuBarStatusIconKeepsCurrentBeaconDesignReference() {
         XCTAssertEqual(BatteryHubStatusIconImage.designReferenceAssetName, BatteryHubSymbols.headerLogoAsset)
-        XCTAssertNotEqual(BatteryHubStatusIconImage.designReferenceAssetName, BatteryHubSymbols.statusGlyphAsset)
 
         let image = BatteryHubStatusIconImage.make()
         XCTAssertEqual(image.size.width, BatteryHubMenuBarMetrics.iconSide, accuracy: 0.01)

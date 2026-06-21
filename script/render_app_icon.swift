@@ -10,10 +10,6 @@ let appIconRoot = URL(
     fileURLWithPath: CommandLine.arguments.dropFirst().first
         ?? "BatteryHub/Mac/Assets.xcassets/AppIcon.appiconset"
 )
-let appIconSource = URL(
-    fileURLWithPath: CommandLine.arguments.dropFirst().dropFirst().first
-        ?? "designs/batteryhub-icons/generated-inventory-hub.png"
-)
 let assetCatalogRoot = appIconRoot.deletingLastPathComponent()
 try FileManager.default.createDirectory(at: appIconRoot, withIntermediateDirectories: true)
 
@@ -66,21 +62,6 @@ func bitmap(pixelSize: Int, draw: (CGFloat, CGRect) -> Void) throws -> Data {
         throw NSError(domain: "BatteryHubIcon", code: 2)
     }
     return data
-}
-
-func renderSourceImagePNG(pixelSize: Int, source: URL) throws -> Data {
-    guard let image = NSImage(contentsOf: source) else {
-        throw NSError(
-            domain: "BatteryHubIcon",
-            code: 3,
-            userInfo: [NSLocalizedDescriptionKey: "App icon source image not found: \(source.path)"]
-        )
-    }
-
-    return try bitmap(pixelSize: pixelSize) { _, rect in
-        NSGraphicsContext.current?.imageInterpolation = .high
-        image.draw(in: rect, from: .zero, operation: .copy, fraction: 1)
-    }
 }
 
 func drawAppIcon(side: CGFloat, rect: CGRect) {
@@ -488,80 +469,8 @@ func drawSmallInventoryHubIcon(side: CGFloat, rect: CGRect) {
     }
 }
 
-func drawTemplateGlyph(side: CGFloat, rect: CGRect) {
-    drawBeaconMenuBarGlyph(side: side, rect: rect)
-}
-
-func beaconMenuPoint(x: CGFloat, y: CGFloat, side: CGFloat, rect: CGRect) -> CGPoint {
-    let scale = side / 36
-    return CGPoint(
-        x: rect.minX + x * scale,
-        y: rect.minY + (36 - y) * scale
-    )
-}
-
-func strokeBeaconMenuLine(
-    from start: CGPoint,
-    to end: CGPoint,
-    color: NSColor,
-    lineWidth: CGFloat
-) {
-    let line = NSBezierPath()
-    line.move(to: start)
-    line.line(to: end)
-    line.lineWidth = lineWidth
-    line.lineCapStyle = .round
-    line.lineJoinStyle = .round
-    color.setStroke()
-    line.stroke()
-}
-
-func drawBeaconMenuBarGlyph(side: CGFloat, rect: CGRect) {
-    let scale = side / 36
-    let center = beaconMenuPoint(x: 14, y: 15, side: side, rect: rect)
-    let foreground = NSColor.white
-
-    strokeBeaconMenuLine(
-        from: beaconMenuPoint(x: 14, y: 17, side: side, rect: rect),
-        to: beaconMenuPoint(x: 14, y: 28, side: side, rect: rect),
-        color: foreground,
-        lineWidth: 2.4 * scale
-    )
-
-    strokeArc(
-        center: center,
-        radius: 6 * scale,
-        startAngle: 16,
-        endAngle: 74,
-        color: foreground,
-        lineWidth: 2 * scale
-    )
-    strokeArc(
-        center: center,
-        radius: 10.5 * scale,
-        startAngle: 16,
-        endAngle: 78,
-        color: foreground.withAlphaComponent(0.9),
-        lineWidth: 2 * scale
-    )
-
-    fillOval(
-        CGRect(
-            x: center.x - 2.5 * scale,
-            y: center.y - 2.5 * scale,
-            width: 5 * scale,
-            height: 5 * scale
-        ),
-        color: foreground
-    )
-}
-
 func renderAppIconPNG(pixelSize: Int) throws -> Data {
     try bitmap(pixelSize: pixelSize, draw: drawAppIcon)
-}
-
-func renderTemplateGlyphPNG(pixelSize: Int) throws -> Data {
-    try bitmap(pixelSize: pixelSize, draw: drawTemplateGlyph)
 }
 
 func writeJSON(_ object: [String: Any], to url: URL) throws {
@@ -635,12 +544,6 @@ try writeImageSet(
     name: "BatteryHubAppIcon",
     basePixelSize: 32,
     renderer: renderAppIconPNG
-)
-try writeImageSet(
-    name: "BatteryHubStatusGlyph",
-    basePixelSize: 18,
-    renderer: renderTemplateGlyphPNG,
-    templateRendering: true
 )
 
 print(appIconRoot.path)
