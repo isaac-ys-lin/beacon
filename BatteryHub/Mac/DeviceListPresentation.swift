@@ -498,8 +498,9 @@ public func isDashboardVisibleItem(_ item: DeviceListItem) -> Bool {
     case .device(let decorated):
         return decorated.snapshot.connectionState == .connected
             && decorated.snapshot.percent != nil
+            && decorated.freshness != .expired
     case .airPods(_, _, let components):
-        return components.contains { $0.percent != nil }
+        return components.contains { $0.percent != nil && $0.freshness != .expired }
     }
 }
 
@@ -508,8 +509,10 @@ public func isStatusMenuFallbackVisibleItem(_ item: DeviceListItem) -> Bool {
     case .device(let decorated):
         return decorated.snapshot.kind != .macBook
             && decorated.snapshot.connectionState == .connected
-    case .airPods:
+            && decorated.freshness != .expired
+    case .airPods(_, _, let components):
         return item.connectionState == .connected
+            && components.contains { $0.freshness != .expired }
     }
 }
 

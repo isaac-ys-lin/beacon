@@ -429,6 +429,31 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(inspectorItems.map(\.isUnavailable), [false, true, true])
     }
 
+    func testDashboardSectionsHideExpiredBatteryReports() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(
+                deviceID: "earfun",
+                displayName: "EarFun Air Pro 4",
+                kind: .bluetoothPeripheral,
+                percent: 90,
+                freshness: .expired
+            ),
+            makeDecorated(
+                deviceID: "keychron",
+                displayName: "Keychron K3 Max",
+                kind: .keyboard,
+                percent: 92
+            ),
+        ]
+
+        let dashboardItems = dashboardDeviceSections(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        ).flatMap(\.items)
+
+        XCTAssertEqual(dashboardItems.map(\.displayName), ["Keychron K3 Max"])
+    }
+
     func testInspectorKeepsConnectedDevicesWithoutBatteryReportVisible() {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keychron", displayName: "Keychron K3 Max", kind: .keyboard, percent: 89),
@@ -480,6 +505,35 @@ final class DeviceListPresentationTests: XCTestCase {
         ).flatMap(\.items)
 
         XCTAssertEqual(items.map(\.displayName), ["Magic Keyboard", "Magic Trackpad"])
+    }
+
+    func testStatusMenuFallbackHidesExpiredConnectedDevices() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(
+                deviceID: "earfun",
+                displayName: "EarFun Air Pro 3",
+                kind: .bluetoothPeripheral,
+                percent: nil,
+                freshness: .expired,
+                connectionState: .connected,
+                source: .coreBluetooth
+            ),
+            makeDecorated(
+                deviceID: "keyboard",
+                displayName: "Magic Keyboard",
+                kind: .keyboard,
+                percent: nil,
+                connectionState: .connected,
+                source: .ioBluetooth
+            ),
+        ]
+
+        let items = statusMenuDeviceSections(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        ).flatMap(\.items)
+
+        XCTAssertEqual(items.map(\.displayName), ["Magic Keyboard"])
     }
 
     func testStatusMenuSectionsPreferBatteryReportsOverNoReportFallback() {

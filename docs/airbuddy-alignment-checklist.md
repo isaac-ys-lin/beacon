@@ -65,10 +65,9 @@ alternatives:
   devices because it would change local device state. The app routes through
   macOS-supported command paths when a paired Bluetooth address is available,
   and tests cover support detection and action selection.
-- The scanner degrades into stale, disconnected, and unsupported-device states
-  instead of surfacing a hard modal error for normal data-source misses. This is
-  deliberate for a menu bar utility where transient Bluetooth/system-profiler
-  misses should remain glanceable.
+- The scanner degrades quietly for transient Bluetooth/system-profiler misses:
+  the status menu shows only fresh connected reports, while Settings can still
+  collapse hidden or unavailable devices for recovery.
 - The local DMG is ad-hoc signed when `DEVELOPER_ID_IDENTITY` is not provided.
   iCloud entitlements are removed when `TEAM_ID` is not provided. Developer ID
   signing, notarization, and final iCloud entitlement restoration require those
@@ -90,4 +89,3 @@ Latest evidence from this completion pass:
   - `/tmp/batteryhub-status-menu-refreshing-render.png`
   - `/tmp/batteryhub-settings-refreshing-render.png`
   - `/tmp/batteryhub-airpods-settings-render.png`
-
