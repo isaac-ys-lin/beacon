@@ -135,6 +135,35 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots.map(\.percent), [82])
     }
 
+    func testMergeDeduplicatesSameIPhoneAcrossBLEAndUSBSources() {
+        let bleReport = BatterySnapshot(
+            deviceID: "bluetooth-iphone-yisungiphone",
+            displayName: "YiSungiPhone",
+            kind: .iPhone,
+            percent: 80,
+            chargeState: .unknown,
+            source: .coreBluetooth,
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let usbReport = BatterySnapshot(
+            deviceID: "usb-iphone-yisungiphone",
+            displayName: "YiSungiPhone",
+            kind: .iPhone,
+            percent: 77,
+            chargeState: .unknown,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 140) })
+        store.merge([bleReport])
+        store.merge([usbReport])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["usb-iphone-yisungiphone"])
+        XCTAssertEqual(store.snapshots.map(\.source), [.ideviceInfo])
+        XCTAssertEqual(store.snapshots.map(\.percent), [77])
+    }
+
     func testMergeKeepsBatteryReportWhenSameRefreshAlsoHasUnsupportedBluetoothDuplicate() {
         let now = Date(timeIntervalSince1970: 120)
         let batteryReport = BatterySnapshot(

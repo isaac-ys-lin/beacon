@@ -13,6 +13,7 @@ public struct AirPodsComponent: Equatable, Sendable {
     public let percent: Int?
     public let chargeState: ChargeState
     public let freshness: Freshness
+    public let updatedAt: Date
 }
 
 // MARK: - Device List Item
@@ -73,6 +74,9 @@ public struct BatteryOverviewDevice: Equatable, Identifiable, Sendable {
     public let percent: Int
     public let chargeState: ChargeState
     public let freshness: Freshness
+    public let source: BatterySource
+    public let provider: BatteryProvider
+    public let updatedAt: Date
 }
 
 public enum DeviceControlQuickAction: Equatable, Sendable {
@@ -652,7 +656,10 @@ public func batteryOverviewDevices(
                         kind: decorated.snapshot.kind,
                         percent: percent,
                         chargeState: decorated.snapshot.chargeState,
-                        freshness: decorated.freshness
+                        freshness: decorated.freshness,
+                        source: decorated.snapshot.source,
+                        provider: decorated.snapshot.provider,
+                        updatedAt: decorated.snapshot.updatedAt
                     )
                 )
 
@@ -665,6 +672,7 @@ public func batteryOverviewDevices(
                 let freshness: Freshness = components.contains { $0.freshness == .expired }
                     ? .expired
                     : (components.contains { $0.freshness == .stale } ? .stale : .fresh)
+                let updatedAt = components.map(\.updatedAt).max() ?? .distantPast
                 devices.append(
                     BatteryOverviewDevice(
                         id: id,
@@ -672,7 +680,10 @@ public func batteryOverviewDevices(
                         kind: .airPods,
                         percent: lowestPercent,
                         chargeState: chargeState,
-                        freshness: freshness
+                        freshness: freshness,
+                        source: .coreBluetooth,
+                        provider: .coreBluetoothBatteryService,
+                        updatedAt: updatedAt
                     )
                 )
             }
@@ -795,11 +806,12 @@ func aggregateAirPods(_ snapshots: [DecoratedBatterySnapshot]) -> [DeviceListIte
             let components: [AirPodsComponent] = group.compactMap { decorated in
                 guard let slot = airPodsSlot(for: decorated.snapshot.deviceID) else { return nil }
                 return AirPodsComponent(
-                    slot: slot,
-                    percent: decorated.snapshot.percent,
-                    chargeState: decorated.snapshot.chargeState,
-                    freshness: decorated.freshness
-                )
+                        slot: slot,
+                        percent: decorated.snapshot.percent,
+                        chargeState: decorated.snapshot.chargeState,
+                        freshness: decorated.freshness,
+                        updatedAt: decorated.snapshot.updatedAt
+                    )
             }.sorted { slotOrder($0.slot) < slotOrder($1.slot) }
 
             result.append((firstIndex, .airPods(name: aggregatedName, id: prefix, components: components)))

@@ -52,6 +52,114 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(snapshot.source, .bluetoothUnsupported)
     }
 
+    func testBLEBatteryServiceClassifiesIPhoneWithProviderMetadata() {
+        let device = BluetoothBatteryCandidate(
+            deviceID: "16AE09F1-3309-CF7D-793F-80F1EE3B4933",
+            displayName: "YiSungiPhone",
+            transport: .ble,
+            batteryPercent: 80
+        )
+
+        let snapshot = BluetoothBatteryResolver.snapshot(from: device, now: Date(timeIntervalSince1970: 50))
+
+        XCTAssertEqual(snapshot.deviceID, "bluetooth-iphone-yisungiphone")
+        XCTAssertEqual(snapshot.displayName, "YiSungiPhone")
+        XCTAssertEqual(snapshot.kind, .iPhone)
+        XCTAssertEqual(snapshot.percent, 80)
+        XCTAssertEqual(snapshot.source, .coreBluetooth)
+        XCTAssertEqual(snapshot.provider, .coreBluetoothBatteryService)
+        XCTAssertEqual(snapshot.readStatus, .reported)
+        XCTAssertEqual(snapshot.confidence, .medium)
+    }
+
+    func testBLEIPhoneUUIDChurnKeepsStableSnapshotIdentity() {
+        let first = BluetoothBatteryResolver.snapshot(
+            from: BluetoothBatteryCandidate(
+                deviceID: "16AE09F1-3309-CF7D-793F-80F1EE3B4933",
+                displayName: "YiSungiPhone",
+                transport: .ble,
+                batteryPercent: 80
+            ),
+            now: Date(timeIntervalSince1970: 50)
+        )
+        let second = BluetoothBatteryResolver.snapshot(
+            from: BluetoothBatteryCandidate(
+                deviceID: "E845C788-1D87-AE9D-C050-44E65C6807E1",
+                displayName: "YiSungiPhone",
+                transport: .ble,
+                batteryPercent: 79
+            ),
+            now: Date(timeIntervalSince1970: 70)
+        )
+
+        XCTAssertEqual(first.deviceID, second.deviceID)
+        XCTAssertEqual(second.deviceID, "bluetooth-iphone-yisungiphone")
+    }
+
+    func testResolverReportCarriesProviderDiagnostics() {
+        let scanReport = BluetoothCandidateScanReport(
+            candidates: [
+                BluetoothBatteryCandidate(
+                    deviceID: "16AE09F1-3309-CF7D-793F-80F1EE3B4933",
+                    displayName: "YiSungiPhone",
+                    transport: .ble,
+                    batteryPercent: 80
+                )
+            ],
+            attempts: [
+                BatteryProviderAttempt(
+                    provider: .coreBluetoothBatteryService,
+                    status: .reported,
+                    candidateCount: 1,
+                    message: "Known BLE scan returned 1 battery candidate",
+                    attemptedAt: Date(timeIntervalSince1970: 40)
+                )
+            ]
+        )
+
+        let report = BluetoothBatteryResolver.report(from: scanReport, now: Date(timeIntervalSince1970: 50))
+
+        XCTAssertEqual(report.snapshots.map(\.deviceID), ["bluetooth-iphone-yisungiphone"])
+        XCTAssertEqual(report.diagnostics.snapshotCount, 1)
+        XCTAssertEqual(report.diagnostics.attempts.count, 1)
+        XCTAssertEqual(report.diagnostics.attempts[0].provider, .coreBluetoothBatteryService)
+        XCTAssertEqual(report.diagnostics.attempts[0].status, .reported)
+        XCTAssertEqual(report.diagnostics.attempts[0].candidateCount, 1)
+    }
+
+    func testIPhoneUSBBatteryParserReadsCapacityAndDeviceName() {
+        let output = """
+        BatteryCurrentCapacity: 77
+        BatteryIsCharging: false
+        DeviceName: YiSungiPhone
+        """
+
+        let reading = IPhoneUSBBatteryProvider.parse(output)
+
+        XCTAssertEqual(reading?.percent, 77)
+        XCTAssertEqual(reading?.displayName, "YiSungiPhone")
+    }
+
+    func testIPhoneUSBBatteryCandidateCreatesUSBProviderSnapshot() throws {
+        let candidate = try XCTUnwrap(
+            IPhoneUSBBatteryProvider.candidate(
+                from: IPhoneUSBBatteryReading(percent: 77, displayName: "YiSungiPhone")
+            )
+        )
+
+        let snapshot = BluetoothBatteryResolver.snapshot(
+            from: candidate,
+            now: Date(timeIntervalSince1970: 70)
+        )
+
+        XCTAssertEqual(snapshot.deviceID, "usb-iphone-yisungiphone")
+        XCTAssertEqual(snapshot.kind, .iPhone)
+        XCTAssertEqual(snapshot.percent, 77)
+        XCTAssertEqual(snapshot.source, .ideviceInfo)
+        XCTAssertEqual(snapshot.provider, .ideviceInfo)
+        XCTAssertEqual(snapshot.confidence, .high)
+    }
+
     func testBluetoothHIDUsageClassifiesKeychronAsKeyboard() {
         let hint = BluetoothDeviceScanner.hidKindHint(
             name: "Keychron K3 Max",
@@ -170,12 +278,75 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertNil(candidate)
     }
 
-    func testBLEBatteryScanWaitsForTransientCentralStates() {
-        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .unknown), .wait)
-        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .resetting), .wait)
-        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .poweredOn), .scan)
-        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .poweredOff), .finish)
-        XCTAssertEqual(BLEBatteryScanStatePolicy.action(for: .unauthorized), .finish)
+    func testBLEBatteryReadPolicyScansKnownPeripheralsWhenPoweredOn() {
+        XCTAssertEqual(BLEBatteryReadStatePolicy.action(for: .unknown), .wait)
+        XCTAssertEqual(BLEBatteryReadStatePolicy.action(for: .resetting), .wait)
+        XCTAssertEqual(BLEBatteryReadStatePolicy.action(for: .poweredOn), .scanKnownPeripherals)
+        XCTAssertEqual(BLEBatteryReadStatePolicy.action(for: .poweredOff), .finish)
+        XCTAssertEqual(BLEBatteryReadStatePolicy.action(for: .unauthorized), .finish)
+    }
+
+    func testBLEKnownDeviceFilterAcceptsKnownDeviceIDWithGenericPeripheralName() {
+        let filter = BLEKnownDeviceFilter(
+            knownCandidates: [
+                BluetoothBatteryCandidate(
+                    deviceID: "9D520BEC-A95A-D7F0-1F4E-FDBAD0D5D0F0",
+                    displayName: "Keychron K3 Max",
+                    transport: .hid,
+                    batteryPercent: nil,
+                    kindHint: .keyboard
+                )
+            ]
+        )
+
+        XCTAssertTrue(
+            filter.contains(
+                deviceID: "9d520bec-a95a-d7f0-1f4e-fdbad0d5d0f0",
+                displayName: "Bluetooth Device"
+            )
+        )
+    }
+
+    func testBLEKnownDeviceFilterRejectsUnknownGenericPeripheralName() {
+        let filter = BLEKnownDeviceFilter(
+            knownCandidates: [
+                BluetoothBatteryCandidate(
+                    deviceID: "9D520BEC-A95A-D7F0-1F4E-FDBAD0D5D0F0",
+                    displayName: "Keychron K3 Max",
+                    transport: .hid,
+                    batteryPercent: nil,
+                    kindHint: .keyboard
+                )
+            ]
+        )
+
+        XCTAssertFalse(
+            filter.contains(
+                deviceID: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+                displayName: "Bluetooth Device"
+            )
+        )
+    }
+
+    func testBLEKnownDeviceFilterAcceptsKnownNonGenericName() {
+        let filter = BLEKnownDeviceFilter(
+            knownCandidates: [
+                BluetoothBatteryCandidate(
+                    deviceID: "9D520BEC-A95A-D7F0-1F4E-FDBAD0D5D0F0",
+                    displayName: "Keychron K3 Max",
+                    transport: .hid,
+                    batteryPercent: nil,
+                    kindHint: .keyboard
+                )
+            ]
+        )
+
+        XCTAssertTrue(
+            filter.contains(
+                deviceID: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+                displayName: "Keychron K3 Max"
+            )
+        )
     }
 
     func testBLEBatteryMergePreservesHIDDisplayNameForGenericPeripheralName() {

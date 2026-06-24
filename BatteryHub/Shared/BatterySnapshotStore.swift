@@ -128,7 +128,7 @@ private extension DeviceKind {
 private extension BatterySource {
     var isBluetoothRelated: Bool {
         switch self {
-        case .ioRegistry, .coreBluetooth, .ioBluetooth, .systemProfiler, .bluetoothUnsupported:
+        case .ioRegistry, .coreBluetooth, .ioBluetooth, .systemProfiler, .bluetoothUnsupported, .ideviceInfo:
             return true
         case .macPowerSource:
             return false

@@ -381,6 +381,9 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
     let percent: Int?
     let chargeState: ChargeState
     let freshness: Freshness
+    let source: BatterySource
+    let provider: BatteryProvider
+    let updatedAt: Date
     let isPinned: Bool
     let airPodsComponents: [AirPodsComponent]
 
@@ -391,6 +394,9 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
         percent: Int?,
         chargeState: ChargeState,
         freshness: Freshness,
+        source: BatterySource = .bluetoothUnsupported,
+        provider: BatteryProvider = .bluetoothUnsupported,
+        updatedAt: Date = .distantPast,
         isPinned: Bool = false,
         airPodsComponents: [AirPodsComponent] = []
     ) {
@@ -400,6 +406,9 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
         self.percent = percent
         self.chargeState = chargeState
         self.freshness = freshness
+        self.source = source
+        self.provider = provider
+        self.updatedAt = updatedAt
         self.isPinned = isPinned
         self.airPodsComponents = airPodsComponents
     }
@@ -412,6 +421,9 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
             percent: device.percent,
             chargeState: device.chargeState,
             freshness: device.freshness,
+            source: device.source,
+            provider: device.provider,
+            updatedAt: device.updatedAt,
             isPinned: isPinned
         )
     }
@@ -426,6 +438,9 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
                 percent: decorated.snapshot.percent,
                 chargeState: decorated.snapshot.chargeState,
                 freshness: decorated.freshness,
+                source: decorated.snapshot.source,
+                provider: decorated.snapshot.provider,
+                updatedAt: decorated.snapshot.updatedAt,
                 isPinned: isPinned
             )
         case .airPods(let name, let id, let components):
@@ -442,6 +457,7 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
             let freshness: Freshness = components.contains { $0.freshness == .expired }
                 ? .expired
                 : (components.contains { $0.freshness == .stale } ? .stale : .fresh)
+            let updatedAt = components.map(\.updatedAt).max() ?? .distantPast
             self.init(
                 id: id,
                 displayName: name,
@@ -449,11 +465,53 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
                 percent: percents.min(),
                 chargeState: chargeState,
                 freshness: freshness,
+                source: .coreBluetooth,
+                provider: .coreBluetoothBatteryService,
+                updatedAt: updatedAt,
                 isPinned: isPinned,
                 airPodsComponents: components
             )
         }
     }
+}
+
+func batteryProviderLabel(source: BatterySource, provider: BatteryProvider) -> String {
+    switch provider {
+    case .macPowerSource: return "Local Mac"
+    case .ioRegistry: return "IORegistry"
+    case .coreBluetoothBatteryService: return "Bluetooth Battery Service"
+    case .ioBluetooth: return "Bluetooth"
+    case .systemProfiler: return "System"
+    case .bluetoothUnsupported: return "Bluetooth"
+    case .ideviceInfo: return "USB iPhone"
+    }
+}
+
+func batteryRelativeAgeText(updatedAt: Date, now: Date = Date()) -> String {
+    let age = max(0, now.timeIntervalSince(updatedAt))
+    if age < 60 { return "Now" }
+    if age < 3_600 { return "\(Int(age / 60))m ago" }
+    if age < 86_400 { return "\(Int(age / 3_600))h ago" }
+    return "\(Int(age / 86_400))d ago"
+}
+
+func dashboardBatteryStatusText(
+    percent: Int?,
+    chargeState: ChargeState,
+    freshness: Freshness,
+    isLow: Bool,
+    showsAirPodsComponents: Bool,
+    updatedAt: Date,
+    now: Date = Date()
+) -> String {
+    if percent == nil { return "No report" }
+    if freshness == .expired { return "Expired" }
+    if freshness == .stale { return batteryRelativeAgeText(updatedAt: updatedAt, now: now) }
+    if chargeState == .charging { return "Charging" }
+    if chargeState == .full { return "Full" }
+    if isLow { return "Low" }
+    if showsAirPodsComponents { return "Parts" }
+    return "Battery"
 }
 
 struct DashboardBatteryProgressBar: View {
@@ -640,14 +698,14 @@ struct DashboardBatteryDeviceRow: View {
     }
 
     private var statusText: String {
-        if device.percent == nil { return "No report" }
-        if device.freshness == .expired { return "Expired" }
-        if device.freshness == .stale { return "Stale" }
-        if device.chargeState == .charging { return "Charging" }
-        if device.chargeState == .full { return "Full" }
-        if isLow { return "Low" }
-        if showsAirPodsComponents { return "Parts" }
-        return "Battery"
+        dashboardBatteryStatusText(
+            percent: device.percent,
+            chargeState: device.chargeState,
+            freshness: device.freshness,
+            isLow: isLow,
+            showsAirPodsComponents: showsAirPodsComponents,
+            updatedAt: device.updatedAt
+        )
     }
 
     private var theme: BeaconThemePalette {

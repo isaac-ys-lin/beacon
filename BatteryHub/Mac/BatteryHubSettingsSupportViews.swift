@@ -650,7 +650,10 @@ struct DeviceCurrentStatsCard: View {
     private var sourceText: String {
         switch item {
         case .device(let decorated):
-            return sourceLabel(for: decorated.snapshot.source)
+            return batteryProviderLabel(
+                source: decorated.snapshot.source,
+                provider: decorated.snapshot.provider
+            )
         case .airPods:
             return "Bluetooth"
         }
@@ -743,15 +746,6 @@ struct DeviceCurrentStatsCard: View {
         return "Range \(historySummary.minimumPercent)% - \(historySummary.maximumPercent)% across \(historySummary.samples.count) reports."
     }
 
-    private func sourceLabel(for source: BatterySource) -> String {
-        switch source {
-        case .macPowerSource: return "Local Mac"
-        case .ioRegistry: return "IORegistry"
-        case .coreBluetooth, .ioBluetooth: return "Bluetooth"
-        case .systemProfiler: return "System"
-        case .bluetoothUnsupported: return "Bluetooth"
-        }
-    }
 }
 
 struct BatteryHistorySparkline: View {

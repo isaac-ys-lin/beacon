@@ -273,6 +273,7 @@ final class BatteryHubModel: ObservableObject {
     @Published private(set) var latestAlertEvents: [BatteryAlertEvent] = []
     @Published private(set) var notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown
     @Published private(set) var latestNotificationDeliveryResult: NotificationCenterDeliveryResult?
+    @Published private(set) var latestRefreshDiagnostics = BatteryRefreshDiagnostics()
 
     private let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "refresh")
     private var refreshLoop: Task<Void, Never>?
@@ -328,10 +329,25 @@ final class BatteryHubModel: ObservableObject {
         }
 
         var nextStore = store
-        guard let bluetoothSnapshots = await readBluetoothSnapshotsWithTimeout() else {
+        guard let readReport = await readBluetoothSnapshotsWithTimeout() else {
             logger.error("Bluetooth refresh timed out after 8 seconds")
+            latestRefreshDiagnostics = BatteryRefreshDiagnostics(
+                attempts: [
+                    BatteryProviderAttempt(
+                        provider: .coreBluetoothBatteryService,
+                        status: .timedOut,
+                        candidateCount: 0,
+                        message: "Battery refresh timed out after 8 seconds",
+                        attemptedAt: Date()
+                    )
+                ],
+                refreshedAt: Date(),
+                snapshotCount: 0
+            )
             return
         }
+        let bluetoothSnapshots = readReport.snapshots
+        latestRefreshDiagnostics = readReport.diagnostics
         logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
         nextStore.merge(bluetoothSnapshots)
         BatteryHistoryStore.record(nextStore.snapshots)
@@ -348,14 +364,14 @@ final class BatteryHubModel: ObservableObject {
         )
     }
 
-    private func readBluetoothSnapshotsWithTimeout() async -> [BatterySnapshot]? {
+    private func readBluetoothSnapshotsWithTimeout() async -> BluetoothBatteryReadReport? {
         let resolverTask = Task.detached(priority: .utility) {
-            await BluetoothBatteryResolver().read()
+            await BluetoothBatteryResolver().readReport()
         }
 
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                let gate = RefreshRaceGate<[BatterySnapshot]?>(continuation)
+                let gate = RefreshRaceGate<BluetoothBatteryReadReport?>(continuation)
 
                 Task {
                     let snapshots = await resolverTask.value

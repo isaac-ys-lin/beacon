@@ -195,6 +195,82 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(dashboardDevice.airPodsComponents.map(\.percent), [53, 100, 100])
     }
 
+    func testDashboardBatteryDeviceKeepsAggregatedAirPodsLatestUpdateTime() {
+        let addr = "7C-F3-4D-74-56-78"
+        let older = Date(timeIntervalSince1970: 2_000)
+        let newer = Date(timeIntervalSince1970: 2_120)
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 53, freshness: .stale, updatedAt: older),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 100, freshness: .stale, updatedAt: newer),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 100, freshness: .stale, updatedAt: older),
+        ]
+
+        let sections = groupedDeviceItems(snapshots)
+        let dashboardDevice = DashboardBatteryDevice(item: sections[0].items[0])
+
+        XCTAssertEqual(dashboardDevice.updatedAt, newer)
+        XCTAssertEqual(
+            dashboardBatteryStatusText(
+                percent: dashboardDevice.percent,
+                chargeState: dashboardDevice.chargeState,
+                freshness: dashboardDevice.freshness,
+                isLow: false,
+                showsAirPodsComponents: true,
+                updatedAt: dashboardDevice.updatedAt,
+                now: newer.addingTimeInterval(12 * 60)
+            ),
+            "12m ago"
+        )
+    }
+
+    func testDashboardBatteryDeviceKeepsDeviceUpdateMetadata() {
+        let updatedAt = Date(timeIntervalSince1970: 2_000)
+        let decorated = makeDecorated(
+            deviceID: "iphone",
+            displayName: "YiSungiPhone",
+            kind: .iPhone,
+            percent: 80,
+            freshness: .stale,
+            source: .coreBluetooth,
+            updatedAt: updatedAt
+        )
+
+        let dashboardDevice = DashboardBatteryDevice(item: .device(decorated))
+
+        XCTAssertEqual(dashboardDevice.updatedAt, updatedAt)
+        XCTAssertEqual(dashboardDevice.source, .coreBluetooth)
+        XCTAssertEqual(dashboardDevice.provider, .coreBluetoothBatteryService)
+    }
+
+    func testDashboardStatusShowsStaleAgeInsteadOfGenericStale() {
+        let now = Date(timeIntervalSince1970: 3_000)
+        let updatedAt = now.addingTimeInterval(-12 * 60)
+
+        XCTAssertEqual(
+            dashboardBatteryStatusText(
+                percent: 80,
+                chargeState: .unplugged,
+                freshness: .stale,
+                isLow: false,
+                showsAirPodsComponents: false,
+                updatedAt: updatedAt,
+                now: now
+            ),
+            "12m ago"
+        )
+    }
+
+    func testBatteryProviderLabelDistinguishesIPhoneSources() {
+        XCTAssertEqual(
+            batteryProviderLabel(source: .coreBluetooth, provider: .coreBluetoothBatteryService),
+            "Bluetooth Battery Service"
+        )
+        XCTAssertEqual(
+            batteryProviderLabel(source: .ideviceInfo, provider: .ideviceInfo),
+            "USB iPhone"
+        )
+    }
+
     // MARK: - Single-component fallback
 
     func testAirPodsSingleComponentFallsBackToDevice() {
@@ -774,6 +850,7 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(devices[0].kind, .airPods)
         XCTAssertEqual(devices[0].chargeState, .charging)
         XCTAssertEqual(devices[0].freshness, .stale)
+        XCTAssertNotEqual(devices[0].updatedAt, .distantPast)
     }
 
     // MARK: - Context menu actions
@@ -799,8 +876,8 @@ final class DeviceListPresentationTests: XCTestCase {
             name: "AirPods Pro",
             id: "bluetooth-20-C1-9B-AA-BB-CC",
             components: [
-                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh),
-                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh),
+                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh, updatedAt: Self.fixedDate),
+                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh, updatedAt: Self.fixedDate),
             ]
         )
 
@@ -851,8 +928,8 @@ final class DeviceListPresentationTests: XCTestCase {
             name: "AirPods Pro",
             id: "bluetooth-20-C1-9B-AA-BB-CC",
             components: [
-                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh),
-                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh),
+                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh, updatedAt: Self.fixedDate),
+                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh, updatedAt: Self.fixedDate),
             ]
         )
         let namedMouse = DeviceListItem.device(

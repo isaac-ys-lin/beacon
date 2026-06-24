@@ -11,27 +11,88 @@ public struct BluetoothDeviceScanner {
     public init() {}
 
     public func connectedCandidates() async -> [BluetoothBatteryCandidate] {
+        await connectedCandidateReport().candidates
+    }
+
+    public func connectedCandidateReport(now: Date = Date()) async -> BluetoothCandidateScanReport {
         var candidates = await readLocalBatteryCandidates()
+        var attempts: [BatteryProviderAttempt] = [
+            BatteryProviderAttempt(
+                provider: .ioRegistry,
+                status: Self.status(for: candidates),
+                candidateCount: candidates.count,
+                message: "IORegistry returned \(candidates.count) Bluetooth battery candidates",
+                attemptedAt: now
+            )
+        ]
 
         let profiler = await Self.readSystemProfilerBatteryCandidates()
         Self.logger.info("system_profiler returned \(profiler.count) battery candidates")
+        attempts.append(
+            BatteryProviderAttempt(
+                provider: .systemProfiler,
+                status: Self.status(for: profiler),
+                candidateCount: profiler.count,
+                message: "system_profiler returned \(profiler.count) battery candidates",
+                attemptedAt: Date()
+            )
+        )
         for candidate in profiler {
             candidates.upsert(candidate)
         }
 
         switch CBCentralManager.authorization {
         case .allowedAlways, .notDetermined:
-            let ble = await BLEBatteryServiceReader().read(timeout: .seconds(4))
-            Self.logger.info("BLE scan returned \(ble.count) battery candidates")
+            let ble = await BLEBatteryServiceReader().read(knownCandidates: candidates, timeout: .seconds(4))
+            Self.logger.info("Known BLE scan returned \(ble.count) battery candidates")
+            attempts.append(
+                BatteryProviderAttempt(
+                    provider: .coreBluetoothBatteryService,
+                    status: Self.status(for: ble),
+                    candidateCount: ble.count,
+                    message: "Known BLE scan returned \(ble.count) battery candidates",
+                    attemptedAt: Date()
+                )
+            )
             for candidate in ble {
                 candidates.upsert(candidate)
             }
         case .denied, .restricted:
-            Self.logger.info("BLE scan skipped because CoreBluetooth authorization is \(String(describing: CBCentralManager.authorization))")
+            Self.logger.info("Known BLE scan skipped because CoreBluetooth authorization is \(String(describing: CBCentralManager.authorization))")
+            attempts.append(
+                BatteryProviderAttempt(
+                    provider: .coreBluetoothBatteryService,
+                    status: .unauthorized,
+                    candidateCount: 0,
+                    message: "Known BLE scan skipped because CoreBluetooth authorization is \(String(describing: CBCentralManager.authorization))",
+                    attemptedAt: Date()
+                )
+            )
         @unknown default:
-            Self.logger.info("BLE scan skipped because CoreBluetooth authorization is unknown")
+            Self.logger.info("Known BLE scan skipped because CoreBluetooth authorization is unknown")
+            attempts.append(
+                BatteryProviderAttempt(
+                    provider: .coreBluetoothBatteryService,
+                    status: .unavailable,
+                    candidateCount: 0,
+                    message: "Known BLE scan skipped because CoreBluetooth authorization is unknown",
+                    attemptedAt: Date()
+                )
+            )
         }
-        return candidates
+
+        let usb = await IPhoneUSBBatteryProvider.readCandidate(now: now)
+        Self.logger.info("USB iPhone read returned \(usb.attempt.candidateCount) battery candidates")
+        attempts.append(usb.attempt)
+        if let candidate = usb.candidate {
+            candidates.upsert(candidate)
+        }
+
+        return BluetoothCandidateScanReport(candidates: candidates, attempts: attempts)
+    }
+
+    private static func status(for candidates: [BluetoothBatteryCandidate]) -> BatteryReadStatus {
+        candidates.contains { $0.batteryPercent != nil } ? .reported : .noReport
     }
 
     private func readLocalBatteryCandidates() async -> [BluetoothBatteryCandidate] {
@@ -602,6 +663,10 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
+    var normalizedBLEIdentity: String {
+        trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
     var isGenericBluetoothDisplayName: Bool {
         let normalized = normalizedDeviceName
         return normalized.isEmpty
@@ -611,17 +676,17 @@ private extension String {
     }
 }
 
-enum BLEBatteryScanStateAction: Equatable {
+enum BLEBatteryReadStateAction: Equatable {
     case wait
-    case scan
+    case scanKnownPeripherals
     case finish
 }
 
-enum BLEBatteryScanStatePolicy {
-    static func action(for state: CBManagerState) -> BLEBatteryScanStateAction {
+enum BLEBatteryReadStatePolicy {
+    static func action(for state: CBManagerState) -> BLEBatteryReadStateAction {
         switch state {
         case .poweredOn:
-            return .scan
+            return .scanKnownPeripherals
         case .unknown, .resetting:
             return .wait
         case .unsupported, .unauthorized, .poweredOff:
@@ -629,6 +694,31 @@ enum BLEBatteryScanStatePolicy {
         @unknown default:
             return .finish
         }
+    }
+}
+
+struct BLEKnownDeviceFilter: Equatable {
+    private let knownIDs: Set<String>
+    private let knownNames: Set<String>
+
+    init(knownCandidates: [BluetoothBatteryCandidate]) {
+        knownIDs = Set(knownCandidates.map { $0.deviceID.normalizedBLEIdentity })
+        knownNames = Set(
+            knownCandidates
+                .map { $0.displayName.normalizedDeviceName }
+                .filter { !$0.isGenericBluetoothDisplayName }
+        )
+    }
+
+    func contains(deviceID: String, displayName: String?) -> Bool {
+        if knownIDs.contains(deviceID.normalizedBLEIdentity) {
+            return true
+        }
+
+        guard let displayName else { return false }
+        let normalizedName = displayName.normalizedDeviceName
+        guard !normalizedName.isGenericBluetoothDisplayName else { return false }
+        return knownNames.contains(normalizedName)
     }
 }
 
@@ -641,10 +731,13 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     private var continuation: CheckedContinuation<[BluetoothBatteryCandidate], Never>?
     private var candidates: [UUID: BluetoothBatteryCandidate] = [:]
     private var peripherals: [UUID: CBPeripheral] = [:]
+    private var connectionAttemptIDs = Set<UUID>()
+    private var knownDeviceFilter = BLEKnownDeviceFilter(knownCandidates: [])
     private var timeoutTask: Task<Void, Never>?
 
-    func read(timeout: Duration = .seconds(4)) async -> [BluetoothBatteryCandidate] {
+    func read(knownCandidates: [BluetoothBatteryCandidate], timeout: Duration = .seconds(4)) async -> [BluetoothBatteryCandidate] {
         await withCheckedContinuation { continuation in
+            self.knownDeviceFilter = BLEKnownDeviceFilter(knownCandidates: knownCandidates)
             self.continuation = continuation
             self.central = CBCentralManager(delegate: self, queue: nil)
             self.timeoutTask = Task { @MainActor [weak self] in
@@ -655,18 +748,18 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     }
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        switch BLEBatteryScanStatePolicy.action(for: central.state) {
+        switch BLEBatteryReadStatePolicy.action(for: central.state) {
         case .wait:
             return
         case .finish:
             finish()
             return
-        case .scan:
+        case .scanKnownPeripherals:
             break
         }
 
         for peripheral in central.retrieveConnectedPeripherals(withServices: [Self.batteryService]) {
-            inspect(peripheral)
+            inspectKnown(peripheral)
         }
 
         central.scanForPeripherals(
@@ -676,7 +769,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        inspect(peripheral)
+        inspectKnown(peripheral)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -685,6 +778,14 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         peripherals[peripheral.identifier] = nil
+        connectionAttemptIDs.remove(peripheral.identifier)
+    }
+
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        if connectionAttemptIDs.contains(peripheral.identifier) {
+            peripherals[peripheral.identifier] = nil
+            connectionAttemptIDs.remove(peripheral.identifier)
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
@@ -717,14 +818,22 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         )
     }
 
-    private func inspect(_ peripheral: CBPeripheral) {
+    private func inspectKnown(_ peripheral: CBPeripheral) {
         guard peripherals[peripheral.identifier] == nil else { return }
+        guard knownDeviceFilter.contains(
+            deviceID: peripheral.identifier.uuidString,
+            displayName: peripheral.name
+        ) else {
+            return
+        }
+
         peripherals[peripheral.identifier] = peripheral
         peripheral.delegate = self
 
         if peripheral.state == .connected {
             peripheral.discoverServices([Self.batteryService])
         } else {
+            connectionAttemptIDs.insert(peripheral.identifier)
             central?.connect(peripheral)
         }
     }
@@ -734,7 +843,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         timeoutTask = nil
         if central?.state == .poweredOn {
             central?.stopScan()
-            for peripheral in peripherals.values where peripheral.state == .connected {
+            for peripheral in peripherals.values where connectionAttemptIDs.contains(peripheral.identifier) {
                 central?.cancelPeripheralConnection(peripheral)
             }
         }
@@ -742,5 +851,6 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         continuation?.resume(returning: result)
         continuation = nil
         central = nil
+        connectionAttemptIDs.removeAll()
     }
 }
