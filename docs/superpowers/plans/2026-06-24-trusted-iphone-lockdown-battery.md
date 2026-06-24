@@ -8,6 +8,14 @@
 
 **Tech Stack:** Swift 6, SwiftUI, UserDefaults, XCTest, XcodeGen, external libimobiledevice command-line tools (`idevice_id`, `ideviceinfo`).
 
+**Implementation Decisions:**
+
+- Enrollment is USB-only. The user must connect the iPhone by USB, unlock it, and tap Trust before BatteryHub stores the UDID.
+- Battery reads support USB plus already-enabled Wi-Fi/network lockdown. BatteryHub does not silently enable Finder Wi-Fi sync or network lockdown in this implementation.
+- `idevice_id -n` is an optional network path. It only works when the iPhone already has Wi-Fi sync/network lockdown available, is reachable on the network, and macOS local-network access allows the tools to talk to it.
+- On macOS 15 and newer, network lockdown may also require Local Network privacy usage copy in `BatteryHub/Mac/Info.plist`. USB success remains the v1 acceptance path; network failure without that privacy work is a diagnostic, not a blocker.
+- The installed `/Applications/BatteryHubMac.app` must prove it can launch the external tools before coding continues past Task 0. Terminal-only CLI success is not enough.
+
 ---
 
 ## File Structure
@@ -15,13 +23,13 @@
 - Create: `BatteryHub/Mac/TrustedIPhoneRegistry.swift`
   - Owns the BatteryHub-local iPhone allowlist stored in UserDefaults.
 - Create: `BatteryHub/Mac/IPhoneLockdownBatteryProvider.swift`
-  - Discovers command-line tools, lists USB/network lockdown devices, reads battery payloads, and converts allowlisted devices into `BluetoothBatteryCandidate` values.
+  - Discovers command-line tools, lists USB and already-enabled network lockdown devices, reads battery payloads, and converts allowlisted devices into `BluetoothBatteryCandidate` values.
 - Modify: `BatteryHub/Mac/BluetoothBatteryResolver.swift`
   - Adds `.lockdownNetwork` transport, blocks BLE iPhones in report creation, and gives trusted iPhones UDID-based IDs.
 - Modify: `BatteryHub/Mac/BluetoothDeviceScanner.swift`
   - Calls the lockdown provider and merges only trusted iPhone candidates.
 - Modify: `BatteryHub/Shared/BatterySnapshotStore.swift`
-  - Adds removal by device ID so Forget removes stale trusted iPhone snapshots immediately.
+  - Adds removal by device ID so Forget removes stale trusted iPhone snapshots immediately, and keeps trusted iPhone snapshots distinct by UDID even when display names match.
 - Modify: `BatteryHub/Mac/BatteryHubMacApp.swift`
   - Publishes trusted iPhone registry state and enrollment result from the model.
 - Modify: `BatteryHub/Mac/BatteryHubSettingsWindowController.swift`
@@ -32,6 +40,8 @@
   - Adds reusable trusted iPhone setup/status views.
 - Modify: `BatteryHub/Mac/DeviceBatteryRow.swift`
   - Labels `.ideviceInfo` as `Trusted iPhone`.
+- Inspect: `BatteryHub/Mac/Info.plist`
+  - Network lockdown is opportunistic in this plan. If network reads become an acceptance criterion, add local-network privacy copy before treating `idevice_id -n` failure as a product bug.
 - Modify: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
   - Tests provider parsing, allowlist filtering, missing command diagnostics, BLE iPhone suppression, and UDID-based IDs.
 - Modify: `BatteryHubTests/BatterySnapshotStoreTests.swift`
@@ -42,6 +52,76 @@
   - Existing source directories already include `BatteryHub/Mac` and `BatteryHubTests`, so no target changes are required.
 - Modify: `BatteryHub.xcodeproj/project.pbxproj`
   - Regenerate with `xcodegen generate` after creating new source files.
+- Inspect and possibly modify: `project.yml`, `BatteryHub/Mac/BatteryHubMac.entitlements`
+  - Task 0 decides whether the direct-distribution app can remain sandboxed while launching external lockdown tools. If not, choose and document an explicit signing/entitlement branch before coding Task 2.
+
+## Task 0: Installed App Lockdown and Sandbox Spike
+
+**Files:**
+- No source edits unless the gate fails.
+- Inspect: `project.yml`
+- Inspect: `BatteryHub/Mac/BatteryHubMac.entitlements`
+
+- [ ] **Step 1: Verify local lockdown tools and USB trust outside the app**
+
+Run with the user's iPhone connected by USB, unlocked, and trusted:
+
+```bash
+command -v idevice_id
+command -v ideviceinfo
+UDID="$(idevice_id -l | head -1)"
+test -n "$UDID"
+ideviceinfo -u "$UDID" -k DeviceName
+ideviceinfo -u "$UDID" -q com.apple.mobile.battery
+```
+
+Expected:
+
+- `command -v` finds both tools.
+- `idevice_id -l` prints the user's iPhone UDID.
+- `ideviceinfo` returns a device name and a battery payload containing `BatteryCurrentCapacity`.
+
+If this fails, stop and fix the local trust/tool setup first. Do not start source implementation against a host that cannot prove the base lockdown path.
+
+- [ ] **Step 2: Verify current installed app behavior under its real entitlements**
+
+Build or install the current app if `/Applications/BatteryHubMac.app` is absent:
+
+```bash
+BATTERYHUB_DEVELOPMENT_TEAM=SM2Y9TGWH3 ./script/build_and_run.sh --install
+```
+
+Launch the installed app and confirm the running path:
+
+```bash
+open -n /Applications/BatteryHubMac.app
+PID="$(pgrep -x BatteryHubMac | head -1)"
+test -n "$PID"
+lsof -p "$PID" | rg '/Applications/BatteryHubMac.app/Contents/MacOS/BatteryHubMac'
+codesign -d --entitlements :- /Applications/BatteryHubMac.app 2>/dev/null | rg 'com.apple.security.app-sandbox|com.apple.security.device.bluetooth'
+```
+
+With the same trusted USB iPhone connected, trigger a refresh in the installed app and collect fresh logs:
+
+```bash
+log show --last 5m --style compact --predicate 'process == "BatteryHubMac" AND (eventMessage CONTAINS[c] "USB iPhone" OR eventMessage CONTAINS[c] "idevice" OR eventMessage CONTAINS[c] "iPhone")'
+```
+
+Expected:
+
+- `lsof` proves the running binary is from `/Applications/BatteryHubMac.app`.
+- Entitlements match the branch being tested.
+- The installed app either reports a USB iPhone battery candidate or reports a clear command/trust failure that matches the terminal evidence.
+
+- [ ] **Step 3: Gate the implementation branch**
+
+Continue to Task 1 only after one of these is true:
+
+- **Sandboxed branch:** The installed app keeps `com.apple.security.app-sandbox` and can launch/read `ideviceinfo` for the trusted USB iPhone. Keep the Task 5 entitlement assertion that sandbox and Bluetooth are present.
+- **Direct-distribution unsandboxed branch:** The installed app cannot access external lockdown tools from the sandbox, and the chosen product decision is to remove `com.apple.security.app-sandbox` for the directly distributed Mac app. Before Task 2, remove the sandbox entitlement from `project.yml` and `BatteryHub/Mac/BatteryHubMac.entitlements`, then update Task 5 to assert sandbox is absent and Bluetooth remains present.
+- **Helper branch:** The installed app cannot access external lockdown tools from the sandbox, and the chosen product decision is a signed helper/bundled-library packaging pass. Stop this plan and write a helper-specific plan first; do not continue with the external-tool provider as if tests prove installed behavior.
+
+Do not proceed on terminal-only success. The user's acceptance criterion is the installed `/Applications/BatteryHubMac.app`.
 
 ## Task 1: Trusted iPhone Registry and Store Removal
 
@@ -129,6 +209,38 @@ func testRemoveDeviceIDsDropsTrustedIPhoneSnapshot() {
 
     XCTAssertEqual(store.snapshots.map(\.deviceID), ["bluetooth-keyboard"])
 }
+
+func testMergeKeepsTrustedIPhonesWithSameDisplayNameWhenUDIDsDiffer() {
+    var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 500) })
+    store.merge([
+        BatterySnapshot(
+            deviceID: "trusted-iphone-00008110-001234567890801E",
+            displayName: "Isaac's iPhone",
+            kind: .iPhone,
+            percent: 80,
+            chargeState: .unknown,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 400)
+        ),
+        BatterySnapshot(
+            deviceID: "trusted-iphone-00008120-00ABCDEFABCDEF00",
+            displayName: "Isaac's iPhone",
+            kind: .iPhone,
+            percent: 52,
+            chargeState: .unknown,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 401)
+        )
+    ])
+
+    XCTAssertEqual(
+        store.snapshots.map(\.deviceID),
+        [
+            "trusted-iphone-00008110-001234567890801E",
+            "trusted-iphone-00008120-00ABCDEFABCDEF00"
+        ]
+    )
+}
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -212,6 +324,21 @@ Modify `BatteryHub/Shared/BatterySnapshotStore.swift` by adding this method afte
 public mutating func removeDeviceIDs(_ deviceIDs: Set<String>) {
     snapshotsByID = snapshotsByID.filter { id, _ in
         !deviceIDs.contains(id)
+    }
+}
+```
+
+Modify the private `BatterySource.isBluetoothRelated` helper in the same file so trusted iPhone snapshots are not deduplicated by display name:
+
+```swift
+private extension BatterySource {
+    var isBluetoothRelated: Bool {
+        switch self {
+        case .ioRegistry, .coreBluetooth, .ioBluetooth, .systemProfiler, .bluetoothUnsupported:
+            return true
+        case .macPowerSource, .ideviceInfo:
+            return false
+        }
     }
 }
 ```
@@ -328,6 +455,35 @@ func testIPhoneLockdownProviderReadsNetworkAllowlistedDevice() async throws {
     XCTAssertEqual(report.candidates.map(\.batteryPercent), [65])
 }
 
+func testIPhoneLockdownProviderReportsTimedOutWhenListingTimesOut() async throws {
+    let commandSet = IPhoneLockdownCommandSet(
+        ideviceID: URL(fileURLWithPath: "/usr/local/bin/idevice_id"),
+        ideviceInfo: URL(fileURLWithPath: "/usr/local/bin/ideviceinfo")
+    )
+    let registry = TrustedIPhoneRegistry(devices: [
+        TrustedIPhone(
+            udid: "00008110-001234567890801E",
+            displayName: "Isaac's iPhone",
+            trustedAt: Date(timeIntervalSince1970: 10)
+        )
+    ])
+    let runner = FakeIPhoneLockdownRunner(outputs: [
+        "idevice_id -l": .init(status: 0, output: "", timedOut: true),
+        "idevice_id -n": .init(status: 0, output: "", timedOut: false)
+    ])
+
+    let report = await IPhoneLockdownBatteryProvider.readCandidates(
+        registry: registry,
+        commandSet: commandSet,
+        runner: runner,
+        now: Date(timeIntervalSince1970: 50)
+    )
+
+    XCTAssertTrue(report.candidates.isEmpty)
+    XCTAssertEqual(report.attempt.status, .timedOut)
+    XCTAssertEqual(report.attempt.candidateCount, 0)
+}
+
 func testIPhoneLockdownProviderReportsMissingCommands() async {
     let report = await IPhoneLockdownBatteryProvider.readCandidates(
         registry: TrustedIPhoneRegistry(),
@@ -366,6 +522,27 @@ func testIPhoneLockdownDiscoveryListsUSBDevicesForEnrollment() async throws {
         )
     ])
     XCTAssertEqual(result.status, .reported)
+}
+
+func testIPhoneLockdownDiscoverySkipsUSBDeviceWhenTrustProofFails() async throws {
+    let commandSet = IPhoneLockdownCommandSet(
+        ideviceID: URL(fileURLWithPath: "/usr/local/bin/idevice_id"),
+        ideviceInfo: URL(fileURLWithPath: "/usr/local/bin/ideviceinfo")
+    )
+    let runner = FakeIPhoneLockdownRunner(outputs: [
+        "idevice_id -l": .init(status: 0, output: "00008110-001234567890801E\n", timedOut: false),
+        "ideviceinfo -u 00008110-001234567890801E -k DeviceName": .init(status: 255, output: "", timedOut: false)
+    ])
+
+    let result = await IPhoneLockdownBatteryProvider.discoverUSBTrustedDevices(
+        commandSet: commandSet,
+        runner: runner,
+        now: Date(timeIntervalSince1970: 50)
+    )
+
+    XCTAssertTrue(result.devices.isEmpty)
+    XCTAssertEqual(result.status, .unavailable)
+    XCTAssertEqual(result.message, "No trusted USB iPhone found. Unlock the iPhone, tap Trust, and reconnect by USB.")
 }
 ```
 
@@ -519,22 +696,30 @@ public enum IPhoneLockdownBatteryProvider {
 
         return await Task.detached(priority: .utility) {
             let listed = listedDevices(commandSet: commandSet, runner: runner)
-            let trusted = listed.filter { registry.isTrusted(udid: $0.udid) }
+            var sawTimedOut = listed.timedOut
+            var sawUnavailable = listed.unavailable
+            let trusted = listed.devices.filter { registry.isTrusted(udid: $0.udid) }
             let candidates = trusted.compactMap { listedDevice -> BluetoothBatteryCandidate? in
-                guard let percent = batteryPercent(
+                let battery = batteryPercent(
                     udid: listedDevice.udid,
                     connection: listedDevice.connection,
                     commandSet: commandSet,
                     runner: runner
-                ) else {
+                )
+                sawTimedOut = sawTimedOut || battery.timedOut
+                sawUnavailable = sawUnavailable || battery.unavailable
+                guard let percent = battery.value else {
                     return nil
                 }
-                let displayName = deviceName(
+                let name = deviceName(
                     udid: listedDevice.udid,
                     connection: listedDevice.connection,
                     commandSet: commandSet,
                     runner: runner
-                ) ?? registry.displayName(for: listedDevice.udid) ?? "iPhone"
+                )
+                sawTimedOut = sawTimedOut || name.timedOut
+                sawUnavailable = sawUnavailable || name.unavailable
+                let displayName = name.value ?? registry.displayName(for: listedDevice.udid) ?? "iPhone"
 
                 return BluetoothBatteryCandidate(
                     deviceID: listedDevice.udid,
@@ -547,10 +732,20 @@ public enum IPhoneLockdownBatteryProvider {
             }
 
             let status: BatteryReadStatus
-            if candidates.isEmpty {
-                status = listed.isEmpty ? .noReport : .noReport
-            } else {
+            if !candidates.isEmpty {
                 status = .reported
+            } else if sawTimedOut {
+                status = .timedOut
+            } else if sawUnavailable {
+                status = .unavailable
+            } else {
+                status = .noReport
+            }
+            var message = "iOS lockdown listed \(listed.devices.count) devices (\(listed.usbCount) USB, \(listed.networkCount) network), \(trusted.count) trusted, \(candidates.count) battery reports"
+            if sawTimedOut {
+                message += "; at least one lockdown command timed out"
+            } else if sawUnavailable {
+                message += "; one or more trusted devices could not be read"
             }
 
             return IPhoneLockdownBatteryReport(
@@ -559,7 +754,7 @@ public enum IPhoneLockdownBatteryProvider {
                     provider: .ideviceInfo,
                     status: status,
                     candidateCount: candidates.count,
-                    message: "iOS lockdown listed \(listed.count) devices, \(trusted.count) trusted, \(candidates.count) battery reports",
+                    message: message,
                     attemptedAt: now
                 )
             )
@@ -585,25 +780,44 @@ public enum IPhoneLockdownBatteryProvider {
                 commandSet: commandSet,
                 runner: runner
             )
-            let devices = usbDevices.map { udid in
-                TrustedIPhone(
+            var sawTimedOut = usbDevices.timedOut
+            var sawUnavailable = usbDevices.unavailable
+            let devices = usbDevices.udids.compactMap { udid -> TrustedIPhone? in
+                let name = deviceName(
                     udid: udid,
-                    displayName: deviceName(
-                        udid: udid,
-                        connection: .usb,
-                        commandSet: commandSet,
-                        runner: runner
-                    ) ?? "iPhone",
+                    connection: .usb,
+                    commandSet: commandSet,
+                    runner: runner
+                )
+                sawTimedOut = sawTimedOut || name.timedOut
+                sawUnavailable = sawUnavailable || name.unavailable
+                guard let displayName = name.value else { return nil }
+                return TrustedIPhone(
+                    udid: udid,
+                    displayName: displayName,
                     trustedAt: now
                 )
+            }
+            let status: BatteryReadStatus
+            let message: String
+            if !devices.isEmpty {
+                status = .reported
+                message = "Added \(devices.count) trusted iPhone devices"
+            } else if sawTimedOut {
+                status = .timedOut
+                message = "Timed out while checking the connected USB iPhone"
+            } else if sawUnavailable {
+                status = .unavailable
+                message = "No trusted USB iPhone found. Unlock the iPhone, tap Trust, and reconnect by USB."
+            } else {
+                status = .noReport
+                message = "No USB iPhone found"
             }
 
             return IPhoneLockdownDiscoveryReport(
                 devices: devices,
-                status: devices.isEmpty ? .noReport : .reported,
-                message: devices.isEmpty
-                    ? "No trusted USB iPhone found"
-                    : "Added \(devices.count) trusted iPhone devices"
+                status: status,
+                message: message
             )
         }.value
     }
@@ -613,30 +827,69 @@ public enum IPhoneLockdownBatteryProvider {
         let connection: IPhoneLockdownConnection
     }
 
+    private struct ListedDeviceReport: Sendable {
+        let devices: [ListedDevice]
+        let usbCount: Int
+        let networkCount: Int
+        let timedOut: Bool
+        let unavailable: Bool
+    }
+
+    private struct UDIDListResult: Sendable {
+        let udids: [String]
+        let timedOut: Bool
+        let unavailable: Bool
+    }
+
+    private struct StringCommandValue: Sendable {
+        let value: String?
+        let timedOut: Bool
+        let unavailable: Bool
+    }
+
+    private struct BatteryPercentValue: Sendable {
+        let value: Int?
+        let timedOut: Bool
+        let unavailable: Bool
+    }
+
     private static func listedDevices(
         commandSet: IPhoneLockdownCommandSet,
         runner: IPhoneLockdownCommandRunning
-    ) -> [ListedDevice] {
+    ) -> ListedDeviceReport {
         let usb = listUDIDs(connection: .usb, commandSet: commandSet, runner: runner)
-            .map { ListedDevice(udid: $0, connection: .usb) }
+        let usbDevices = usb.udids.map { ListedDevice(udid: $0, connection: .usb) }
         let network = listUDIDs(connection: .network, commandSet: commandSet, runner: runner)
-            .filter { networkUDID in !usb.contains { $0.udid == networkUDID } }
+        let networkDevices = network.udids
+            .filter { networkUDID in !usbDevices.contains { $0.udid == networkUDID } }
             .map { ListedDevice(udid: $0, connection: .network) }
-        return usb + network
+        return ListedDeviceReport(
+            devices: usbDevices + networkDevices,
+            usbCount: usbDevices.count,
+            networkCount: networkDevices.count,
+            timedOut: usb.timedOut || network.timedOut,
+            unavailable: usb.unavailable || network.unavailable
+        )
     }
 
     private static func listUDIDs(
         connection: IPhoneLockdownConnection,
         commandSet: IPhoneLockdownCommandSet,
         runner: IPhoneLockdownCommandRunning
-    ) -> [String] {
+    ) -> UDIDListResult {
         let arguments = connection == .network ? ["-n"] : ["-l"]
         let result = runner.run(commandURL: commandSet.ideviceID, arguments: arguments, timeout: timeout)
-        guard result.status == 0, !result.timedOut else { return [] }
-        return result.output
+        if result.timedOut {
+            return UDIDListResult(udids: [], timedOut: true, unavailable: false)
+        }
+        guard result.status == 0 else {
+            return UDIDListResult(udids: [], timedOut: false, unavailable: true)
+        }
+        let udids = result.output
             .split(whereSeparator: \.isNewline)
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+        return UDIDListResult(udids: udids, timedOut: false, unavailable: false)
     }
 
     private static func deviceName(
@@ -644,15 +897,20 @@ public enum IPhoneLockdownBatteryProvider {
         connection: IPhoneLockdownConnection,
         commandSet: IPhoneLockdownCommandSet,
         runner: IPhoneLockdownCommandRunning
-    ) -> String? {
+    ) -> StringCommandValue {
         let result = runner.run(
             commandURL: commandSet.ideviceInfo,
             arguments: baseArguments(udid: udid, connection: connection) + ["-k", "DeviceName"],
             timeout: timeout
         )
-        guard result.status == 0, !result.timedOut else { return nil }
+        if result.timedOut {
+            return StringCommandValue(value: nil, timedOut: true, unavailable: false)
+        }
+        guard result.status == 0 else {
+            return StringCommandValue(value: nil, timedOut: false, unavailable: true)
+        }
         let name = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? nil : name
+        return StringCommandValue(value: name.isEmpty ? nil : name, timedOut: false, unavailable: false)
     }
 
     private static func batteryPercent(
@@ -660,14 +918,19 @@ public enum IPhoneLockdownBatteryProvider {
         connection: IPhoneLockdownConnection,
         commandSet: IPhoneLockdownCommandSet,
         runner: IPhoneLockdownCommandRunning
-    ) -> Int? {
+    ) -> BatteryPercentValue {
         let result = runner.run(
             commandURL: commandSet.ideviceInfo,
             arguments: baseArguments(udid: udid, connection: connection) + ["-q", "com.apple.mobile.battery"],
             timeout: timeout
         )
-        guard result.status == 0, !result.timedOut else { return nil }
-        return parseBatteryPercent(result.output)
+        if result.timedOut {
+            return BatteryPercentValue(value: nil, timedOut: true, unavailable: false)
+        }
+        guard result.status == 0 else {
+            return BatteryPercentValue(value: nil, timedOut: false, unavailable: true)
+        }
+        return BatteryPercentValue(value: parseBatteryPercent(result.output), timedOut: false, unavailable: false)
     }
 
     private static func baseArguments(udid: String, connection: IPhoneLockdownConnection) -> [String] {
@@ -718,11 +981,13 @@ public enum IPhoneLockdownBatteryProvider {
 }
 ```
 
-- [ ] **Step 4: Add network transport case**
+- [ ] **Step 4: Extend the existing transport enum**
 
 Modify `BatteryHub/Mac/BluetoothBatteryResolver.swift`:
 
 ```swift
+// Replace the existing declaration `public enum BluetoothTransport: Sendable`.
+// Do not add a second `.usb` case; `.usb` already exists in the current code.
 public enum BluetoothTransport: Equatable, Sendable {
     case hid
     case ble
@@ -734,10 +999,11 @@ public enum BluetoothTransport: Equatable, Sendable {
 }
 ```
 
-In `source(for:)`, add:
+In `source(for:)`, replace the existing `case .usb: return .ideviceInfo` branch:
 
 ```swift
-case .usb, .lockdownNetwork: return .ideviceInfo
+case .usb, .lockdownNetwork:
+    return .ideviceInfo
 ```
 
 - [ ] **Step 5: Regenerate project**
@@ -1095,6 +1361,8 @@ onForgetTrustedIPhone: { [weak model] udid in
 
 Place those arguments after `latestNotificationDeliveryResult:` and before `onRefresh:`.
 
+Keep `onRefresh` as the existing `BatteryHubSettingsWindowController` closure that calls `Task { await model?.refresh() }`. Do not introduce a second `onRefresh` source inside `TrustedIPhoneSettingsCard`; the card only receives `onTrustConnectedIPhone` and `onForgetTrustedIPhone`. Successful enrollment refreshes through `BatteryHubModel.trustConnectedIPhones()`.
+
 Modify `BatteryHub/Mac/BatteryHubStatusController.swift` so Settings refreshes when trust state changes:
 
 ```swift
@@ -1299,6 +1567,17 @@ AddDeviceGuideRow(
 )
 ```
 
+Update the existing `testAddDeviceGuideRenderProducesNonBlankImage` call in `BatteryHubTests/DeviceListPresentationTests.swift` so the memberwise initializer receives the new required arguments:
+
+```swift
+let view = AddDeviceGuideView(
+    trustedIPhoneEnrollmentResult: nil,
+    onTrustConnectedIPhone: {},
+    onOpenBluetoothSettings: {},
+    onDismiss: {}
+)
+```
+
 - [ ] **Step 7: Update provider label**
 
 Modify `batteryProviderLabel(source:provider:)` in `BatteryHub/Mac/DeviceBatteryRow.swift`:
@@ -1368,11 +1647,14 @@ Run:
 command -v idevice_id
 command -v ideviceinfo
 idevice_id -l
+idevice_id -n
 ```
 
 Expected:
 
 - If tools exist and the iPhone is trusted over USB, `idevice_id -l` prints the iPhone UDID.
+- `idevice_id -n` may be empty or unavailable unless Finder Wi-Fi sync/network lockdown is already enabled and the phone is reachable. Treat that as a network-path diagnostic, not as USB enrollment failure.
+- On macOS 15+, if network reads are part of acceptance, verify `BatteryHub/Mac/Info.plist` includes a user-facing `NSLocalNetworkUsageDescription` before interpreting `idevice_id -n` failure as an app bug.
 - If tools are missing, BatteryHub still builds and Settings diagnostics show `idevice_id or ideviceinfo command not found`.
 
 - [ ] **Step 5: Build and install to Applications**
@@ -1410,14 +1692,17 @@ PID="$(pgrep -x BatteryHubMac | head -1)"
 ps -p "$PID" -o pid=,comm=
 lsof -p "$PID" | rg '/Applications/BatteryHubMac.app/Contents/MacOS/BatteryHubMac'
 codesign --verify --deep --strict /Applications/BatteryHubMac.app
-codesign -d --entitlements :- /Applications/BatteryHubMac.app 2>/dev/null | rg 'com.apple.security.app-sandbox|com.apple.security.device.bluetooth'
+codesign -d --entitlements :- /Applications/BatteryHubMac.app 2>/dev/null | tee /tmp/batteryhub-entitlements.plist
+rg 'com.apple.security.device.bluetooth' /tmp/batteryhub-entitlements.plist
 ```
 
 Expected:
 
 - `lsof` shows `/Applications/BatteryHubMac.app/Contents/MacOS/BatteryHubMac`.
 - `codesign --verify --deep --strict` exits 0.
-- Entitlements include sandbox and Bluetooth.
+- Entitlements include Bluetooth.
+- If Task 0 chose the sandboxed branch, entitlements also include `com.apple.security.app-sandbox`.
+- If Task 0 chose the direct-distribution unsandboxed branch, entitlements do not include `com.apple.security.app-sandbox`.
 
 - [ ] **Step 7: Manual trusted iPhone acceptance test**
 
@@ -1442,6 +1727,18 @@ Expected:
 - The dashboard shows one iPhone row with source label `Trusted iPhone`.
 - Removing the USB cable keeps the last reading visible until the existing stale/expired thresholds apply.
 - A BLE-only iPhone does not create an iPhone row.
+
+Optional network-path check, only when Finder Wi-Fi sync/network lockdown is already enabled:
+
+```bash
+idevice_id -n
+ideviceinfo -n -u <UDID_FROM_IDEVICE_ID_N> -q com.apple.mobile.battery
+```
+
+Expected:
+
+- If `idevice_id -n` prints the same trusted UDID, BatteryHub may refresh that same allowlisted row over `.lockdownNetwork`.
+- If `idevice_id -n` is empty or unavailable, BatteryHub keeps USB enrollment valid and reports a network-path diagnostic instead of adding any BLE iPhone row.
 
 - [ ] **Step 8: Commit verification-ready implementation**
 

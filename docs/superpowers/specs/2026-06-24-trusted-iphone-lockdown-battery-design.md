@@ -4,7 +4,7 @@
 
 BatteryHub should show battery status for the user's own iPhone without requiring any companion app on the iPhone. It must not create dashboard rows from random BLE advertisements or nearby devices that only happen to look like an iPhone.
 
-The practical route is the same class of solution described by AirBuddy and implemented by AirBattery: use Apple's existing iOS trust and lockdown pairing path. The user connects the iPhone to the Mac once by USB, unlocks it, taps Trust, and BatteryHub stores that device's UDID in a local allowlist. After that, BatteryHub may read the iPhone battery through USB or Wi-Fi lockdown when the Mac can reach the same trusted device.
+The practical route is the same class of solution described by AirBuddy and implemented by AirBattery: use Apple's existing iOS trust and lockdown pairing path. The user connects the iPhone to the Mac once by USB, unlocks it, taps Trust, and BatteryHub stores that device's UDID in a local allowlist. After that, BatteryHub reads the iPhone battery through USB, and may also read through Wi-Fi/network lockdown when Finder Wi-Fi sync or equivalent network lockdown support is already enabled and the Mac can reach the same trusted device.
 
 ## References
 
@@ -29,7 +29,7 @@ The practical route is the same class of solution described by AirBuddy and impl
 BatteryHub gets a new iOS lockdown provider that is separate from the current Bluetooth scanner concerns:
 
 1. `TrustedIPhoneRegistry` owns the local allowlist of iOS UDIDs that the user explicitly added.
-2. `IPhoneLockdownBatteryProvider` discovers `idevice_id` and `ideviceinfo` command-line tools, lists USB and network lockdown devices, reads `DeviceName`, reads `com.apple.mobile.battery`, and emits candidates only for allowlisted UDIDs.
+2. `IPhoneLockdownBatteryProvider` discovers `idevice_id` and `ideviceinfo` command-line tools, lists USB and already-enabled network lockdown devices, reads `DeviceName`, reads `com.apple.mobile.battery`, and emits candidates only for allowlisted UDIDs.
 3. `BluetoothDeviceScanner.connectedCandidateReport` still merges local HID, system profiler, and BLE Battery Service candidates, then adds trusted iPhone candidates from the lockdown provider.
 4. `BluetoothBatteryResolver.report` drops BLE iPhone candidates before snapshots are created. That keeps random or stale iPhone BLE readings from becoming BatteryHub rows.
 5. Settings adds an iPhone setup card. The user connects a phone by USB, unlocks it, taps Trust, and clicks an explicit BatteryHub action to add the connected trusted iPhone. The app saves the UDID locally.
@@ -44,7 +44,7 @@ Add:
 - `TrustedIPhone`: `udid`, `displayName`, `trustedAt`.
 - `TrustedIPhoneRegistry`: loads and saves `[TrustedIPhone]` in UserDefaults.
 - `IPhoneLockdownConnection`: `usb` or `network`.
-- `IPhoneLockdownDevice`: UDID, display name, battery percent, charge state, and connection type.
+- `IPhoneLockdownDevice`: UDID, display name, battery percent, and connection type. The first implementation stores snapshot charge state as `.unknown`; parsing charging/full state can be added after percent reads are proven in the installed app.
 
 Snapshot IDs for trusted iPhones use the UDID, not display name:
 
@@ -52,7 +52,9 @@ Snapshot IDs for trusted iPhones use the UDID, not display name:
 trusted-iphone-00008110-001234567890801E
 ```
 
-That prevents duplicate rows for the same phone across USB and Wi-Fi, and it prevents two phones with the same display name from collapsing into one row.
+That prevents duplicate rows for the same phone across USB and Wi-Fi. The implementation plan also updates snapshot-store deduplication so two trusted iPhones with the same display name are kept distinct by UDID-based device ID instead of being collapsed by display name.
+
+BatteryHub's existing snapshot store deduplicates Bluetooth-like sources by kind and normalized display name. Trusted iPhone snapshots must be excluded from that display-name dedupe path, because their UDID-based `deviceID` is the authoritative identity.
 
 ## UI Behavior
 
@@ -62,7 +64,7 @@ The existing Add Device sheet gets an iPhone row:
 - Subtitle: `Connect by USB, unlock, Trust this Mac, then add it here.`
 - Action: `Trust`
 
-When the user clicks Trust, BatteryHub lists USB lockdown devices and reads each device name. If one or more trusted USB devices are visible, it adds them to `TrustedIPhoneRegistry`, refreshes battery data, and keeps the Settings window on the Devices pane. If no device is visible, Settings shows the latest enrollment result: command missing, no USB iPhone, device not trusted, or device added.
+When the user clicks Trust, BatteryHub lists USB lockdown devices and reads each device name. A device is enrollable only when `DeviceName` succeeds, which proves the user completed iOS Trust for that USB connection. If one or more trusted USB devices are visible, it adds them to `TrustedIPhoneRegistry`, refreshes battery data, and keeps the Settings window on the Devices pane. If no device is visible or trust proof fails, Settings shows the latest enrollment result: command missing, no USB iPhone, device not trusted, timeout, or device added.
 
 For trusted iPhone rows in the device inspector:
 
@@ -80,7 +82,8 @@ For trusted iPhone rows in the device inspector:
 - `status: .commandMissing` when `idevice_id` or `ideviceinfo` is absent.
 - `status: .noReport` when devices exist but none are allowlisted or no battery payload was returned.
 - `status: .timedOut` when a command exceeds the timeout.
-- `message` includes USB/network counts and allowlist filtering counts.
+- `status: .unavailable` when a lockdown command exits non-zero for a listed trusted device.
+- `message` includes USB/network counts and allowlist filtering counts. Network counts are opportunistic; an empty or unavailable `idevice_id -n` path is expected unless Wi-Fi sync/network lockdown is already enabled.
 
 Settings should pass `latestRefreshDiagnostics` into `BatteryHubSettingsView` and render a compact diagnostics card in the Devices pane. This closes the current gap where diagnostics exist in the model but are not visible in Settings.
 
@@ -92,11 +95,14 @@ Required tests:
 
 - `TrustedIPhoneRegistry` round-trips through isolated `UserDefaults`.
 - Registry trust updates display name without duplicating UDIDs.
-- Lockdown parser reads `BatteryCurrentCapacity`, `BatteryIsCharging`, and `DeviceName`.
+- Lockdown parser reads `BatteryCurrentCapacity` and tolerates extra battery keys such as `BatteryIsCharging`; `DeviceName` is read separately as trust proof for enrollment and display naming.
 - Provider lists USB and network devices, but emits snapshots only for allowlisted UDIDs.
 - Provider reports `commandMissing` when either `idevice_id` or `ideviceinfo` is missing.
+- Provider reports `timedOut` when listing or reading commands exceed the timeout.
+- Enrollment skips a USB UDID when `DeviceName` cannot be read, instead of adding an untrusted generic `iPhone`.
 - Resolver drops BLE iPhone candidates.
 - Trusted iPhone snapshots use UDID-based IDs and high confidence.
+- Snapshot store merge keeps two trusted iPhones with the same display name when their UDID-based IDs differ.
 - Battery provider label changes from `USB iPhone` to `Trusted iPhone`.
 - Add Device guide renders an iPhone setup row.
 - Settings can render diagnostics.
@@ -106,15 +112,18 @@ Manual verification:
 1. Install libimobiledevice tools on the Mac used for testing.
 2. Connect the user's iPhone by USB, unlock it, and trust the Mac.
 3. Confirm `idevice_id -l` returns the iPhone UDID.
-4. Add the iPhone in BatteryHub Settings.
-5. Confirm `/Applications/BatteryHubMac.app` is the running app.
-6. Confirm the iPhone row appears only after allowlisting.
-7. Confirm a fake or nearby BLE iPhone does not create a row.
+4. Confirm `ideviceinfo -u <UDID> -k DeviceName` and `ideviceinfo -u <UDID> -q com.apple.mobile.battery` work from Terminal.
+5. Add the iPhone in BatteryHub Settings.
+6. Confirm `/Applications/BatteryHubMac.app` is the running app.
+7. Confirm the iPhone row appears only after allowlisting.
+8. Confirm a fake or nearby BLE iPhone does not create a row.
+9. Optional: if Finder Wi-Fi sync/network lockdown is already enabled, confirm `idevice_id -n` returns the same trusted UDID and BatteryHub refreshes the same allowlisted row over the network path. If it is empty, report that as a network-path diagnostic only.
 
 ## Risks
 
-- A sandboxed app may not be able to launch external Homebrew tools in all signing modes. The implementation must verify this in the installed `/Applications/BatteryHubMac.app`, not only in tests.
+- A sandboxed app may not be able to launch external Homebrew tools in all signing modes. The implementation must verify this in the installed `/Applications/BatteryHubMac.app` before coding depends on external command execution, not only at the end.
 - Wi-Fi lockdown availability depends on iPhone trust, Finder Wi-Fi sync state, network reachability, and local network permissions. The UI must present stale data honestly.
+- On macOS 15 and newer, network lockdown may require Local Network privacy usage copy in the app's Info.plist. USB is the first acceptance path; network failure without that privacy work should remain a diagnostic, not a reason to show BLE iPhones.
 - Bundling libimobiledevice command-line tools introduces license, signing, notarization, and helper lifecycle work. That is intentionally out of scope for the first pass.
 
 ## Spec Self-Review
@@ -122,5 +131,6 @@ Manual verification:
 - Scope is focused on one subsystem: trusted iOS lockdown battery reading.
 - The design explicitly excludes iPhone companion apps and BLE identity guessing.
 - Identity uses UDID, not display name, which fixes same-name phone collisions.
+- The snapshot store behavior is included in scope so UDID identity survives merge/deduplication, not only snapshot creation.
 - Diagnostics are visible in Settings, so command and trust failures are actionable.
 - Packaging/bundled helper decisions are documented as risks, not hidden implementation requirements.
