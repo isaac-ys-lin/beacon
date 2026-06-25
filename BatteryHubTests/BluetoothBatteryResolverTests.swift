@@ -114,10 +114,49 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         let scanReport = BluetoothCandidateScanReport(
             candidates: [
                 BluetoothBatteryCandidate(
+                    deviceID: "apple-keyboard",
+                    displayName: "Magic Keyboard",
+                    transport: .hid,
+                    batteryPercent: 80,
+                    kindHint: .keyboard
+                )
+            ],
+            attempts: [
+                BatteryProviderAttempt(
+                    provider: .ioRegistry,
+                    status: .reported,
+                    candidateCount: 1,
+                    message: "IORegistry returned 1 battery candidate",
+                    attemptedAt: Date(timeIntervalSince1970: 40)
+                )
+            ]
+        )
+
+        let report = BluetoothBatteryResolver.report(from: scanReport, now: Date(timeIntervalSince1970: 50))
+
+        XCTAssertEqual(report.snapshots.map(\.deviceID), ["bluetooth-apple-keyboard"])
+        XCTAssertEqual(report.diagnostics.snapshotCount, 1)
+        XCTAssertEqual(report.diagnostics.attempts.count, 1)
+        XCTAssertEqual(report.diagnostics.attempts[0].provider, .ioRegistry)
+        XCTAssertEqual(report.diagnostics.attempts[0].status, .reported)
+        XCTAssertEqual(report.diagnostics.attempts[0].candidateCount, 1)
+    }
+
+    func testResolverReportDropsBLEIPhoneCandidates() {
+        let scanReport = BluetoothCandidateScanReport(
+            candidates: [
+                BluetoothBatteryCandidate(
                     deviceID: "16AE09F1-3309-CF7D-793F-80F1EE3B4933",
                     displayName: "YiSungiPhone",
                     transport: .ble,
                     batteryPercent: 80
+                ),
+                BluetoothBatteryCandidate(
+                    deviceID: "apple-keyboard",
+                    displayName: "Magic Keyboard",
+                    transport: .hid,
+                    batteryPercent: 64,
+                    kindHint: .keyboard
                 )
             ],
             attempts: [
@@ -133,45 +172,54 @@ final class BluetoothBatteryResolverTests: XCTestCase {
 
         let report = BluetoothBatteryResolver.report(from: scanReport, now: Date(timeIntervalSince1970: 50))
 
-        XCTAssertEqual(report.snapshots.map(\.deviceID), ["bluetooth-iphone-yisungiphone"])
+        XCTAssertEqual(report.snapshots.map(\.deviceID), ["bluetooth-apple-keyboard"])
         XCTAssertEqual(report.diagnostics.snapshotCount, 1)
-        XCTAssertEqual(report.diagnostics.attempts.count, 1)
-        XCTAssertEqual(report.diagnostics.attempts[0].provider, .coreBluetoothBatteryService)
-        XCTAssertEqual(report.diagnostics.attempts[0].status, .reported)
-        XCTAssertEqual(report.diagnostics.attempts[0].candidateCount, 1)
     }
 
-    func testIPhoneUSBBatteryParserReadsCapacityAndDeviceName() {
-        let output = """
-        BatteryCurrentCapacity: 77
-        BatteryIsCharging: false
-        DeviceName: YiSungiPhone
-        """
-
-        let reading = IPhoneUSBBatteryProvider.parse(output)
-
-        XCTAssertEqual(reading?.percent, 77)
-        XCTAssertEqual(reading?.displayName, "YiSungiPhone")
-    }
-
-    func testIPhoneUSBBatteryCandidateCreatesUSBProviderSnapshot() throws {
-        let candidate = try XCTUnwrap(
-            IPhoneUSBBatteryProvider.candidate(
-                from: IPhoneUSBBatteryReading(percent: 77, displayName: "YiSungiPhone")
-            )
+    func testTrustedIPhoneSnapshotUsesUDIDIdentity() {
+        let usbSnapshot = BluetoothBatteryResolver.snapshot(
+            from: BluetoothBatteryCandidate(
+                deviceID: "00008030-001A",
+                displayName: "YiSungiPhone",
+                transport: .usb,
+                batteryPercent: 77,
+                kindHint: .iPhone
+            ),
+            now: Date(timeIntervalSince1970: 70)
         )
-
-        let snapshot = BluetoothBatteryResolver.snapshot(
-            from: candidate,
+        let networkSnapshot = BluetoothBatteryResolver.snapshot(
+            from: BluetoothBatteryCandidate(
+                deviceID: "00008110-00BB",
+                displayName: "YiSungiPhone",
+                transport: .lockdownNetwork,
+                batteryPercent: 72,
+                kindHint: .iPhone
+            ),
             now: Date(timeIntervalSince1970: 70)
         )
 
-        XCTAssertEqual(snapshot.deviceID, "usb-iphone-yisungiphone")
-        XCTAssertEqual(snapshot.kind, .iPhone)
-        XCTAssertEqual(snapshot.percent, 77)
-        XCTAssertEqual(snapshot.source, .ideviceInfo)
-        XCTAssertEqual(snapshot.provider, .ideviceInfo)
-        XCTAssertEqual(snapshot.confidence, .high)
+        XCTAssertEqual(usbSnapshot.deviceID, "trusted-iphone-00008030-001A")
+        XCTAssertEqual(usbSnapshot.kind, .iPhone)
+        XCTAssertEqual(usbSnapshot.percent, 77)
+        XCTAssertEqual(usbSnapshot.source, .ideviceInfo)
+        XCTAssertEqual(usbSnapshot.provider, .ideviceInfo)
+        XCTAssertEqual(usbSnapshot.confidence, .high)
+        XCTAssertEqual(networkSnapshot.deviceID, "trusted-iphone-00008110-00BB")
+        XCTAssertEqual(networkSnapshot.source, .ideviceInfo)
+    }
+
+    func testIPhoneLockdownBatteryParserReadsCapacityAndDeviceName() {
+        let reading = IPhoneLockdownBatteryProvider.parseBatteryReading(
+            """
+            BatteryCurrentCapacity: 77
+            BatteryIsCharging: false
+            DeviceName: YiSungiPhone
+            """,
+            fallbackDisplayName: "Fallback iPhone"
+        )
+
+        XCTAssertEqual(reading?.percent, 77)
+        XCTAssertEqual(reading?.displayName, "YiSungiPhone")
     }
 
     func testIPhoneLockdownProviderReadsOnlyAllowlistedDevices() async throws {

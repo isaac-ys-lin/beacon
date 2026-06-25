@@ -40,6 +40,8 @@ public struct BatterySnapshotStore: Sendable {
     }
 
     public mutating func merge(_ incoming: [BatterySnapshot]) {
+        removeLegacyBLEIPhoneSnapshots()
+
         for snapshot in incoming {
             if hasNewerDuplicateBluetoothSnapshot(matching: snapshot) {
                 continue
@@ -52,6 +54,12 @@ public struct BatterySnapshotStore: Sendable {
             }
             removeDuplicateBluetoothSnapshots(matching: snapshot)
             snapshotsByID[snapshot.deviceID] = snapshot
+        }
+    }
+
+    private mutating func removeLegacyBLEIPhoneSnapshots() {
+        snapshotsByID = snapshotsByID.filter { _, snapshot in
+            !snapshot.isLegacyBLEIPhoneSnapshot
         }
     }
 
@@ -132,6 +140,12 @@ public struct BatterySnapshotStore: Sendable {
 private extension BatterySnapshot {
     var isTrustedIPhoneSnapshot: Bool {
         source == .ideviceInfo && deviceID.hasPrefix("trusted-iphone-")
+    }
+
+    var isLegacyBLEIPhoneSnapshot: Bool {
+        kind == .iPhone
+            && source == .coreBluetooth
+            && deviceID.hasPrefix("bluetooth-iphone-")
     }
 }
 

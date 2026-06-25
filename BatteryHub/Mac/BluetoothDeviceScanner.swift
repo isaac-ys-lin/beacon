@@ -81,10 +81,10 @@ public struct BluetoothDeviceScanner {
             )
         }
 
-        let usb = await IPhoneUSBBatteryProvider.readCandidate(now: now)
-        Self.logger.info("USB iPhone read returned \(usb.attempt.candidateCount) battery candidates")
-        attempts.append(usb.attempt)
-        if let candidate = usb.candidate {
+        let trustedIPhoneReport = await IPhoneLockdownBatteryProvider().readReport(now: now)
+        Self.logger.info("Trusted iPhone read returned \(trustedIPhoneReport.candidates.count) battery candidates")
+        attempts.append(contentsOf: trustedIPhoneReport.attempts)
+        for candidate in trustedIPhoneReport.candidates {
             candidates.upsert(candidate)
         }
 

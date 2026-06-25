@@ -135,7 +135,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots.map(\.percent), [82])
     }
 
-    func testMergeDeduplicatesSameIPhoneAcrossBLEAndUSBSources() {
+    func testMergePurgesLegacyBLEIPhoneSnapshot() {
         let bleReport = BatterySnapshot(
             deviceID: "bluetooth-iphone-yisungiphone",
             displayName: "YiSungiPhone",
@@ -146,7 +146,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
             updatedAt: Date(timeIntervalSince1970: 100)
         )
         let usbReport = BatterySnapshot(
-            deviceID: "usb-iphone-yisungiphone",
+            deviceID: "trusted-iphone-00008030",
             displayName: "YiSungiPhone",
             kind: .iPhone,
             percent: 77,
@@ -159,9 +159,10 @@ final class BatterySnapshotStoreTests: XCTestCase {
         store.merge([bleReport])
         store.merge([usbReport])
 
-        XCTAssertEqual(store.snapshots.map(\.deviceID), ["usb-iphone-yisungiphone"])
-        XCTAssertEqual(store.snapshots.map(\.source), [.ideviceInfo])
-        XCTAssertEqual(store.snapshots.map(\.percent), [77])
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["trusted-iphone-00008030"])
+        XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), ["trusted-iphone-00008030"])
+        XCTAssertEqual(store.snapshots.first?.source, .ideviceInfo)
+        XCTAssertEqual(store.snapshots.first?.percent, 77)
     }
 
     func testRemoveDeviceIDsDropsTrustedIPhoneSnapshot() {
