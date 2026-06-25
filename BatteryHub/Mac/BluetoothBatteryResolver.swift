@@ -1,15 +1,16 @@
 import Foundation
 
-public enum BluetoothTransport: Sendable {
+public enum BluetoothTransport: Equatable, Sendable {
     case hid
     case ble
     case classic
     case systemProfiler
     case usb
+    case lockdownNetwork
     case unknown
 }
 
-public struct BluetoothBatteryCandidate: Sendable {
+public struct BluetoothBatteryCandidate: Equatable, Sendable {
     public let deviceID: String
     public let displayName: String
     public let transport: BluetoothTransport
@@ -101,6 +102,9 @@ public struct BluetoothBatteryResolver {
         if kind == .iPhone, candidate.transport == .usb {
             return "usb-iphone-\(candidate.displayName.stableBluetoothIdentitySlug)"
         }
+        if kind == .iPhone, candidate.transport == .lockdownNetwork {
+            return "trusted-iphone-\(candidate.deviceID)"
+        }
         return "bluetooth-\(candidate.deviceID)"
     }
 
@@ -111,7 +115,7 @@ public struct BluetoothBatteryResolver {
         case .ble: return .coreBluetooth
         case .classic: return .ioBluetooth
         case .systemProfiler: return .systemProfiler
-        case .usb: return .ideviceInfo
+        case .usb, .lockdownNetwork: return .ideviceInfo
         case .unknown: return .bluetoothUnsupported
         }
     }

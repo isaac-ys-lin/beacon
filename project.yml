@@ -25,7 +25,6 @@ targets:
     entitlements:
       path: BatteryHub/Mac/BatteryHubMac.entitlements
       properties:
-        com.apple.security.app-sandbox: true
         com.apple.security.device.bluetooth: true
     settings:
       base:

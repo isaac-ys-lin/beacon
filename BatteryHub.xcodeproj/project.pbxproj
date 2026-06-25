@@ -21,6 +21,7 @@
 		5D634D3DDBBE3F109D2F7FB5 /* BatteryHubStatusController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4054211F99F22D250429EE43 /* BatteryHubStatusController.swift */; };
 		633BA44DDF2636BB9218B3D5 /* BatteryHubSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96BAA8C3EF93B7718365B9A /* BatteryHubSettingsView.swift */; };
 		759798D6E876B82A8304FD26 /* BatteryHubQuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D83E21BB5DAA9F07874BBB7 /* BatteryHubQuickActions.swift */; };
+		765B22DFC6C23E8E52E28E05 /* IPhoneLockdownBatteryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076E9FF9BABE2EDD6E61AD51 /* IPhoneLockdownBatteryProvider.swift */; };
 		782801FDEA2CCDE36533BA6E /* BluetoothDeviceScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */; };
 		942FE4611CC7E0C6850F6065 /* BluetoothBatteryResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3F20615717ABC149F0CE39 /* BluetoothBatteryResolver.swift */; };
 		959DFF8817529DF2A09B7C0D /* ActionHUDSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB06AE7508CA5F2F9BCB09D /* ActionHUDSettingsPane.swift */; };
@@ -59,6 +60,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		076E9FF9BABE2EDD6E61AD51 /* IPhoneLockdownBatteryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneLockdownBatteryProvider.swift; sourceTree = "<group>"; };
 		0C254213BB0D5DADF9F1F5FD /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
 		0EDBB2E81DFB38D0D14D8485 /* StatusMenuSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuSnapshotTests.swift; sourceTree = "<group>"; };
 		0FB0372F03E7E0D027A92495 /* TrustedIPhoneRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustedIPhoneRegistry.swift; sourceTree = "<group>"; };
@@ -162,6 +164,7 @@
 				668D7469010F9F52672D0768 /* DeviceBatteryRow.swift */,
 				809F1103BFF7C13AF6817CFD /* DeviceListPresentation.swift */,
 				20C940CE61834B35B25A743C /* Info.plist */,
+				076E9FF9BABE2EDD6E61AD51 /* IPhoneLockdownBatteryProvider.swift */,
 				520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */,
 				BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */,
 				B03BFECD6FD8B2685359F87F /* QuickActionsSettingsPane.swift */,
@@ -319,6 +322,7 @@
 				A2F311CF66BE5F52F4C17DA3 /* DesignTokens.swift in Sources */,
 				07DB1584A760AE080C17CB52 /* DeviceBatteryRow.swift in Sources */,
 				42EAB0D28902C87A454CFEA0 /* DeviceListPresentation.swift in Sources */,
+				765B22DFC6C23E8E52E28E05 /* IPhoneLockdownBatteryProvider.swift in Sources */,
 				32FA20A2BF036886CCAFFD31 /* LowBatteryNotifier.swift in Sources */,
 				3E35364E3690DA8E20556AFA /* MacPowerSourceReader.swift in Sources */,
 				BB462FEC3DB41714F2EF9DDB /* QuickActionsSettingsPane.swift in Sources */,
