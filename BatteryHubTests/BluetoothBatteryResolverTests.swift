@@ -3,6 +3,13 @@ import XCTest
 @testable import BatteryHub
 
 final class BluetoothBatteryResolverTests: XCTestCase {
+    private func isolatedDefaults(name: String = UUID().uuidString) -> UserDefaults {
+        let suiteName = "BluetoothBatteryResolverTests.\(name)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+
     func testIORegistryBatteryPercentCreatesKeyboardSnapshot() {
         let device = BluetoothBatteryCandidate(
             deviceID: "apple-keyboard",
@@ -158,6 +165,57 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(snapshot.source, .ideviceInfo)
         XCTAssertEqual(snapshot.provider, .ideviceInfo)
         XCTAssertEqual(snapshot.confidence, .high)
+    }
+
+    func testTrustedIPhoneRegistryPersistsAllowlistedUDIDs() {
+        let defaults = isolatedDefaults()
+        let firstTrustedAt = Date(timeIntervalSince1970: 1_000)
+        let secondTrustedAt = Date(timeIntervalSince1970: 2_000)
+        let registry = TrustedIPhoneRegistry()
+            .trusting(TrustedIPhone(udid: "00008030-001A", displayName: "YiSungiPhone", trustedAt: firstTrustedAt))
+            .trusting(TrustedIPhone(udid: "00008110-00BB", displayName: "Work iPhone", trustedAt: secondTrustedAt))
+
+        registry.save(to: defaults)
+        let loaded = TrustedIPhoneRegistry.load(from: defaults)
+
+        XCTAssertTrue(loaded.isTrusted(udid: "00008030-001A"))
+        XCTAssertEqual(loaded.displayName(for: "00008110-00BB"), "Work iPhone")
+        XCTAssertEqual(loaded.devices.first { $0.udid == "00008030-001A" }?.trustedAt, firstTrustedAt)
+        XCTAssertEqual(loaded.devices.first { $0.udid == "00008110-00BB" }?.trustedAt, secondTrustedAt)
+        XCTAssertEqual(loaded.devices, registry.devices)
+    }
+
+    func testTrustedIPhoneRegistryUpdatesExistingUDIDWithoutDuplicate() {
+        let oldTrustedAt = Date(timeIntervalSince1970: 1_000)
+        let newTrustedAt = Date(timeIntervalSince1970: 2_000)
+        let registry = TrustedIPhoneRegistry()
+            .trusting(TrustedIPhone(udid: "00008030-001A", displayName: "Old Name", trustedAt: oldTrustedAt))
+            .trusting(TrustedIPhone(udid: "00008030-001A", displayName: "YiSungiPhone", trustedAt: newTrustedAt))
+
+        XCTAssertEqual(registry.devices.count, 1)
+        XCTAssertEqual(registry.displayName(for: "00008030-001A"), "YiSungiPhone")
+        XCTAssertEqual(registry.devices.first?.trustedAt, newTrustedAt)
+    }
+
+    func testTrustedIPhoneRegistryRemovesUDID() {
+        let trustedAt = Date(timeIntervalSince1970: 1_000)
+        let registry = TrustedIPhoneRegistry()
+            .trusting(TrustedIPhone(udid: "00008030-001A", displayName: "YiSungiPhone", trustedAt: trustedAt))
+            .trusting(TrustedIPhone(udid: "00008110-00BB", displayName: "Work iPhone", trustedAt: trustedAt))
+            .removing(udid: "00008030-001A")
+
+        XCTAssertFalse(registry.isTrusted(udid: "00008030-001A"))
+        XCTAssertTrue(registry.isTrusted(udid: "00008110-00BB"))
+        XCTAssertEqual(registry.devices.map(\.udid), ["00008110-00BB"])
+    }
+
+    func testTrustedIPhoneRegistryLoadsEmptyFromCorruptData() {
+        let defaults = isolatedDefaults()
+        defaults.set(Data("not-json".utf8), forKey: TrustedIPhoneRegistry.storageKey)
+
+        let registry = TrustedIPhoneRegistry.load(from: defaults)
+
+        XCTAssertTrue(registry.devices.isEmpty)
     }
 
     func testBluetoothHIDUsageClassifiesKeychronAsKeyboard() {

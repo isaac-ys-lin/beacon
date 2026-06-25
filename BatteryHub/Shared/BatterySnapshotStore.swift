@@ -55,6 +55,13 @@ public struct BatterySnapshotStore: Sendable {
         }
     }
 
+    public mutating func removeDeviceIDs(_ deviceIDs: Set<String>) {
+        guard !deviceIDs.isEmpty else { return }
+        snapshotsByID = snapshotsByID.filter { deviceID, _ in
+            !deviceIDs.contains(deviceID)
+        }
+    }
+
     public static func freshness(for snapshot: BatterySnapshot, now: Date) -> Freshness {
         let age = now.timeIntervalSince(snapshot.updatedAt)
         if age >= 1_800 { return .expired }
@@ -67,12 +74,17 @@ public struct BatterySnapshotStore: Sendable {
     }
 
     private func hasNewerDuplicateBluetoothSnapshot(matching snapshot: BatterySnapshot) -> Bool {
-        guard snapshot.source.isBluetoothRelated else { return false }
+        guard snapshot.source.isBluetoothRelated,
+              !snapshot.isTrustedIPhoneSnapshot
+        else {
+            return false
+        }
 
         let normalizedName = snapshot.displayName.normalizedDeviceName
         return snapshotsByID.contains { id, existing in
             id != snapshot.deviceID
                 && existing.source.isBluetoothRelated
+                && !existing.isTrustedIPhoneSnapshot
                 && existing.kind == snapshot.kind
                 && existing.displayName.normalizedDeviceName == normalizedName
                 && existing.updatedAt > snapshot.updatedAt
@@ -81,6 +93,7 @@ public struct BatterySnapshotStore: Sendable {
 
     private func hasBetterDuplicateBluetoothSnapshot(matching snapshot: BatterySnapshot) -> Bool {
         guard snapshot.source.isBluetoothRelated,
+              !snapshot.isTrustedIPhoneSnapshot,
               snapshot.percent == nil
         else {
             return false
@@ -90,6 +103,7 @@ public struct BatterySnapshotStore: Sendable {
         return snapshotsByID.contains { id, existing in
             id != snapshot.deviceID
                 && existing.source.isBluetoothRelated
+                && !existing.isTrustedIPhoneSnapshot
                 && existing.kind == snapshot.kind
                 && existing.displayName.normalizedDeviceName == normalizedName
                 && existing.percent != nil
@@ -98,15 +112,26 @@ public struct BatterySnapshotStore: Sendable {
     }
 
     private mutating func removeDuplicateBluetoothSnapshots(matching snapshot: BatterySnapshot) {
-        guard snapshot.source.isBluetoothRelated else { return }
+        guard snapshot.source.isBluetoothRelated,
+              !snapshot.isTrustedIPhoneSnapshot
+        else {
+            return
+        }
 
         let normalizedName = snapshot.displayName.normalizedDeviceName
         snapshotsByID = snapshotsByID.filter { id, existing in
             id == snapshot.deviceID
                 || !existing.source.isBluetoothRelated
+                || existing.isTrustedIPhoneSnapshot
                 || existing.kind != snapshot.kind
                 || existing.displayName.normalizedDeviceName != normalizedName
         }
+    }
+}
+
+private extension BatterySnapshot {
+    var isTrustedIPhoneSnapshot: Bool {
+        source == .ideviceInfo && deviceID.hasPrefix("trusted-iphone-")
     }
 }
 

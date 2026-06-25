@@ -164,6 +164,63 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots.map(\.percent), [77])
     }
 
+    func testRemoveDeviceIDsDropsTrustedIPhoneSnapshot() {
+        let trustedIPhone = BatterySnapshot(
+            deviceID: "trusted-iphone-00008030",
+            displayName: "YiSungiPhone",
+            kind: .iPhone,
+            percent: 64,
+            chargeState: .unplugged,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+        let keyboard = BatterySnapshot(
+            deviceID: "bluetooth-hid-keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 82,
+            chargeState: .unplugged,
+            source: .ioRegistry,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 140) })
+        store.merge([trustedIPhone, keyboard])
+        store.removeDeviceIDs(["trusted-iphone-00008030"])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["bluetooth-hid-keyboard"])
+    }
+
+    func testMergeKeepsTwoTrustedIPhonesWithSameDisplayNameWhenUDIDsDiffer() {
+        let first = BatterySnapshot(
+            deviceID: "trusted-iphone-00008030",
+            displayName: "iPhone",
+            kind: .iPhone,
+            percent: 64,
+            chargeState: .unplugged,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+        let second = BatterySnapshot(
+            deviceID: "trusted-iphone-00008110",
+            displayName: "iPhone",
+            kind: .iPhone,
+            percent: 72,
+            chargeState: .charging,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 130)
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 140) })
+        store.merge([first])
+        store.merge([second])
+
+        let snapshotsByID = Dictionary(uniqueKeysWithValues: store.snapshots.map { ($0.deviceID, $0) })
+        XCTAssertEqual(Set(snapshotsByID.keys), ["trusted-iphone-00008030", "trusted-iphone-00008110"])
+        XCTAssertEqual(snapshotsByID["trusted-iphone-00008030"]?.percent, 64)
+        XCTAssertEqual(snapshotsByID["trusted-iphone-00008110"]?.percent, 72)
+    }
+
     func testMergeKeepsBatteryReportWhenSameRefreshAlsoHasUnsupportedBluetoothDuplicate() {
         let now = Date(timeIntervalSince1970: 120)
         let batteryReport = BatterySnapshot(
