@@ -41,6 +41,9 @@ final class BatteryHubSettingsWindowController {
             isPreviewingData: model.isUsingPreviewData,
             notificationAuthorizationState: model.notificationAuthorizationState,
             latestNotificationDeliveryResult: model.latestNotificationDeliveryResult,
+            latestRefreshDiagnostics: model.latestRefreshDiagnostics,
+            trustedIPhones: model.trustedIPhoneRegistry.devices,
+            trustedIPhoneEnrollmentResult: model.trustedIPhoneEnrollmentResult,
             onRefresh: { [weak model] in
                 Task { await model?.refresh() }
             },
@@ -61,6 +64,12 @@ final class BatteryHubSettingsWindowController {
             },
             onSendTestNotification: { [weak model] in
                 model?.sendTestNotification()
+            },
+            onTrustConnectedIPhone: { [weak model] in
+                Task { await model?.trustConnectedIPhones() }
+            },
+            onForgetTrustedIPhone: { [weak model] udid in
+                model?.forgetTrustedIPhone(udid: udid)
             },
             onQuit: {
                 NSApp.terminate(nil)

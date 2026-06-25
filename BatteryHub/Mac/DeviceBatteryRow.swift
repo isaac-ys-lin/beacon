@@ -483,7 +483,7 @@ func batteryProviderLabel(source: BatterySource, provider: BatteryProvider) -> S
     case .ioBluetooth: return "Bluetooth"
     case .systemProfiler: return "System"
     case .bluetoothUnsupported: return "Bluetooth"
-    case .ideviceInfo: return "USB iPhone"
+    case .ideviceInfo: return "Trusted iPhone"
     }
 }
 

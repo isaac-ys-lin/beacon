@@ -40,6 +40,9 @@ struct BatteryHubSettingsView: View {
     let isPreviewingData: Bool
     let notificationAuthorizationState: NotificationCenterAuthorizationState
     let latestNotificationDeliveryResult: NotificationCenterDeliveryResult?
+    let latestRefreshDiagnostics: BatteryRefreshDiagnostics
+    let trustedIPhones: [TrustedIPhone]
+    let trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport?
     let onRefresh: () -> Void
     let onOpenBluetoothSettings: () -> Void
     let onOpenSoundSettings: () -> Void
@@ -47,6 +50,8 @@ struct BatteryHubSettingsView: View {
     let onRequestNotificationPermission: () -> Void
     let onOpenNotificationSettings: () -> Void
     let onSendTestNotification: () -> Void
+    let onTrustConnectedIPhone: () -> Void
+    let onForgetTrustedIPhone: (String) -> Void
     let onQuit: () -> Void
 
     @AppStorage(LowBatteryNotifier.thresholdDefaultsKey) private var lowBatteryThreshold = LowBatteryNotifier.defaultThreshold
@@ -77,6 +82,9 @@ struct BatteryHubSettingsView: View {
         isPreviewingData: Bool = false,
         notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown,
         latestNotificationDeliveryResult: NotificationCenterDeliveryResult? = nil,
+        latestRefreshDiagnostics: BatteryRefreshDiagnostics = BatteryRefreshDiagnostics(),
+        trustedIPhones: [TrustedIPhone] = [],
+        trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport? = nil,
         onRefresh: @escaping () -> Void,
         onOpenBluetoothSettings: @escaping () -> Void = {},
         onOpenSoundSettings: @escaping () -> Void = {},
@@ -84,6 +92,8 @@ struct BatteryHubSettingsView: View {
         onRequestNotificationPermission: @escaping () -> Void = {},
         onOpenNotificationSettings: @escaping () -> Void = {},
         onSendTestNotification: @escaping () -> Void = {},
+        onTrustConnectedIPhone: @escaping () -> Void = {},
+        onForgetTrustedIPhone: @escaping (String) -> Void = { _ in },
         onQuit: @escaping () -> Void = {},
         initialPane: SettingsPane = .devices,
         initialSelectedDeviceID: String? = nil,
@@ -94,6 +104,9 @@ struct BatteryHubSettingsView: View {
         self.isPreviewingData = isPreviewingData
         self.notificationAuthorizationState = notificationAuthorizationState
         self.latestNotificationDeliveryResult = latestNotificationDeliveryResult
+        self.latestRefreshDiagnostics = latestRefreshDiagnostics
+        self.trustedIPhones = trustedIPhones
+        self.trustedIPhoneEnrollmentResult = trustedIPhoneEnrollmentResult
         self.onRefresh = onRefresh
         self.onOpenBluetoothSettings = onOpenBluetoothSettings
         self.onOpenSoundSettings = onOpenSoundSettings
@@ -101,6 +114,8 @@ struct BatteryHubSettingsView: View {
         self.onRequestNotificationPermission = onRequestNotificationPermission
         self.onOpenNotificationSettings = onOpenNotificationSettings
         self.onSendTestNotification = onSendTestNotification
+        self.onTrustConnectedIPhone = onTrustConnectedIPhone
+        self.onForgetTrustedIPhone = onForgetTrustedIPhone
         self.onQuit = onQuit
         _selectedPane = State(initialValue: initialPane)
         _selectedDeviceID = State(initialValue: initialSelectedDeviceID)
@@ -131,7 +146,9 @@ struct BatteryHubSettingsView: View {
         }
         .sheet(isPresented: $isShowingAddDeviceGuide) {
             AddDeviceGuideView(
+                trustedIPhoneEnrollmentResult: trustedIPhoneEnrollmentResult,
                 onOpenBluetoothSettings: onOpenBluetoothSettings,
+                onTrustConnectedIPhone: onTrustConnectedIPhone,
                 onDismiss: { isShowingAddDeviceGuide = false }
             )
         }
@@ -256,15 +273,23 @@ struct BatteryHubSettingsView: View {
 
             Divider()
 
-            Group {
-                if let selectedDevice {
-                    ScrollView(showsIndicators: false) {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
+                    TrustedIPhoneSettingsCard(
+                        latestRefreshDiagnostics: latestRefreshDiagnostics,
+                        trustedIPhones: trustedIPhones,
+                        enrollmentResult: trustedIPhoneEnrollmentResult,
+                        onTrustConnectedIPhone: onTrustConnectedIPhone,
+                        onForgetTrustedIPhone: onForgetTrustedIPhone
+                    )
+
+                    if let selectedDevice {
                         deviceDetail(for: selectedDevice)
-                            .padding(1)
+                    } else {
+                        emptyDeviceDetail
                     }
-                } else {
-                    emptyDeviceDetail
                 }
+                .padding(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.leading, 22)

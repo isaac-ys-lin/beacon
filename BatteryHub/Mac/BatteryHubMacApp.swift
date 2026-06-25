@@ -274,6 +274,8 @@ final class BatteryHubModel: ObservableObject {
     @Published private(set) var notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown
     @Published private(set) var latestNotificationDeliveryResult: NotificationCenterDeliveryResult?
     @Published private(set) var latestRefreshDiagnostics = BatteryRefreshDiagnostics()
+    @Published private(set) var trustedIPhoneRegistry = TrustedIPhoneRegistry.load()
+    @Published private(set) var trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport?
 
     private let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "refresh")
     private var refreshLoop: Task<Void, Never>?
@@ -362,6 +364,26 @@ final class BatteryHubModel: ObservableObject {
                 }
             }
         )
+    }
+
+    func trustConnectedIPhones() async {
+        let report = await IPhoneLockdownBatteryProvider.discoverUSBTrustedDevices()
+        trustedIPhoneEnrollmentResult = report
+        guard !report.devices.isEmpty else { return }
+
+        var nextRegistry = trustedIPhoneRegistry
+        for device in report.devices {
+            nextRegistry = nextRegistry.trusting(device)
+        }
+        trustedIPhoneRegistry = nextRegistry
+        nextRegistry.save()
+        await refresh()
+    }
+
+    func forgetTrustedIPhone(udid: String) {
+        trustedIPhoneRegistry = trustedIPhoneRegistry.removing(udid: udid)
+        trustedIPhoneRegistry.save()
+        store.removeDeviceIDs(Set(["trusted-iphone-\(udid)"]))
     }
 
     private func readBluetoothSnapshotsWithTimeout() async -> BluetoothBatteryReadReport? {

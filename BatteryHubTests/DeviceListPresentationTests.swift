@@ -267,7 +267,7 @@ final class DeviceListPresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             batteryProviderLabel(source: .ideviceInfo, provider: .ideviceInfo),
-            "USB iPhone"
+            "Trusted iPhone"
         )
     }
 
@@ -2327,7 +2327,16 @@ final class DeviceListPresentationTests: XCTestCase {
 
     @MainActor
     func testAddDeviceGuideRenderProducesNonBlankImage() throws {
-        let view = AddDeviceGuideView(onOpenBluetoothSettings: {}, onDismiss: {})
+        let view = AddDeviceGuideView(
+            trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport(
+                devices: [],
+                status: .noReport,
+                message: "Connect by USB, unlock, and trust this Mac."
+            ),
+            onOpenBluetoothSettings: {},
+            onTrustConnectedIPhone: {},
+            onDismiss: {}
+        )
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(x: 0, y: 0, width: 520, height: 330)
         hostingView.layoutSubtreeIfNeeded()
@@ -2344,6 +2353,58 @@ final class DeviceListPresentationTests: XCTestCase {
 
         try pngData?.write(to: outputURL, options: .atomic)
         XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
+    }
+
+    @MainActor
+    func testBatteryHubSettingsDevicesRenderTrustedIPhoneDiagnostics() throws {
+        let diagnostics = BatteryRefreshDiagnostics(
+            attempts: [
+                BatteryProviderAttempt(
+                    provider: .ideviceInfo,
+                    status: .commandMissing,
+                    candidateCount: 0,
+                    message: "idevice_id or ideviceinfo command not found",
+                    attemptedAt: Date(timeIntervalSince1970: 4_000)
+                )
+            ],
+            refreshedAt: Date(timeIntervalSince1970: 4_000),
+            snapshotCount: 0
+        )
+        let view = BatteryHubSettingsView(
+            snapshots: [],
+            latestRefreshDiagnostics: diagnostics,
+            trustedIPhones: [
+                TrustedIPhone(
+                    udid: "trusted-usb",
+                    displayName: "Yi-Sung iPhone",
+                    trustedAt: Date(timeIntervalSince1970: 3_000)
+                )
+            ],
+            trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport(
+                devices: [],
+                status: .commandMissing,
+                message: "idevice_id or ideviceinfo command not found"
+            ),
+            onRefresh: {},
+            onTrustConnectedIPhone: {},
+            onForgetTrustedIPhone: { _ in }
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-settings-trusted-iphone-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
     }
 
     @MainActor
