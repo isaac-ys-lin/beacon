@@ -279,18 +279,24 @@ final class BatteryHubModel: ObservableObject {
 
     private let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "refresh")
     private var refreshLoop: Task<Void, Never>?
+    private var refreshInFlight = false
     private let usesPreviewData: Bool
+    private let bluetoothReportReader: (@Sendable () async -> BluetoothBatteryReadReport?)?
 
     var isUsingPreviewData: Bool {
         usesPreviewData
     }
 
-    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+    init(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        bluetoothReportReader: (@Sendable () async -> BluetoothBatteryReadReport?)? = nil
+    ) {
         #if DEBUG
         usesPreviewData = environment["BATTERYHUB_PREVIEW_DATA"] == "1"
         #else
         usesPreviewData = false
         #endif
+        self.bluetoothReportReader = bluetoothReportReader
     }
 
     func start() {
@@ -307,10 +313,10 @@ final class BatteryHubModel: ObservableObject {
 
         logger.info("Battery refresh loop started")
         refreshLoop = Task { [weak self] in
-            await self?.refresh()
+            await self?.refresh(showsActivityIndicator: false)
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(45))
-                await self?.refresh()
+                await self?.refresh(showsActivityIndicator: false)
             }
         }
     }
@@ -319,11 +325,22 @@ final class BatteryHubModel: ObservableObject {
         refreshLoop?.cancel()
     }
 
-    func refresh() async {
-        guard !isRefreshing else { return }
-        logger.info("Battery refresh started")
-        isRefreshing = true
-        defer { isRefreshing = false }
+    func refresh(showsActivityIndicator: Bool = true) async {
+        guard !refreshInFlight else {
+            if showsActivityIndicator {
+                isRefreshing = true
+            }
+            return
+        }
+        logger.info("Battery refresh started activityIndicator=\(showsActivityIndicator, privacy: .public)")
+        refreshInFlight = true
+        if showsActivityIndicator {
+            isRefreshing = true
+        }
+        defer {
+            refreshInFlight = false
+            isRefreshing = false
+        }
 
         if usesPreviewData {
             seedPreviewData()
@@ -331,7 +348,12 @@ final class BatteryHubModel: ObservableObject {
         }
 
         var nextStore = store
-        guard let readReport = await readBluetoothSnapshotsWithTimeout() else {
+        let report = if let bluetoothReportReader {
+            await bluetoothReportReader()
+        } else {
+            await readBluetoothSnapshotsWithTimeout()
+        }
+        guard let readReport = report else {
             logger.error("Bluetooth refresh timed out after 8 seconds")
             latestRefreshDiagnostics = BatteryRefreshDiagnostics(
                 attempts: [

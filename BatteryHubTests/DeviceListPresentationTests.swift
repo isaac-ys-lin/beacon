@@ -10,6 +10,33 @@ final class DeviceListPresentationTests: XCTestCase {
 
     private static let fixedDate = Date(timeIntervalSince1970: 1_000)
 
+    private actor ControlledBluetoothReportReader {
+        private var readContinuation: CheckedContinuation<BluetoothBatteryReadReport?, Never>?
+        private var startedContinuation: CheckedContinuation<Void, Never>?
+        private var hasStarted = false
+
+        func read() async -> BluetoothBatteryReadReport? {
+            hasStarted = true
+            startedContinuation?.resume()
+            startedContinuation = nil
+            return await withCheckedContinuation { continuation in
+                readContinuation = continuation
+            }
+        }
+
+        func waitUntilStarted() async {
+            guard !hasStarted else { return }
+            await withCheckedContinuation { continuation in
+                startedContinuation = continuation
+            }
+        }
+
+        func finish(returning report: BluetoothBatteryReadReport?) {
+            readContinuation?.resume(returning: report)
+            readContinuation = nil
+        }
+    }
+
     private func makeSnapshot(
         deviceID: String,
         displayName: String,
@@ -70,6 +97,59 @@ final class DeviceListPresentationTests: XCTestCase {
         return view.subviews.reduce(current.map { [$0] } ?? []) { partial, subview in
             partial + scrollViews(in: subview)
         }
+    }
+
+    private func emptyBluetoothReadReport(now: Date = fixedDate) -> BluetoothBatteryReadReport {
+        BluetoothBatteryReadReport(
+            snapshots: [],
+            diagnostics: BatteryRefreshDiagnostics(refreshedAt: now, snapshotCount: 0)
+        )
+    }
+
+    // MARK: - Refresh Activity
+
+    @MainActor
+    func testBackgroundRefreshDoesNotShowSettingsSpinner() async {
+        let reader = ControlledBluetoothReportReader()
+        let model = BatteryHubModel(
+            environment: [:],
+            bluetoothReportReader: {
+                await reader.read()
+            }
+        )
+
+        let refreshTask = Task {
+            await model.refresh(showsActivityIndicator: false)
+        }
+        await reader.waitUntilStarted()
+
+        XCTAssertFalse(model.isRefreshing)
+
+        await reader.finish(returning: emptyBluetoothReadReport())
+        await refreshTask.value
+        XCTAssertFalse(model.isRefreshing)
+    }
+
+    @MainActor
+    func testManualRefreshShowsSpinnerUntilRefreshCompletes() async {
+        let reader = ControlledBluetoothReportReader()
+        let model = BatteryHubModel(
+            environment: [:],
+            bluetoothReportReader: {
+                await reader.read()
+            }
+        )
+
+        let refreshTask = Task {
+            await model.refresh()
+        }
+        await reader.waitUntilStarted()
+
+        XCTAssertTrue(model.isRefreshing)
+
+        await reader.finish(returning: emptyBluetoothReadReport())
+        await refreshTask.value
+        XCTAssertFalse(model.isRefreshing)
     }
 
     // MARK: - airPodsPrefix
