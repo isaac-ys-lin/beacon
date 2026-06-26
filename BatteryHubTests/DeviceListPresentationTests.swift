@@ -1850,7 +1850,7 @@ final class DeviceListPresentationTests: XCTestCase {
     func testMenuBarStatusIconUsesReadableMenuBarSizing() {
         XCTAssertEqual(BatteryHubStatusIconImage.designReferenceAssetName, BatteryHubSymbols.headerLogoAsset)
         XCTAssertEqual(BatteryHubMenuBarMetrics.iconSide, 20)
-        XCTAssertEqual(BatteryHubMenuBarMetrics.imageOnlyLength, NSStatusItem.squareLength)
+        XCTAssertEqual(BatteryHubMenuBarMetrics.imageOnlyLength, NSStatusItem.variableLength)
 
         let image = BatteryHubStatusIconImage.make()
         XCTAssertEqual(image.size.width, BatteryHubMenuBarMetrics.iconSide, accuracy: 0.01)
