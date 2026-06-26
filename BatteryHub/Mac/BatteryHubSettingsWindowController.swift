@@ -11,6 +11,8 @@ final class BatteryHubSettingsWindowController {
     private var initialPane: SettingsPane = .devices
     private var initialSelectedDeviceID: String?
     private var initiallyShowingAddDeviceGuide = false
+    private var isSettingsRefreshing = false
+    private var settingsRefreshTask: Task<Void, Never>?
 
     init(model: BatteryHubModel) {
         self.model = model
@@ -37,15 +39,15 @@ final class BatteryHubSettingsWindowController {
         guard let window else { return }
         let rootView = BatteryHubSettingsView(
             snapshots: model.store.decoratedSnapshots,
-            isRefreshing: model.isRefreshing,
+            isRefreshing: isSettingsRefreshing,
             isPreviewingData: model.isUsingPreviewData,
             notificationAuthorizationState: model.notificationAuthorizationState,
             latestNotificationDeliveryResult: model.latestNotificationDeliveryResult,
             latestRefreshDiagnostics: model.latestRefreshDiagnostics,
             trustedIPhones: model.trustedIPhoneRegistry.devices,
             trustedIPhoneEnrollmentResult: model.trustedIPhoneEnrollmentResult,
-            onRefresh: { [weak model] in
-                Task { await model?.refresh() }
+            onRefresh: { [weak self] in
+                self?.refreshFromSettings()
             },
             onOpenBluetoothSettings: {
                 BatteryHubSystemSettingsActions.openBluetoothSettings()
@@ -86,6 +88,22 @@ final class BatteryHubSettingsWindowController {
             window.contentViewController = hostingController
         }
         initiallyShowingAddDeviceGuide = false
+    }
+
+    private func refreshFromSettings() {
+        guard settingsRefreshTask == nil else { return }
+        isSettingsRefreshing = true
+        updateContent()
+        settingsRefreshTask = Task { [weak self, weak model] in
+            await model?.refresh(showsActivityIndicator: false)
+            self?.finishSettingsRefresh()
+        }
+    }
+
+    private func finishSettingsRefresh() {
+        settingsRefreshTask = nil
+        isSettingsRefreshing = false
+        updateContent()
     }
 
     private func existingOrNewWindow() -> NSWindow {
