@@ -244,8 +244,8 @@ private enum BatteryHubStatusIconDrawingMetrics {
 }
 
 enum BatteryHubMenuBarMetrics {
-    static let iconSide: CGFloat = 24
-    static let imageOnlyLength: CGFloat = 32
+    static let iconSide: CGFloat = 18
+    static let imageOnlyLength: CGFloat = 20
 }
 
 private enum BatteryRefreshLimits {
