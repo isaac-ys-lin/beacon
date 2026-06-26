@@ -1858,65 +1858,6 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertTrue(image.isTemplate)
     }
 
-    func testMenuBarStatusIconOpticallyBalancesRightSideWhitespace() {
-        let image = BatteryHubStatusIconImage.make()
-        let pixelBounds = renderedOpaquePixelBounds(for: image, scale: 4)
-
-        XCTAssertGreaterThan(pixelBounds.midX / (image.size.width * 4), 0.52)
-        XCTAssertGreaterThan(pixelBounds.width / (image.size.width * 4), 0.60)
-    }
-
-    private func renderedOpaquePixelBounds(for image: NSImage, scale: CGFloat) -> CGRect {
-        let width = Int(image.size.width * scale)
-        let height = Int(image.size.height * scale)
-        let bytesPerRow = width * 4
-        var data = [UInt8](repeating: 0, count: height * bytesPerRow)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let context = CGContext(
-            data: &data,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        )
-
-        guard let context else {
-            XCTFail("Failed to create icon render context")
-            return .zero
-        }
-
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        image.draw(in: CGRect(x: 0, y: 0, width: image.size.width * scale, height: image.size.height * scale))
-        NSGraphicsContext.restoreGraphicsState()
-
-        var minX = width
-        var minY = height
-        var maxX = -1
-        var maxY = -1
-
-        for y in 0..<height {
-            for x in 0..<width {
-                let alpha = data[y * bytesPerRow + x * 4 + 3]
-                if alpha > 20 {
-                    minX = min(minX, x)
-                    minY = min(minY, y)
-                    maxX = max(maxX, x)
-                    maxY = max(maxY, y)
-                }
-            }
-        }
-
-        guard maxX >= minX, maxY >= minY else {
-            XCTFail("Rendered icon did not produce opaque pixels")
-            return .zero
-        }
-
-        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
-    }
-
     // MARK: - Runtime-adjacent render smoke test
 
     func testDesktopWidgetReuseFrameDoesNotDriftWhenStyleIsUnchanged() {

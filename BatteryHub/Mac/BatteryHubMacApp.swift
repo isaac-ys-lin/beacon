@@ -164,9 +164,8 @@ enum BatteryHubStatusIconImage {
             )
 
             let dotRadius = BatteryHubStatusIconDrawingMetrics.dotDiameter / 2
-            let dotCenterX = transformedX(14)
             let dotRect = NSRect(
-                x: origin.x + (dotCenterX - dotRadius) * scale,
+                x: origin.x + (14 - dotRadius) * scale,
                 y: origin.y + (15 - dotRadius) * scale,
                 width: BatteryHubStatusIconDrawingMetrics.dotDiameter * scale,
                 height: BatteryHubStatusIconDrawingMetrics.dotDiameter * scale
@@ -227,27 +226,17 @@ enum BatteryHubStatusIconImage {
     }
 
     private static func scaledPoint(x: CGFloat, y: CGFloat, scale: CGFloat, origin: NSPoint) -> NSPoint {
-        NSPoint(x: origin.x + transformedX(x) * scale, y: origin.y + y * scale)
+        NSPoint(x: origin.x + x * scale, y: origin.y + y * scale)
     }
 
     private static func scaledPoint(_ point: NSPoint, scale: CGFloat, origin: NSPoint) -> NSPoint {
         scaledPoint(x: point.x, y: point.y, scale: scale, origin: origin)
-    }
-
-    private static func transformedX(_ x: CGFloat) -> CGFloat {
-        let metrics = BatteryHubStatusIconDrawingMetrics.self
-        return metrics.opticalCenterX
-            + (x - metrics.opticalCenterX) * metrics.horizontalScale
-            + metrics.opticalXOffset
     }
 }
 
 private enum BatteryHubStatusIconDrawingMetrics {
     static let canvasSide: CGFloat = 36
     static let artworkScale: CGFloat = 1.04
-    static let opticalCenterX: CGFloat = 14
-    static let horizontalScale: CGFloat = 1.7
-    static let opticalXOffset: CGFloat = 3.0
     static let stemLineWidth: CGFloat = 3.25
     static let innerArcLineWidth: CGFloat = 2.75
     static let outerArcLineWidth: CGFloat = 2.65
