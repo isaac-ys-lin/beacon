@@ -186,7 +186,8 @@ struct BatteryDesktopWidgetView: View {
             if let onOpenSettings {
                 BatteryHubHeaderControls(
                     theme: theme,
-                    onOpenSettings: onOpenSettings
+                    onOpenSettings: onOpenSettings,
+                    onQuit: { NSApp.terminate(nil) }
                 )
             }
         }

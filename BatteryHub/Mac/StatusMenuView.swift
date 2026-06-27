@@ -144,7 +144,8 @@ struct StatusMenuView: View {
 
             BatteryHubHeaderControls(
                 theme: theme,
-                onOpenSettings: { onOpenSettings(.devices, nil) }
+                onOpenSettings: { onOpenSettings(.devices, nil) },
+                onQuit: { NSApp.terminate(nil) }
             )
         }
         .padding(.horizontal, 16)

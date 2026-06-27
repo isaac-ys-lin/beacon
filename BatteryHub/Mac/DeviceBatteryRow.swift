@@ -154,12 +154,25 @@ struct BatteryHubUtilityIconButtonStyle: ButtonStyle {
 struct BatteryHubHeaderControls: View {
     let theme: BeaconThemePalette
     let onOpenSettings: () -> Void
+    var onQuit: (() -> Void)?
     var frameSize: CGFloat = 28
     var settingsGlyphSize: CGFloat = 13
     var spacing: CGFloat = 8
 
     var body: some View {
         HStack(spacing: spacing) {
+            if let onQuit {
+                Button(action: onQuit) {
+                    Image(systemName: "power")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(theme.textPrimary)
+                        .frame(width: frameSize, height: frameSize)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
+                .help("Quit BatteryHub")
+            }
+
             Button(action: onOpenSettings) {
                 BatteryHubHeaderSettingsIcon(
                     color: theme.textPrimary,

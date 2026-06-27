@@ -257,23 +257,26 @@ public struct BluetoothDeviceScanner {
         }
 
         return sections.flatMap { section -> [BluetoothBatteryCandidate] in
-            guard let connected = section["device_connected"] as? [[String: Any]] else {
-                return []
-            }
+            let connectedEntries = (section["device_connected"] as? [[String: Any]]) ?? []
+            let disconnectedEntries = (section["device_not_connected"] as? [[String: Any]]) ?? []
 
-            return connected.flatMap { entry -> [BluetoothBatteryCandidate] in
+            let fromConnected = connectedEntries.flatMap { entry -> [BluetoothBatteryCandidate] in
                 entry.flatMap { name, value -> [BluetoothBatteryCandidate] in
-                    guard let device = value as? [String: Any] else {
-                        return []
-                    }
-
-                    return candidates(fromSystemProfilerDeviceNamed: name, device: device)
+                    guard let device = value as? [String: Any] else { return [] }
+                    return candidates(fromSystemProfilerDeviceNamed: name, device: device, connectionState: .connected)
                 }
             }
+            let fromDisconnected = disconnectedEntries.flatMap { entry -> [BluetoothBatteryCandidate] in
+                entry.flatMap { name, value -> [BluetoothBatteryCandidate] in
+                    guard let device = value as? [String: Any] else { return [] }
+                    return candidates(fromSystemProfilerDeviceNamed: name, device: device, connectionState: .disconnected)
+                }
+            }
+            return fromConnected + fromDisconnected
         }
     }
 
-    private static func candidates(fromSystemProfilerDeviceNamed name: String, device: [String: Any]) -> [BluetoothBatteryCandidate] {
+    private static func candidates(fromSystemProfilerDeviceNamed name: String, device: [String: Any], connectionState: ConnectionState = .connected) -> [BluetoothBatteryCandidate] {
         let address = stringValue(device["device_address"]) ?? name
         let minorType = stringValue(device["device_minorType"]) ?? ""
         let kindHint = kindHint(name: name, minorType: minorType)
@@ -288,7 +291,8 @@ public struct BluetoothDeviceScanner {
                     displayName: "\(name) \(component)",
                     transport: .systemProfiler,
                     batteryPercent: level.percent,
-                    kindHint: .airPods
+                    kindHint: .airPods,
+                    connectionState: connectionState
                 )
             }
         }
@@ -303,7 +307,8 @@ public struct BluetoothDeviceScanner {
                 displayName: name,
                 transport: .systemProfiler,
                 batteryPercent: percent,
-                kindHint: kindHint
+                kindHint: kindHint,
+                connectionState: connectionState
             )
         ]
     }
