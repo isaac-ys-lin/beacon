@@ -43,7 +43,7 @@ public struct BluetoothDeviceScanner {
 
         switch CBCentralManager.authorization {
         case .allowedAlways, .notDetermined:
-            let ble = await BLEBatteryServiceReader().read(knownCandidates: candidates, timeout: .seconds(4))
+            let ble = await BLEBatteryServiceReader().read(timeout: .seconds(6))
             Self.logger.info("Known BLE scan returned \(ble.count) battery candidates")
             attempts.append(
                 BatteryProviderAttempt(
@@ -397,7 +397,7 @@ public struct BluetoothDeviceScanner {
         }
 
         return transport.localizedCaseInsensitiveContains("bluetooth")
-            && kindHint == .keyboard
+            && (kindHint == .keyboard || kindHint == .mouse || kindHint == .trackpad)
     }
 
     static func appleDeviceManagementCandidate(from properties: [String: Any]) -> BluetoothBatteryCandidate? {
@@ -668,10 +668,6 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    var normalizedBLEIdentity: String {
-        trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    }
-
     var isGenericBluetoothDisplayName: Bool {
         let normalized = normalizedDeviceName
         return normalized.isEmpty
@@ -702,47 +698,21 @@ enum BLEBatteryReadStatePolicy {
     }
 }
 
-struct BLEKnownDeviceFilter: Equatable {
-    private let knownIDs: Set<String>
-    private let knownNames: Set<String>
-
-    init(knownCandidates: [BluetoothBatteryCandidate]) {
-        knownIDs = Set(knownCandidates.map { $0.deviceID.normalizedBLEIdentity })
-        knownNames = Set(
-            knownCandidates
-                .map { $0.displayName.normalizedDeviceName }
-                .filter { !$0.isGenericBluetoothDisplayName }
-        )
-    }
-
-    func contains(deviceID: String, displayName: String?) -> Bool {
-        if knownIDs.contains(deviceID.normalizedBLEIdentity) {
-            return true
-        }
-
-        guard let displayName else { return false }
-        let normalizedName = displayName.normalizedDeviceName
-        guard !normalizedName.isGenericBluetoothDisplayName else { return false }
-        return knownNames.contains(normalizedName)
-    }
-}
-
 @MainActor
 private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentralManagerDelegate, @preconcurrency CBPeripheralDelegate {
     private static let batteryService = CBUUID(string: "180F")
     private static let batteryLevel = CBUUID(string: "2A19")
+    private static let hidService = CBUUID(string: "1812")
 
     private var central: CBCentralManager?
     private var continuation: CheckedContinuation<[BluetoothBatteryCandidate], Never>?
     private var candidates: [UUID: BluetoothBatteryCandidate] = [:]
     private var peripherals: [UUID: CBPeripheral] = [:]
     private var connectionAttemptIDs = Set<UUID>()
-    private var knownDeviceFilter = BLEKnownDeviceFilter(knownCandidates: [])
     private var timeoutTask: Task<Void, Never>?
 
-    func read(knownCandidates: [BluetoothBatteryCandidate], timeout: Duration = .seconds(4)) async -> [BluetoothBatteryCandidate] {
+    func read(timeout: Duration = .seconds(4)) async -> [BluetoothBatteryCandidate] {
         await withCheckedContinuation { continuation in
-            self.knownDeviceFilter = BLEKnownDeviceFilter(knownCandidates: knownCandidates)
             self.continuation = continuation
             self.central = CBCentralManager(delegate: self, queue: nil)
             self.timeoutTask = Task { @MainActor [weak self] in
@@ -764,7 +734,10 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         }
 
         for peripheral in central.retrieveConnectedPeripherals(withServices: [Self.batteryService]) {
-            inspectKnown(peripheral)
+            inspect(peripheral)
+        }
+        for peripheral in central.retrieveConnectedPeripherals(withServices: [Self.hidService]) {
+            inspect(peripheral)
         }
 
         central.scanForPeripherals(
@@ -774,7 +747,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        inspectKnown(peripheral)
+        inspect(peripheral)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -794,26 +767,17 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard let service = peripheral.services?.first(where: { $0.uuid == Self.batteryService }) else {
-            return
-        }
+        guard let service = peripheral.services?.first(where: { $0.uuid == Self.batteryService }) else { return }
         peripheral.discoverCharacteristics([Self.batteryLevel], for: service)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard let characteristic = service.characteristics?.first(where: { $0.uuid == Self.batteryLevel }) else {
-            return
-        }
+        guard let characteristic = service.characteristics?.first(where: { $0.uuid == Self.batteryLevel }) else { return }
         peripheral.readValue(for: characteristic)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard characteristic.uuid == Self.batteryLevel,
-              let value = characteristic.value?.first
-        else {
-            return
-        }
-
+        guard characteristic.uuid == Self.batteryLevel, let value = characteristic.value?.first else { return }
         let name = peripheral.name ?? "Bluetooth Device"
         candidates[peripheral.identifier] = BluetoothBatteryCandidate(
             deviceID: peripheral.identifier.uuidString,
@@ -823,18 +787,10 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         )
     }
 
-    private func inspectKnown(_ peripheral: CBPeripheral) {
+    private func inspect(_ peripheral: CBPeripheral) {
         guard peripherals[peripheral.identifier] == nil else { return }
-        guard knownDeviceFilter.contains(
-            deviceID: peripheral.identifier.uuidString,
-            displayName: peripheral.name
-        ) else {
-            return
-        }
-
         peripherals[peripheral.identifier] = peripheral
         peripheral.delegate = self
-
         if peripheral.state == .connected {
             peripheral.discoverServices([Self.batteryService])
         } else {
@@ -855,7 +811,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         let result = Array(candidates.values)
         continuation?.resume(returning: result)
         continuation = nil
-        central = nil
         connectionAttemptIDs.removeAll()
+        central = nil
     }
 }
