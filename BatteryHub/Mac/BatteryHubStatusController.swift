@@ -103,6 +103,12 @@ final class BatteryHubStatusController: NSObject {
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
+        // Don't overlap the popover with an open Settings window — surface the
+        // window instead.
+        if settingsWindowController.isWindowOpen {
+            settingsWindowController.bringToFront()
+            return
+        }
         if statusMenuPanelController.isShown {
             closeStatusMenu()
         } else {

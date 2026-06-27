@@ -11,6 +11,13 @@ final class BatteryHubSettingsWindowController {
     private var initialPane: SettingsPane = .devices
     private var initialSelectedDeviceID: String?
     private var initiallyShowingAddDeviceGuide = false
+    private var closeShortcutMonitor: Any?
+
+    /// True while the Settings window is on screen (or only miniaturized).
+    /// Used by the status controller to avoid overlapping it with the popover.
+    var isWindowOpen: Bool {
+        (window?.isVisible ?? false) || (window?.isMiniaturized ?? false)
+    }
 
     init(model: BatteryHubModel) {
         self.model = model
@@ -75,6 +82,17 @@ final class BatteryHubSettingsWindowController {
         initiallyShowingAddDeviceGuide = false
     }
 
+    /// Brings an already-open Settings window to the front without resetting the
+    /// selected pane/device (unlike `showWindow`).
+    func bringToFront() {
+        guard let window else { return }
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     private func existingOrNewWindow() -> NSWindow {
         if let window {
             return window
@@ -94,6 +112,24 @@ final class BatteryHubSettingsWindowController {
         window.isReleasedWhenClosed = false
         window.center()
         self.window = window
+        installCloseShortcutMonitorIfNeeded()
         return window
+    }
+
+    /// Wires ⌘W to close the Settings window. The app is a menu-bar accessory
+    /// with no main menu, so the standard Close key equivalent has nothing to
+    /// handle it; a local key monitor fills that gap and consumes the event to
+    /// avoid the system beep.
+    private func installCloseShortcutMonitorIfNeeded() {
+        guard closeShortcutMonitor == nil else { return }
+        closeShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, let window = self.window, window.isKeyWindow else { return event }
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags == .command, event.charactersIgnoringModifiers?.lowercased() == "w" {
+                window.performClose(nil)
+                return nil
+            }
+            return event
+        }
     }
 }
