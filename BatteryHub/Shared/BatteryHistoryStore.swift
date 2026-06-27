@@ -63,6 +63,37 @@ public enum BatteryHistoryStore {
         defaults.removeObject(forKey: storageKey)
     }
 
+    /// Heuristic charging detection for devices that expose no hardware charge
+    /// signal (BLE/HID peripherals): true when the most recent observed battery
+    /// change was an increase, and that increase is recent enough to still be
+    /// happening. A drop, a flat-too-long trend, or stale history all read as
+    /// not charging — so the pulse stops within `maxStepAge` of unplugging.
+    public static func isChargingByTrend(
+        for deviceID: String,
+        now: Date = Date(),
+        defaults: UserDefaults = .standard,
+        maxStepAge: TimeInterval = 600
+    ) -> Bool {
+        isChargingByTrend(
+            samples: samples(for: deviceID, defaults: defaults),
+            now: now,
+            maxStepAge: maxStepAge
+        )
+    }
+
+    public static func isChargingByTrend(
+        samples: [BatteryHistorySample],
+        now: Date,
+        maxStepAge: TimeInterval = 600
+    ) -> Bool {
+        let sorted = samples.sorted { $0.recordedAt < $1.recordedAt }
+        guard sorted.count >= 2 else { return false }
+        let latest = sorted[sorted.count - 1]
+        let previous = sorted[sorted.count - 2]
+        guard latest.percent > previous.percent else { return false }
+        return now.timeIntervalSince(latest.recordedAt) <= maxStepAge
+    }
+
     private static func shouldAppend(
         _ sample: BatteryHistorySample,
         after previous: BatteryHistorySample?

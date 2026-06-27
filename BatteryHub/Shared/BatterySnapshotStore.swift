@@ -80,6 +80,16 @@ public struct BatterySnapshotStore: Sendable {
         "\(snapshot.kind)|\(snapshot.displayName.normalizedDeviceName)"
     }
 
+    /// Replaces each stored snapshot's charge state with `resolve(snapshot)`.
+    /// Used to layer in heuristic (battery-trend) charging for devices that
+    /// report no hardware charge signal, without touching recorded history.
+    public mutating func applyInferredChargeStates(_ resolve: (BatterySnapshot) -> ChargeState) {
+        snapshotsByID = snapshotsByID.mapValues { snapshot in
+            let inferred = resolve(snapshot)
+            return inferred == snapshot.chargeState ? snapshot : snapshot.withChargeState(inferred)
+        }
+    }
+
     public static func freshness(for snapshot: BatterySnapshot, now: Date) -> Freshness {
         let age = now.timeIntervalSince(snapshot.updatedAt)
         if age >= 1_800 { return .expired }

@@ -135,6 +135,26 @@ public struct BatterySnapshot: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+public extension BatterySnapshot {
+    /// Returns a copy with a different charge state, preserving every other
+    /// field (including the resolved provider/readStatus/confidence).
+    func withChargeState(_ newChargeState: ChargeState) -> BatterySnapshot {
+        BatterySnapshot(
+            deviceID: deviceID,
+            displayName: displayName,
+            kind: kind,
+            percent: percent,
+            chargeState: newChargeState,
+            connectionState: connectionState,
+            source: source,
+            provider: provider,
+            readStatus: readStatus,
+            confidence: confidence,
+            updatedAt: updatedAt
+        )
+    }
+}
+
 public extension BatteryProvider {
     static func defaultProvider(for source: BatterySource) -> BatteryProvider {
         switch source {

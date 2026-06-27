@@ -358,6 +358,17 @@ final class BatteryHubModel: ObservableObject {
         logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
         nextStore.reconcile(with: bluetoothSnapshots)
         BatteryHistoryStore.record(nextStore.snapshots)
+        let inferenceNow = Date()
+        nextStore.applyInferredChargeStates { snapshot in
+            // Only infer for devices with no hardware charge signal; never
+            // override a real reading (USB iPhone, Mac) or the Mac power source.
+            guard snapshot.chargeState == .unknown, snapshot.source != .macPowerSource else {
+                return snapshot.chargeState
+            }
+            return BatteryHistoryStore.isChargingByTrend(for: snapshot.deviceID, now: inferenceNow)
+                ? .charging
+                : .unknown
+        }
         store = nextStore
         logger.info("Visible external snapshots: \(nextStore.externalBatterySnapshots.count)")
         latestAlertEvents = LowBatteryNotifier.notifyIfNeeded(

@@ -348,6 +348,73 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(Set(store.snapshots.map(\.deviceID)), ["mac", "keyboard"])
     }
 
+    func testIsChargingByTrendDetectsRecentRise() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let samples = [
+            BatteryHistorySample(deviceID: "kbd", percent: 80, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-120)),
+            BatteryHistorySample(deviceID: "kbd", percent: 83, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-30)),
+        ]
+        XCTAssertTrue(BatteryHistoryStore.isChargingByTrend(samples: samples, now: now))
+    }
+
+    func testIsChargingByTrendRejectsFallingBattery() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let samples = [
+            BatteryHistorySample(deviceID: "kbd", percent: 83, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-120)),
+            BatteryHistorySample(deviceID: "kbd", percent: 80, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-30)),
+        ]
+        XCTAssertFalse(BatteryHistoryStore.isChargingByTrend(samples: samples, now: now))
+    }
+
+    func testIsChargingByTrendRejectsStaleRise() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let samples = [
+            BatteryHistorySample(deviceID: "kbd", percent: 80, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-2_000)),
+            BatteryHistorySample(deviceID: "kbd", percent: 83, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-1_200)),
+        ]
+        XCTAssertFalse(BatteryHistoryStore.isChargingByTrend(samples: samples, now: now))
+    }
+
+    func testIsChargingByTrendNeedsTwoSamples() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let samples = [
+            BatteryHistorySample(deviceID: "kbd", percent: 83, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-30)),
+        ]
+        XCTAssertFalse(BatteryHistoryStore.isChargingByTrend(samples: samples, now: now))
+    }
+
+    func testApplyInferredChargeStatesOnlyOverridesUnknown() {
+        let now = Date(timeIntervalSince1970: 100)
+        let blePeripheral = BatterySnapshot(
+            deviceID: "kbd",
+            displayName: "Keychron K3 Max",
+            kind: .keyboard,
+            percent: 83,
+            chargeState: .unknown,
+            source: .coreBluetooth,
+            updatedAt: now
+        )
+        let usbIPhone = BatterySnapshot(
+            deviceID: "usb-iphone",
+            displayName: "iPhone",
+            kind: .iPhone,
+            percent: 50,
+            chargeState: .unplugged,
+            source: .ideviceInfo,
+            updatedAt: now
+        )
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(10) })
+        store.merge([blePeripheral, usbIPhone])
+
+        store.applyInferredChargeStates { snapshot in
+            snapshot.chargeState == .unknown ? .charging : snapshot.chargeState
+        }
+
+        let byID = Dictionary(uniqueKeysWithValues: store.snapshots.map { ($0.deviceID, $0) })
+        XCTAssertEqual(byID["kbd"]?.chargeState, .charging)        // inferred
+        XCTAssertEqual(byID["usb-iphone"]?.chargeState, .unplugged) // real reading preserved
+    }
+
     func testBatteryHistoryStoreRecordsAndSummarizesPercentTrend() {
         let defaults = isolatedDefaults()
         let base = Date(timeIntervalSince1970: 1_000)
