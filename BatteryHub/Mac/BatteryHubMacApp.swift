@@ -277,6 +277,9 @@ final class BatteryHubModel: ObservableObject {
 
     private let logger = Logger(subsystem: "com.isaacyslin.BatteryHub.mac", category: "refresh")
     private var refreshLoop: Task<Void, Never>?
+    /// Concurrency guard for refresh(); separate from `isRefreshing` so the
+    /// 45s background poll can run without surfacing the UI spinner.
+    private var refreshInFlight = false
     private let usesPreviewData: Bool
 
     var isUsingPreviewData: Bool {
@@ -305,10 +308,10 @@ final class BatteryHubModel: ObservableObject {
 
         logger.info("Battery refresh loop started")
         refreshLoop = Task { [weak self] in
-            await self?.refresh()
+            await self?.refresh(userInitiated: false)
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(45))
-                await self?.refresh()
+                await self?.refresh(userInitiated: false)
             }
         }
     }
@@ -317,11 +320,15 @@ final class BatteryHubModel: ObservableObject {
         refreshLoop?.cancel()
     }
 
-    func refresh() async {
-        guard !isRefreshing else { return }
-        logger.info("Battery refresh started")
-        isRefreshing = true
-        defer { isRefreshing = false }
+    func refresh(userInitiated: Bool = true) async {
+        guard !refreshInFlight else { return }
+        refreshInFlight = true
+        if userInitiated { isRefreshing = true }
+        logger.info("Battery refresh started userInitiated=\(userInitiated, privacy: .public)")
+        defer {
+            refreshInFlight = false
+            if userInitiated { isRefreshing = false }
+        }
 
         if usesPreviewData {
             seedPreviewData()
