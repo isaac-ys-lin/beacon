@@ -272,7 +272,7 @@ public struct BluetoothDeviceScanner {
                     return candidates(fromSystemProfilerDeviceNamed: name, device: device, connectionState: .disconnected)
                 }
             }
-            return fromConnected + fromDisconnected
+            return fromConnected
         }
     }
 

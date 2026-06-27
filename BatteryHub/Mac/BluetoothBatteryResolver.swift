@@ -204,7 +204,13 @@ enum IPhoneUSBBatteryProvider {
                 )
             }
 
-            let batteryResult = run(commandURL: commandURL, arguments: ["-q", "com.apple.mobile.battery"])
+            // Try USB first, fall back to Wi-Fi lockdown (established after one USB trust pairing)
+            var batteryResult = run(commandURL: commandURL, arguments: ["-q", "com.apple.mobile.battery"])
+            var networkMode = false
+            if batteryResult.status != 0 {
+                batteryResult = run(commandURL: commandURL, arguments: ["-n", "-q", "com.apple.mobile.battery"])
+                networkMode = true
+            }
             guard batteryResult.status == 0 else {
                 return (
                     nil,
@@ -213,14 +219,15 @@ enum IPhoneUSBBatteryProvider {
                         status: batteryResult.timedOut ? .timedOut : .unavailable,
                         candidateCount: 0,
                         message: batteryResult.timedOut
-                            ? "ideviceinfo timed out while reading USB iPhone battery"
+                            ? "ideviceinfo timed out while reading iPhone battery"
                             : "ideviceinfo returned status \(batteryResult.status)",
                         attemptedAt: now
                     )
                 )
             }
 
-            let deviceName = run(commandURL: commandURL, arguments: ["-k", "DeviceName"])
+            let nameArgs = networkMode ? ["-n", "-k", "DeviceName"] : ["-k", "DeviceName"]
+            let deviceName = run(commandURL: commandURL, arguments: nameArgs)
                 .output
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let fallbackName = deviceName.isEmpty ? "iPhone" : deviceName
@@ -245,7 +252,7 @@ enum IPhoneUSBBatteryProvider {
                     provider: .ideviceInfo,
                     status: .reported,
                     candidateCount: 1,
-                    message: "ideviceinfo returned 1 USB iPhone battery candidate",
+                    message: "ideviceinfo returned 1 iPhone battery candidate (\(networkMode ? "Wi-Fi" : "USB"))",
                     attemptedAt: now
                 )
             )
