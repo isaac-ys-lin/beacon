@@ -55,6 +55,31 @@ public struct BatterySnapshotStore: Sendable {
         }
     }
 
+    /// Merges the latest live read, then drops any Bluetooth-sourced device that
+    /// no provider reported this cycle. Without this, a disconnected or removed
+    /// device keeps its stale `.connected` snapshot (under a now-orphaned id)
+    /// until the 30-minute freshness window expires — so it lingers in the menu.
+    /// Matching is by (kind, normalized name) rather than raw deviceID so the
+    /// prune survives the id churn between providers.
+    ///
+    /// Skips pruning when the live read produced no Bluetooth snapshots at all
+    /// (a failed/empty scan) to avoid wiping the whole list on a transient miss.
+    public mutating func reconcile(with liveSnapshots: [BatterySnapshot]) {
+        merge(liveSnapshots)
+
+        let liveBluetooth = liveSnapshots.filter { $0.source.isBluetoothRelated }
+        guard !liveBluetooth.isEmpty else { return }
+
+        let liveKeys = Set(liveBluetooth.map(Self.reconciliationKey))
+        snapshotsByID = snapshotsByID.filter { _, existing in
+            !existing.source.isBluetoothRelated || liveKeys.contains(Self.reconciliationKey(existing))
+        }
+    }
+
+    private static func reconciliationKey(_ snapshot: BatterySnapshot) -> String {
+        "\(snapshot.kind)|\(snapshot.displayName.normalizedDeviceName)"
+    }
+
     public static func freshness(for snapshot: BatterySnapshot, now: Date) -> Freshness {
         let age = now.timeIntervalSince(snapshot.updatedAt)
         if age >= 1_800 { return .expired }

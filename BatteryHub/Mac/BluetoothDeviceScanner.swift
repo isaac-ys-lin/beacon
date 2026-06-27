@@ -88,7 +88,45 @@ public struct BluetoothDeviceScanner {
             candidates.upsert(candidate)
         }
 
-        return BluetoothCandidateScanReport(candidates: candidates, attempts: attempts)
+        let collapsed = Self.collapsingDuplicateIPhones(candidates)
+        return BluetoothCandidateScanReport(candidates: collapsed, attempts: attempts)
+    }
+
+    /// The same iPhone can surface through multiple providers (USB `ideviceinfo`,
+    /// BLE, system_profiler) under different display names — iOS `DeviceName`
+    /// ("Yi's iPhone") vs the Bluetooth name ("YisiPhone") — which `upsert`'s
+    /// name-based dedup cannot collapse. Fold all iPhone candidates into one,
+    /// preferring the battery-bearing (USB) reading.
+    static func collapsingDuplicateIPhones(
+        _ candidates: [BluetoothBatteryCandidate]
+    ) -> [BluetoothBatteryCandidate] {
+        let iPhones = candidates.filter(Self.isIPhoneCandidate)
+        guard iPhones.count > 1 else { return candidates }
+
+        let preferred = iPhones.first { $0.batteryPercent != nil && $0.connectionState == .connected }
+            ?? iPhones.first { $0.batteryPercent != nil }
+            ?? iPhones.first { $0.connectionState == .connected }
+            ?? iPhones[0]
+
+        var result: [BluetoothBatteryCandidate] = []
+        var insertedIPhone = false
+        for candidate in candidates {
+            if Self.isIPhoneCandidate(candidate) {
+                if !insertedIPhone {
+                    result.append(preferred)
+                    insertedIPhone = true
+                }
+            } else {
+                result.append(candidate)
+            }
+        }
+        return result
+    }
+
+    private static func isIPhoneCandidate(_ candidate: BluetoothBatteryCandidate) -> Bool {
+        if let hint = candidate.kindHint { return hint == .iPhone }
+        let name = candidate.displayName.lowercased()
+        return name.contains("iphone") || name.contains("ios")
     }
 
     private static func status(for candidates: [BluetoothBatteryCandidate]) -> BatteryReadStatus {
@@ -710,6 +748,12 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     private var peripherals: [UUID: CBPeripheral] = [:]
     private var connectionAttemptIDs = Set<UUID>()
     private var timeoutTask: Task<Void, Never>?
+    /// Peripherals whose battery read is still in flight. Once the initially
+    /// connected set has all resolved we can finish without waiting out the
+    /// full timeout window — the common case where nothing needs the full scan.
+    private var pendingResolutionIDs = Set<UUID>()
+    private var inspectedAnyPeripheral = false
+    private var didStartInitialInspection = false
 
     func read(timeout: Duration = .seconds(4)) async -> [BluetoothBatteryCandidate] {
         await withCheckedContinuation { continuation in
@@ -744,6 +788,9 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
             withServices: [Self.batteryService],
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
         )
+
+        didStartInitialInspection = true
+        checkEarlyFinish()
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
@@ -757,6 +804,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         peripherals[peripheral.identifier] = nil
         connectionAttemptIDs.remove(peripheral.identifier)
+        resolve(peripheral.identifier)
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
@@ -764,20 +812,30 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
             peripherals[peripheral.identifier] = nil
             connectionAttemptIDs.remove(peripheral.identifier)
         }
+        resolve(peripheral.identifier)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard let service = peripheral.services?.first(where: { $0.uuid == Self.batteryService }) else { return }
+        guard let service = peripheral.services?.first(where: { $0.uuid == Self.batteryService }) else {
+            resolve(peripheral.identifier)
+            return
+        }
         peripheral.discoverCharacteristics([Self.batteryLevel], for: service)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard let characteristic = service.characteristics?.first(where: { $0.uuid == Self.batteryLevel }) else { return }
+        guard let characteristic = service.characteristics?.first(where: { $0.uuid == Self.batteryLevel }) else {
+            resolve(peripheral.identifier)
+            return
+        }
         peripheral.readValue(for: characteristic)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard characteristic.uuid == Self.batteryLevel, let value = characteristic.value?.first else { return }
+        guard characteristic.uuid == Self.batteryLevel, let value = characteristic.value?.first else {
+            resolve(peripheral.identifier)
+            return
+        }
         let name = peripheral.name ?? "Bluetooth Device"
         candidates[peripheral.identifier] = BluetoothBatteryCandidate(
             deviceID: peripheral.identifier.uuidString,
@@ -785,18 +843,36 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
             transport: .ble,
             batteryPercent: Int(value)
         )
+        resolve(peripheral.identifier)
     }
 
     private func inspect(_ peripheral: CBPeripheral) {
         guard peripherals[peripheral.identifier] == nil else { return }
         peripherals[peripheral.identifier] = peripheral
         peripheral.delegate = self
+        inspectedAnyPeripheral = true
+        pendingResolutionIDs.insert(peripheral.identifier)
         if peripheral.state == .connected {
             peripheral.discoverServices([Self.batteryService])
         } else {
             connectionAttemptIDs.insert(peripheral.identifier)
             central?.connect(peripheral)
         }
+    }
+
+    /// Marks a peripheral as done (battery read, or terminal failure) and
+    /// finishes the scan early once every inspected peripheral has resolved.
+    private func resolve(_ identifier: UUID) {
+        pendingResolutionIDs.remove(identifier)
+        checkEarlyFinish()
+    }
+
+    private func checkEarlyFinish() {
+        guard didStartInitialInspection,
+              inspectedAnyPeripheral,
+              pendingResolutionIDs.isEmpty
+        else { return }
+        finish()
     }
 
     private func finish() {

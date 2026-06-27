@@ -219,6 +219,135 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), ["iphone", "keyboard"])
     }
 
+    func testReconcileRemovesDeviceMissingFromLiveRead() {
+        let now = Date(timeIntervalSince1970: 100)
+        let keyboard = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 88,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: now
+        )
+        let iphone = BatterySnapshot(
+            deviceID: "usb-iphone-yisungiphone",
+            displayName: "YiSungiPhone",
+            kind: .iPhone,
+            percent: 52,
+            chargeState: .unplugged,
+            source: .ideviceInfo,
+            updatedAt: now
+        )
+
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(20) })
+        store.merge([keyboard, iphone])
+
+        // Next live read only sees the keyboard (iPhone disconnected/removed).
+        let keyboardNext = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 87,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: now.addingTimeInterval(45)
+        )
+        store.reconcile(with: [keyboardNext])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["keyboard"])
+    }
+
+    func testReconcileRemovesStaleIPhoneEvenWhenNameDiffersFromLiveRead() {
+        let now = Date(timeIntervalSince1970: 100)
+        // Stale connected iPhone captured earlier under the iOS DeviceName.
+        let staleUSBIPhone = BatterySnapshot(
+            deviceID: "usb-iphone-yisung-s-iphone",
+            displayName: "YiSung's iPhone",
+            kind: .iPhone,
+            percent: 60,
+            chargeState: .charging,
+            source: .ideviceInfo,
+            updatedAt: now
+        )
+        let keyboard = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 88,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: now
+        )
+
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(20) })
+        store.merge([staleUSBIPhone, keyboard])
+
+        // iPhone now only visible over Bluetooth as disconnected, under its
+        // Bluetooth name (different normalized name than the USB DeviceName).
+        let liveKeyboard = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 87,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: now.addingTimeInterval(45)
+        )
+        store.reconcile(with: [liveKeyboard])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["keyboard"])
+    }
+
+    func testReconcileSkipsPruneWhenLiveReadHasNoBluetoothDevices() {
+        let now = Date(timeIntervalSince1970: 100)
+        let keyboard = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 88,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: now
+        )
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(20) })
+        store.merge([keyboard])
+
+        // A failed/empty scan must not wipe the existing list.
+        store.reconcile(with: [])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["keyboard"])
+    }
+
+    func testReconcilePreservesMacPowerSourceDevice() {
+        let now = Date(timeIntervalSince1970: 100)
+        let mac = BatterySnapshot(
+            deviceID: "mac",
+            displayName: "MacBook",
+            kind: .macBook,
+            percent: 80,
+            chargeState: .charging,
+            source: .macPowerSource,
+            updatedAt: now
+        )
+        let keyboard = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 88,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: now
+        )
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(20) })
+        store.merge([mac, keyboard])
+
+        // Live Bluetooth read does not include the Mac power source — it must survive.
+        store.reconcile(with: [keyboard])
+
+        XCTAssertEqual(Set(store.snapshots.map(\.deviceID)), ["mac", "keyboard"])
+    }
+
     func testBatteryHistoryStoreRecordsAndSummarizesPercentTrend() {
         let defaults = isolatedDefaults()
         let base = Date(timeIntervalSince1970: 1_000)

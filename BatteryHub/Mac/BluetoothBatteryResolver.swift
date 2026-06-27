@@ -16,6 +16,7 @@ public struct BluetoothBatteryCandidate: Sendable {
     public let batteryPercent: Int?
     public let kindHint: DeviceKind?
     public let connectionState: ConnectionState
+    public let chargeState: ChargeState
 
     public init(
         deviceID: String,
@@ -23,7 +24,8 @@ public struct BluetoothBatteryCandidate: Sendable {
         transport: BluetoothTransport,
         batteryPercent: Int?,
         kindHint: DeviceKind? = nil,
-        connectionState: ConnectionState = .connected
+        connectionState: ConnectionState = .connected,
+        chargeState: ChargeState = .unknown
     ) {
         self.deviceID = deviceID
         self.displayName = displayName
@@ -31,6 +33,7 @@ public struct BluetoothBatteryCandidate: Sendable {
         self.batteryPercent = batteryPercent
         self.kindHint = kindHint
         self.connectionState = connectionState
+        self.chargeState = chargeState
     }
 }
 
@@ -87,7 +90,7 @@ public struct BluetoothBatteryResolver {
             displayName: candidate.displayName,
             kind: kind,
             percent: percent,
-            chargeState: .unknown,
+            chargeState: candidate.chargeState,
             connectionState: candidate.connectionState,
             source: source,
             updatedAt: now
@@ -134,10 +137,12 @@ public struct BluetoothBatteryResolver {
 public struct IPhoneUSBBatteryReading: Equatable, Sendable {
     public let percent: Int
     public let displayName: String
+    public let chargeState: ChargeState
 
-    public init(percent: Int, displayName: String) {
+    public init(percent: Int, displayName: String, chargeState: ChargeState = .unknown) {
         self.percent = percent
         self.displayName = displayName
+        self.chargeState = chargeState
     }
 }
 
@@ -156,7 +161,8 @@ enum IPhoneUSBBatteryProvider {
             transport: .usb,
             batteryPercent: reading.percent,
             kindHint: .iPhone,
-            connectionState: .connected
+            connectionState: .connected,
+            chargeState: reading.chargeState
         )
     }
 
@@ -185,8 +191,34 @@ enum IPhoneUSBBatteryProvider {
 
         return IPhoneUSBBatteryReading(
             percent: max(0, min(100, percent)),
-            displayName: displayName
+            displayName: displayName,
+            chargeState: chargeState(from: values)
         )
+    }
+
+    static func chargeState(from values: [String: String]) -> ChargeState {
+        let fullyCharged = boolValue(values["fullycharged"])
+        let isCharging = boolValue(values["batteryischarging"])
+        let externalConnected = boolValue(values["externalconnected"])
+
+        if fullyCharged == true { return .full }
+        if isCharging == true { return .charging }
+        // External power present but not actively charging (e.g. optimized
+        // charging hold) still reads as charging to the user.
+        if externalConnected == true { return .charging }
+        if isCharging == false || externalConnected == false { return .unplugged }
+        return .unknown
+    }
+
+    private static func boolValue(_ value: String?) -> Bool? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+            return nil
+        }
+        switch value {
+        case "true", "yes", "1": return true
+        case "false", "no", "0": return false
+        default: return nil
+        }
     }
 
     static func readCandidate(now: Date = Date()) async -> (candidate: BluetoothBatteryCandidate?, attempt: BatteryProviderAttempt) {

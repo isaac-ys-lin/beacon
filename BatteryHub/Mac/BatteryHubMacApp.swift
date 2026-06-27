@@ -349,7 +349,7 @@ final class BatteryHubModel: ObservableObject {
         let bluetoothSnapshots = readReport.snapshots
         latestRefreshDiagnostics = readReport.diagnostics
         logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
-        nextStore.merge(bluetoothSnapshots)
+        nextStore.reconcile(with: bluetoothSnapshots)
         BatteryHistoryStore.record(nextStore.snapshots)
         store = nextStore
         logger.info("Visible external snapshots: \(nextStore.externalBatterySnapshots.count)")
