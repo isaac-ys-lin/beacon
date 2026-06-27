@@ -119,11 +119,7 @@ private struct DesktopWidgetBackground: NSViewRepresentable {
 struct BatteryDesktopWidgetView: View {
     let snapshots: [DecoratedBatterySnapshot]
     let style: DesktopWidgetStyle
-    var isRefreshing = false
-    var bluetoothPowerState: BluetoothPowerState = .on
-    var onRefresh: (() -> Void)?
     var onOpenSettings: (() -> Void)?
-    var onOpenBluetoothSettings: (() -> Void)?
     @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
 
@@ -187,14 +183,10 @@ struct BatteryDesktopWidgetView: View {
 
             Spacer(minLength: 0)
 
-            if let onOpenSettings, let onRefresh, let onOpenBluetoothSettings {
+            if let onOpenSettings {
                 BatteryHubHeaderControls(
                     theme: theme,
-                    isRefreshing: isRefreshing,
-                    bluetoothPowerState: bluetoothPowerState,
-                    onOpenSettings: onOpenSettings,
-                    onRefresh: onRefresh,
-                    onOpenBluetoothSettings: onOpenBluetoothSettings
+                    onOpenSettings: onOpenSettings
                 )
             }
         }
@@ -212,7 +204,7 @@ struct BatteryDesktopWidgetView: View {
                 Text("No battery reports")
                     .font(DesignTokens.Typography.controlLabelEmphasis)
                     .foregroundStyle(theme.textPrimary)
-                Text("Refresh or pair a nearby device.")
+                Text("Pair a nearby device.")
                     .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(theme.textMuted)
             }
@@ -257,11 +249,7 @@ final class BatteryHubDesktopWidgetController {
 
     func update(
         snapshots: [DecoratedBatterySnapshot],
-        isRefreshing: Bool,
-        bluetoothPowerState: BluetoothPowerState,
-        onRefresh: @escaping () -> Void,
-        onOpenSettings: @escaping () -> Void,
-        onOpenBluetoothSettings: @escaping () -> Void
+        onOpenSettings: @escaping () -> Void
     ) {
         guard UserDefaults.standard.bool(forKey: DesktopWidgetPreferences.showDesktopWidgetKey) else {
             close()
@@ -278,11 +266,7 @@ final class BatteryHubDesktopWidgetController {
             rootView: BatteryDesktopWidgetView(
                 snapshots: snapshots,
                 style: style,
-                isRefreshing: isRefreshing,
-                bluetoothPowerState: bluetoothPowerState,
-                onRefresh: onRefresh,
-                onOpenSettings: onOpenSettings,
-                onOpenBluetoothSettings: onOpenBluetoothSettings
+                onOpenSettings: onOpenSettings
             )
         )
         hostingController.sizingOptions = []

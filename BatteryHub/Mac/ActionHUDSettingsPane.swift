@@ -4,9 +4,6 @@ struct ActionHUDSettingsPane: View {
     @Binding var showActionHUD: Bool
     @Binding var showLowBatteryHUD: Bool
     @Binding var showChargedHUD: Bool
-    @Binding var autoDismissActionHUD: Bool
-    @Binding var actionHUDDismissDelay: Double
-    @Binding var showActionHUDDismissButton: Bool
     let lowBatteryThreshold: Int
 
     var body: some View {
@@ -54,13 +51,8 @@ struct ActionHUDSettingsPane: View {
 
     private var previewPanel: some View {
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Preview")
-                    .font(DesignTokens.Typography.sectionTitle)
-                Text(autoDismissActionHUD ? "Dismisses after \(Int(clampedActionHUDDismissDelay)) seconds" : "Stays until dismissed")
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-            }
+            Text("Preview")
+                .font(DesignTokens.Typography.sectionTitle)
 
             VStack(spacing: 10) {
                 BatteryActionHUDView(
@@ -70,7 +62,7 @@ struct ActionHUDSettingsPane: View {
                         displayName: "Magic Mouse",
                         percent: lowBatteryThreshold
                     ),
-                    showsDismissButton: showActionHUDDismissButton
+                    showsDismissButton: false
                 )
                 .scaleEffect(0.58)
                 .frame(width: 302, height: 54)
@@ -82,7 +74,7 @@ struct ActionHUDSettingsPane: View {
                         displayName: "Magic Keyboard",
                         percent: 100
                     ),
-                    showsDismissButton: showActionHUDDismissButton
+                    showsDismissButton: false
                 )
                 .scaleEffect(0.58)
                 .frame(width: 302, height: 54)
@@ -94,49 +86,12 @@ struct ActionHUDSettingsPane: View {
             VStack(alignment: .leading, spacing: 7) {
                 hudStateRow("Low battery", isOn: showLowBatteryHUD)
                 hudStateRow("Finished charging", isOn: showChargedHUD)
-                hudStateRow("Manual close", isOn: showActionHUDDismissButton)
             }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Behavior")
-                    .font(DesignTokens.Typography.captionEmphasis)
-
-                Toggle("Auto-dismiss", isOn: $autoDismissActionHUD)
-                    .disabled(!showActionHUD)
-
-                HStack {
-                    Slider(value: actionHUDDismissDelayBinding, in: 2...10, step: 1)
-                        .disabled(!showActionHUD || !autoDismissActionHUD)
-                    Text("\(Int(clampedActionHUDDismissDelay))s")
-                        .font(DesignTokens.Typography.captionEmphasis)
-                        .monospacedDigit()
-                        .foregroundStyle(DesignTokens.Palette.accent)
-                        .frame(width: 30, alignment: .trailing)
-                }
-                .opacity(autoDismissActionHUD ? 1 : 0.45)
-
-                Toggle("Show dismiss button", isOn: $showActionHUDDismissButton)
-                    .disabled(!showActionHUD)
-            }
-            .font(DesignTokens.Typography.controlLabel)
         }
         .padding(16)
         .frame(width: 330, alignment: .topLeading)
         .background(settingsCardBackground)
         .padding(.top, 18)
-    }
-
-    private var clampedActionHUDDismissDelay: Double {
-        Swift.max(2, Swift.min(10, actionHUDDismissDelay))
-    }
-
-    private var actionHUDDismissDelayBinding: Binding<Double> {
-        Binding(
-            get: { clampedActionHUDDismissDelay },
-            set: { actionHUDDismissDelay = $0.rounded() }
-        )
     }
 
     private func hudStateRow(_ title: String, isOn: Bool) -> some View {

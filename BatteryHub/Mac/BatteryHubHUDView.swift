@@ -44,7 +44,7 @@ enum BatteryHUDPreferences {
 
     static func showsDismissButton(defaults: UserDefaults = .standard) -> Bool {
         guard defaults.object(forKey: showDismissButtonKey) != nil else {
-            return true
+            return false
         }
         return defaults.bool(forKey: showDismissButtonKey)
     }

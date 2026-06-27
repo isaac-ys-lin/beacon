@@ -120,7 +120,6 @@ final class BatteryHubStatusController: NSObject {
                 isRefreshing: model.isRefreshing,
                 isPreviewingData: model.isUsingPreviewData,
                 configuration: configuration,
-                bluetoothPowerState: bluetoothPowerStateObserver.state,
                 onRefresh: { [weak model] in
                     Task { await model?.refresh() }
                 },
@@ -176,7 +175,6 @@ final class BatteryHubStatusController: NSObject {
         let screenHeight = screen?.visibleFrame.height ?? 900
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: dashboardItemCount,
-            showsOverview: configuration.showsBatteryOverview,
             visibleScreenHeight: screenHeight
         )
         return NSSize(width: size.width, height: size.height)
@@ -193,16 +191,8 @@ final class BatteryHubStatusController: NSObject {
     private func updateDesktopWidget() {
         desktopWidgetController.update(
             snapshots: model.store.decoratedSnapshots,
-            isRefreshing: model.isRefreshing,
-            bluetoothPowerState: bluetoothPowerStateObserver.state,
-            onRefresh: { [weak model] in
-                Task { await model?.refresh() }
-            },
             onOpenSettings: { [weak self] in
                 self?.showSettingsWindow(initialPane: .dashboard)
-            },
-            onOpenBluetoothSettings: {
-                BatteryHubSystemSettingsActions.openBluetoothSettings()
             }
         )
     }

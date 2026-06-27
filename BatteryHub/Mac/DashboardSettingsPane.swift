@@ -2,7 +2,6 @@ import SwiftUI
 
 struct DashboardSettingsPane: View {
     let snapshots: [DecoratedBatterySnapshot]
-    @Binding var showBatteryOverview: Bool
     @Binding var showMenuBarBattery: Bool
     @Binding var showDesktopWidget: Bool
     @Binding var desktopWidgetStyleRawValue: String
@@ -26,7 +25,6 @@ struct DashboardSettingsPane: View {
                 }
 
                 Section {
-                    Toggle("Show battery overview", isOn: $showBatteryOverview)
                     Toggle("Show lowest battery in menu bar", isOn: $showMenuBarBattery)
                 } header: {
                     Text("Menu Bar Dashboard")
@@ -59,9 +57,7 @@ struct DashboardSettingsPane: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 StatusWindowPreview(
-                    showsMenuBarBattery: showMenuBarBattery,
-                    showsBatteryOverview: showBatteryOverview,
-                    bluetoothPowerState: .on
+                    showsMenuBarBattery: showMenuBarBattery
                 )
                 .frame(width: 292)
 
@@ -82,10 +78,7 @@ struct DashboardSettingsPane: View {
                 BatteryDesktopWidgetView(
                     snapshots: desktopWidgetPreviewSnapshots,
                     style: desktopWidgetStyle,
-                    bluetoothPowerState: .on,
-                    onRefresh: {},
-                    onOpenSettings: {},
-                    onOpenBluetoothSettings: {}
+                    onOpenSettings: {}
                 )
                 .scaleEffect(0.74, anchor: .topLeading)
                 .frame(
@@ -102,9 +95,6 @@ struct DashboardSettingsPane: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onChange(of: showMenuBarBattery) { _, _ in
-            StatusWindowPreferences.notifyChanged()
-        }
-        .onChange(of: showBatteryOverview) { _, _ in
             StatusWindowPreferences.notifyChanged()
         }
     }

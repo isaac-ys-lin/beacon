@@ -7,7 +7,6 @@ final class StatusMenuPanelController {
     private(set) var panel: BatteryHubStatusPanel?
     private var contentSize: NSSize = StatusMenuSizing.preferredContentSize(
         dashboardItemCount: 0,
-        showsOverview: false,
         visibleScreenHeight: 900
     )
 

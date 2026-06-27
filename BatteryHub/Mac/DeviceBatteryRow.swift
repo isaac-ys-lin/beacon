@@ -153,15 +153,9 @@ struct BatteryHubUtilityIconButtonStyle: ButtonStyle {
 
 struct BatteryHubHeaderControls: View {
     let theme: BeaconThemePalette
-    let isRefreshing: Bool
-    let bluetoothPowerState: BluetoothPowerState
     let onOpenSettings: () -> Void
-    let onRefresh: () -> Void
-    let onOpenBluetoothSettings: () -> Void
     var frameSize: CGFloat = 28
     var settingsGlyphSize: CGFloat = 13
-    var refreshGlyphSize: CGFloat = 13
-    var bluetoothGlyphSize: CGFloat = 18
     var spacing: CGFloat = 8
 
     var body: some View {
@@ -175,58 +169,6 @@ struct BatteryHubHeaderControls: View {
             }
             .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
             .help("Open BatteryHub Settings")
-
-            Button(action: onRefresh) {
-                if isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: frameSize, height: frameSize)
-                        .accessibilityLabel("Refreshing")
-                } else {
-                    BatteryHubHeaderRefreshIcon(
-                        color: theme.textPrimary,
-                        glyphSize: refreshGlyphSize,
-                        frameSize: frameSize
-                    )
-                }
-            }
-            .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
-            .disabled(isRefreshing)
-            .help(isRefreshing ? "Refreshing" : "Refresh")
-
-            Button(action: onOpenBluetoothSettings) {
-                BluetoothSettingsIcon(
-                    color: bluetoothPowerColor,
-                    glyphSize: bluetoothGlyphSize,
-                    frameSize: frameSize
-                )
-                .accessibilityLabel(bluetoothAccessibilityLabel)
-            }
-            .buttonStyle(BatteryHubUtilityIconButtonStyle(theme: theme))
-            .help(bluetoothHelpText)
-        }
-    }
-
-    private var bluetoothPowerColor: Color {
-        switch bluetoothPowerState {
-        case .on: return theme.textPrimary
-        case .off, .unknown: return theme.textDisabled
-        }
-    }
-
-    private var bluetoothAccessibilityLabel: String {
-        switch bluetoothPowerState {
-        case .on: return "Bluetooth is on. Open Bluetooth Settings."
-        case .off: return "Bluetooth is off. Open Bluetooth Settings."
-        case .unknown: return "Bluetooth status unavailable. Open Bluetooth Settings."
-        }
-    }
-
-    private var bluetoothHelpText: String {
-        switch bluetoothPowerState {
-        case .on: return "Bluetooth is on. Open Bluetooth Settings."
-        case .off: return "Bluetooth is off. Open Bluetooth Settings."
-        case .unknown: return "Bluetooth status unavailable. Open Bluetooth Settings."
         }
     }
 }
@@ -552,12 +494,20 @@ struct DashboardBatteryProgressBar: View {
 
 private struct BeaconStatusDot: View {
     let color: Color
+    var isCharging: Bool = false
+    @State private var pulsing = false
 
     var body: some View {
         Circle()
             .fill(color)
             .frame(width: 7, height: 7)
-            .shadow(color: color.opacity(0.36), radius: 5, x: 0, y: 0)
+            .shadow(color: color.opacity(pulsing ? 0.72 : 0.36), radius: pulsing ? 9 : 5, x: 0, y: 0)
+            .animation(
+                isCharging ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true) : .default,
+                value: pulsing
+            )
+            .onAppear { pulsing = isCharging }
+            .onChange(of: isCharging) { _, v in pulsing = v }
             .accessibilityHidden(true)
     }
 }
@@ -583,7 +533,7 @@ struct DashboardBatteryDeviceRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
-                    BeaconStatusDot(color: statusColor)
+                    BeaconStatusDot(color: statusColor, isCharging: device.chargeState == .charging)
 
                     Text(device.displayName)
                         .font(DesignTokens.Typography.controlLabelEmphasis)

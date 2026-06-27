@@ -40,7 +40,6 @@ final class BatteryHubSettingsWindowController {
             isRefreshing: model.isRefreshing,
             isPreviewingData: model.isUsingPreviewData,
             notificationAuthorizationState: model.notificationAuthorizationState,
-            latestNotificationDeliveryResult: model.latestNotificationDeliveryResult,
             onRefresh: { [weak model] in
                 Task { await model?.refresh() }
             },
@@ -58,9 +57,6 @@ final class BatteryHubSettingsWindowController {
             },
             onOpenNotificationSettings: {
                 BatteryHubSystemSettingsActions.openNotificationSettings()
-            },
-            onSendTestNotification: { [weak model] in
-                model?.sendTestNotification()
             },
             onQuit: {
                 NSApp.terminate(nil)

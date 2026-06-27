@@ -39,14 +39,12 @@ struct BatteryHubSettingsView: View {
     let isRefreshing: Bool
     let isPreviewingData: Bool
     let notificationAuthorizationState: NotificationCenterAuthorizationState
-    let latestNotificationDeliveryResult: NotificationCenterDeliveryResult?
     let onRefresh: () -> Void
     let onOpenBluetoothSettings: () -> Void
     let onOpenSoundSettings: () -> Void
     let onRefreshNotificationAuthorization: () -> Void
     let onRequestNotificationPermission: () -> Void
     let onOpenNotificationSettings: () -> Void
-    let onSendTestNotification: () -> Void
     let onQuit: () -> Void
 
     @AppStorage(LowBatteryNotifier.thresholdDefaultsKey) private var lowBatteryThreshold = LowBatteryNotifier.defaultThreshold
@@ -55,11 +53,7 @@ struct BatteryHubSettingsView: View {
     @AppStorage(BatteryHUDPreferences.showActionHUDKey) private var showActionHUD = true
     @AppStorage(BatteryHUDPreferences.lowBatteryHUDEnabledKey) private var showLowBatteryHUD = true
     @AppStorage(BatteryHUDPreferences.chargedHUDEnabledKey) private var showChargedHUD = true
-    @AppStorage(BatteryHUDPreferences.autoDismissEnabledKey) private var autoDismissActionHUD = true
-    @AppStorage(BatteryHUDPreferences.dismissDelaySecondsKey) private var actionHUDDismissDelay = BatteryHUDPreferences.defaultDismissDelaySeconds
-    @AppStorage(BatteryHUDPreferences.showDismissButtonKey) private var showActionHUDDismissButton = true
     @AppStorage(StatusWindowPreferences.showMenuBarBatteryKey) private var showMenuBarBattery = false
-    @AppStorage(StatusWindowPreferences.showBatteryOverviewKey) private var showBatteryOverview = true
     @AppStorage(DesktopWidgetPreferences.showDesktopWidgetKey) private var showDesktopWidget = false
     @AppStorage(DesktopWidgetPreferences.widgetStyleKey) private var desktopWidgetStyleRawValue = DesktopWidgetStyle.compact.rawValue
     @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
@@ -76,14 +70,12 @@ struct BatteryHubSettingsView: View {
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
         notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown,
-        latestNotificationDeliveryResult: NotificationCenterDeliveryResult? = nil,
         onRefresh: @escaping () -> Void,
         onOpenBluetoothSettings: @escaping () -> Void = {},
         onOpenSoundSettings: @escaping () -> Void = {},
         onRefreshNotificationAuthorization: @escaping () -> Void = {},
         onRequestNotificationPermission: @escaping () -> Void = {},
         onOpenNotificationSettings: @escaping () -> Void = {},
-        onSendTestNotification: @escaping () -> Void = {},
         onQuit: @escaping () -> Void = {},
         initialPane: SettingsPane = .devices,
         initialSelectedDeviceID: String? = nil,
@@ -93,14 +85,12 @@ struct BatteryHubSettingsView: View {
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
         self.notificationAuthorizationState = notificationAuthorizationState
-        self.latestNotificationDeliveryResult = latestNotificationDeliveryResult
         self.onRefresh = onRefresh
         self.onOpenBluetoothSettings = onOpenBluetoothSettings
         self.onOpenSoundSettings = onOpenSoundSettings
         self.onRefreshNotificationAuthorization = onRefreshNotificationAuthorization
         self.onRequestNotificationPermission = onRequestNotificationPermission
         self.onOpenNotificationSettings = onOpenNotificationSettings
-        self.onSendTestNotification = onSendTestNotification
         self.onQuit = onQuit
         _selectedPane = State(initialValue: initialPane)
         _selectedDeviceID = State(initialValue: initialSelectedDeviceID)
@@ -279,8 +269,6 @@ struct BatteryHubSettingsView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 10) {
-                    compactNotificationCenterCard
-
                     if let selectedDevice {
                         alertDetail(for: selectedDevice)
                     } else {
@@ -394,80 +382,6 @@ struct BatteryHubSettingsView: View {
             .padding(.horizontal, 9)
             .frame(height: 24)
             .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
-    }
-
-    private var compactNotificationCenterCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                compactAlertTitleRow(
-                    title: "Notification Center",
-                    subtitle: "System notifications for battery alerts.",
-                    systemImage: "bell.badge",
-                    color: notificationAuthorizationColor
-                )
-
-                Spacer(minLength: 8)
-
-                Text(notificationAuthorizationState.title)
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .foregroundStyle(notificationAuthorizationColor)
-                    .padding(.horizontal, 8)
-                    .frame(height: 24)
-                    .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 48)
-
-            Divider()
-                .padding(.leading, 50)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(notificationAuthorizationState.subtitle)
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text("Notification Center and Action HUD are separate. Action HUD controls in-app alerts.")
-                    .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.tertiaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 8) {
-                    if notificationAuthorizationState.canRequestPermission {
-                        Button("Allow Notifications", action: onRequestNotificationPermission)
-                            .controlSize(.small)
-                    }
-
-                    Button("Send Test Notification", action: onSendTestNotification)
-                        .controlSize(.small)
-                        .disabled(!notificationAuthorizationState.canSendTestNotification)
-
-                    if notificationAuthorizationState.canOpenSystemSettings {
-                        Button("Open Notifications Settings", action: onOpenNotificationSettings)
-                            .controlSize(.small)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-
-                if let latestNotificationDeliveryResult {
-                    HStack(spacing: 6) {
-                        Image(systemName: latestNotificationDeliveryResult.state == .queued ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .font(.system(size: 11, weight: .semibold))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(latestNotificationDeliveryResult.state == .queued ? DesignTokens.Palette.healthy : DesignTokens.Palette.warning)
-
-                        Text("\(latestNotificationDeliveryResult.title): \(latestNotificationDeliveryResult.subtitle)")
-                            .font(DesignTokens.Typography.caption2)
-                            .foregroundStyle(DesignTokens.Palette.secondaryText)
-                            .lineLimit(1)
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-        }
-        .background(settingsCardBackground)
     }
 
     private func compactDeviceAlertCard(for row: DeviceInspectorItem) -> some View {
@@ -658,9 +572,6 @@ struct BatteryHubSettingsView: View {
             showActionHUD: $showActionHUD,
             showLowBatteryHUD: $showLowBatteryHUD,
             showChargedHUD: $showChargedHUD,
-            autoDismissActionHUD: $autoDismissActionHUD,
-            actionHUDDismissDelay: $actionHUDDismissDelay,
-            showActionHUDDismissButton: $showActionHUDDismissButton,
             lowBatteryThreshold: clampedLowBatteryThreshold
         )
     }
@@ -668,7 +579,6 @@ struct BatteryHubSettingsView: View {
     private var dashboardTab: some View {
         DashboardSettingsPane(
             snapshots: snapshots,
-            showBatteryOverview: $showBatteryOverview,
             showMenuBarBattery: $showMenuBarBattery,
             showDesktopWidget: $showDesktopWidget,
             desktopWidgetStyleRawValue: $desktopWidgetStyleRawValue
@@ -942,21 +852,6 @@ struct BatteryHubSettingsView: View {
             get: { Double(clampedLowBatteryThreshold) },
             set: { lowBatteryThreshold = Int($0.rounded()) }
         )
-    }
-
-    private var notificationAuthorizationColor: Color {
-        switch notificationAuthorizationState {
-        case .authorized:
-            return DesignTokens.Palette.healthy
-        case .provisional:
-            return DesignTokens.Palette.warning
-        case .denied:
-            return DesignTokens.Palette.critical
-        case .notDetermined:
-            return DesignTokens.Palette.accent
-        case .unknown:
-            return DesignTokens.Palette.secondaryText
-        }
     }
 
     private func deviceThresholdBinding(for deviceID: String) -> Binding<Double> {

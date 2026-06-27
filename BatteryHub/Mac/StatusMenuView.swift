@@ -3,7 +3,6 @@ import SwiftUI
 
 enum StatusWindowPreferences {
     static let showMenuBarBatteryKey = "BatteryHub.showMenuBarBattery"
-    static let showBatteryOverviewKey = "BatteryHub.showBatteryOverview"
     static let didChangeNotification = Notification.Name("BatteryHub.statusWindowPreferencesDidChange")
 
     static func notifyChanged() {
@@ -13,18 +12,12 @@ enum StatusWindowPreferences {
 
 struct StatusWindowConfiguration: Equatable {
     var showsMenuBarBattery: Bool
-    var showsBatteryOverview: Bool
 
     static func load(from defaults: UserDefaults = .standard) -> StatusWindowConfiguration {
         return StatusWindowConfiguration(
             showsMenuBarBattery: boolPreference(
                 StatusWindowPreferences.showMenuBarBatteryKey,
                 defaultValue: false,
-                defaults: defaults
-            ),
-            showsBatteryOverview: boolPreference(
-                StatusWindowPreferences.showBatteryOverviewKey,
-                defaultValue: true,
                 defaults: defaults
             )
         )
@@ -46,12 +39,10 @@ enum StatusMenuSizing {
 
     static func preferredContentSize(
         dashboardItemCount: Int,
-        showsOverview: Bool,
         visibleScreenHeight: CGFloat
     ) -> CGSize {
         let panelVerticalPadding: CGFloat = 28
         let headerHeight: CGFloat = 58
-        let overviewHeight: CGFloat = showsOverview ? 48 : 0
         let rowHeight: CGFloat = 58
         let rowSpacing: CGFloat = dashboardItemCount > 1 ? CGFloat(dashboardItemCount - 1) * 8 : 0
         let listVerticalPadding: CGFloat = dashboardItemCount == 0 ? 0 : 18
@@ -61,7 +52,6 @@ enum StatusMenuSizing {
             : listVerticalPadding + CGFloat(dashboardItemCount) * rowHeight + rowSpacing
         let desiredHeight = panelVerticalPadding
             + headerHeight
-            + overviewHeight
             + contentHeight
         let minimumHeight: CGFloat
         if dashboardItemCount == 0 {
@@ -81,7 +71,6 @@ struct StatusMenuView: View {
     let isRefreshing: Bool
     let isPreviewingData: Bool
     let configuration: StatusWindowConfiguration
-    let bluetoothPowerState: BluetoothPowerState
     let onRefresh: () -> Void
     let onOpenSettings: (SettingsPane, String?) -> Void
 
@@ -95,7 +84,6 @@ struct StatusMenuView: View {
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
         configuration: StatusWindowConfiguration = .load(),
-        bluetoothPowerState: BluetoothPowerState = .on,
         onRefresh: @escaping () -> Void,
         onOpenSettings: @escaping (SettingsPane, String?) -> Void = { _, _ in },
         initialDisplayPreferences: DeviceDisplayPreferences = .load()
@@ -104,7 +92,6 @@ struct StatusMenuView: View {
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
         self.configuration = configuration
-        self.bluetoothPowerState = bluetoothPowerState
         self.onRefresh = onRefresh
         self.onOpenSettings = onOpenSettings
         _displayPreferences = State(initialValue: initialDisplayPreferences)
@@ -122,10 +109,6 @@ struct StatusMenuView: View {
                 nativePreviewNotice
             }
 
-            if configuration.showsBatteryOverview, !sections.isEmpty {
-                nativeOverviewMetrics
-            }
-
             if sections.isEmpty {
                 nativeEmptyState
             } else {
@@ -138,47 +121,6 @@ struct StatusMenuView: View {
         .frame(width: statusWindowWidth)
         .beaconPopoverSurface(cornerRadius: NativeMacStyle.popoverCornerRadius, theme: theme)
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
-    }
-
-    private var nativeOverviewMetrics: some View {
-        HStack(spacing: 8) {
-            nativeMetric(
-                "\(visibleItemCount)",
-                visibleItemCount == 1 ? "Device" : "Devices",
-                color: theme.statusOK
-            )
-
-            nativeMetric(
-                "\(lowBatteryItemCount)",
-                "Low",
-                color: lowBatteryItemCount > 0 ? theme.statusLow : theme.textMuted
-            )
-        }
-        .padding(.horizontal, 14)
-        .padding(.bottom, 8)
-    }
-
-    private func nativeMetric(_ value: String, _ label: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(DesignTokens.Typography.nativePopoverPercent)
-                .monospacedDigit()
-                .foregroundStyle(color)
-
-            Text(label)
-                .font(DesignTokens.Typography.caption2)
-                .foregroundStyle(theme.textTertiary)
-        }
-        .padding(.horizontal, 11)
-        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                .fill(theme.raised.opacity(0.72))
-                .overlay(
-                    RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                        .stroke(theme.hairlineSubtle, lineWidth: 0.7)
-                )
-        )
     }
 
     private var nativeHeader: some View {
@@ -202,11 +144,7 @@ struct StatusMenuView: View {
 
             BatteryHubHeaderControls(
                 theme: theme,
-                isRefreshing: isRefreshing,
-                bluetoothPowerState: bluetoothPowerState,
-                onOpenSettings: { onOpenSettings(.devices, nil) },
-                onRefresh: onRefresh,
-                onOpenBluetoothSettings: BatteryHubSystemSettingsActions.openBluetoothSettings
+                onOpenSettings: { onOpenSettings(.devices, nil) }
             )
         }
         .padding(.horizontal, 16)
@@ -255,14 +193,6 @@ struct StatusMenuView: View {
     private var nativeDeviceList: some View {
         ScrollView(showsIndicators: nativeItems.count > 8) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Monitored devices")
-                    .font(DesignTokens.Typography.caption2Emphasis)
-                    .textCase(.uppercase)
-                    .tracking(0.8)
-                    .foregroundStyle(theme.textTertiary)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 1)
-
                 ForEach(nativeItems.indices, id: \.self) { index in
                     let item = nativeItems[index]
 
@@ -327,10 +257,6 @@ struct StatusMenuView: View {
         sections.reduce(0) { partial, section in partial + section.items.count }
     }
 
-    private var overviewSummary: BatteryOverviewSummary {
-        batteryOverviewSummary(for: sections, lowBatteryThreshold: clampedLowBatteryThreshold)
-    }
-
     private var latestUpdateText: String {
         guard let latest = snapshots.map(\.snapshot.updatedAt).max() else { return "No devices" }
         let interval = abs(latest.timeIntervalSinceNow)
@@ -340,35 +266,12 @@ struct StatusMenuView: View {
         return "Updated \(formatter.localizedString(for: latest, relativeTo: Date()))"
     }
 
-    private var lowBatteryItemCount: Int {
-        sections.reduce(0) { partial, section in
-            partial + section.items.filter(isLowBatteryItem).count
-        }
-    }
-
     private var statusWindowWidth: CGFloat {
         StatusMenuSizing.width
     }
 
     private var contentMaxHeight: CGFloat {
         StatusMenuSizing.contentMaxHeight
-    }
-
-    private func isLowBatteryItem(_ item: DeviceListItem) -> Bool {
-        switch item {
-        case .device(let decorated):
-            guard let percent = decorated.snapshot.percent else { return false }
-            return percent <= clampedLowBatteryThreshold
-                && decorated.snapshot.chargeState != .charging
-                && decorated.snapshot.chargeState != .full
-        case .airPods(_, _, let components):
-            return components.contains { component in
-                guard let percent = component.percent else { return false }
-                return percent <= clampedLowBatteryThreshold
-                    && component.chargeState != .charging
-                    && component.chargeState != .full
-            }
-        }
     }
 
     // MARK: - Helpers
@@ -427,8 +330,6 @@ struct StatusMenuView: View {
 
 struct StatusWindowPreview: View {
     let showsMenuBarBattery: Bool
-    let showsBatteryOverview: Bool
-    var bluetoothPowerState: BluetoothPowerState = .on
     @AppStorage(BatteryHubAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BatteryHubAppearanceTheme.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
 
@@ -447,10 +348,6 @@ struct StatusWindowPreview: View {
 
             VStack(spacing: 4) {
                 previewHeader
-
-                if showsBatteryOverview {
-                    previewOverview
-                }
 
                 ForEach(0..<rowCount, id: \.self) { index in
                     previewRow(previewDevice(for: index))
@@ -504,15 +401,9 @@ struct StatusWindowPreview: View {
 
             BatteryHubHeaderControls(
                 theme: previewTheme,
-                isRefreshing: false,
-                bluetoothPowerState: bluetoothPowerState,
                 onOpenSettings: {},
-                onRefresh: {},
-                onOpenBluetoothSettings: {},
                 frameSize: 20,
                 settingsGlyphSize: 11,
-                refreshGlyphSize: 11,
-                bluetoothGlyphSize: 12.5,
                 spacing: 4
             )
             .allowsHitTesting(false)
@@ -523,31 +414,6 @@ struct StatusWindowPreview: View {
     private var previewTheme: BeaconThemePalette {
         BatteryHubAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
             .palette(resolvedSystemScheme: colorScheme)
-    }
-
-    private var previewOverview: some View {
-        HStack(spacing: 6) {
-            previewMetric("4", "Devices", color: DesignTokens.Palette.accent)
-            previewMetric("1", "Low", color: DesignTokens.Palette.critical)
-        }
-    }
-
-    private func previewMetric(_ value: String, _ title: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(DesignTokens.Typography.nativePopoverPercent)
-                .monospacedDigit()
-                .foregroundStyle(color)
-            Text(title)
-                .font(DesignTokens.Typography.caption2)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-        }
-        .padding(.horizontal, 9)
-        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill)
-        )
     }
 
     private func previewRow(_ device: DashboardBatteryDevice) -> some View {

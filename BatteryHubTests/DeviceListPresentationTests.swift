@@ -662,41 +662,24 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     func testStatusMenuSizingGrowsWithDashboardDeviceCount() {
-        let nativeOneDevice = StatusMenuSizing.preferredContentSize(
+        let oneDevice = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 1,
-            showsOverview: false,
             visibleScreenHeight: 1_000
         )
-        let nativeFiveDevices = StatusMenuSizing.preferredContentSize(
+        let fiveDevices = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
-            showsOverview: false,
-            visibleScreenHeight: 1_000
-        )
-        let oneDeviceWithOverview = StatusMenuSizing.preferredContentSize(
-            dashboardItemCount: 1,
-            showsOverview: true,
-            visibleScreenHeight: 1_000
-        )
-        let fiveDevicesWithOverview = StatusMenuSizing.preferredContentSize(
-            dashboardItemCount: 5,
-            showsOverview: true,
             visibleScreenHeight: 1_000
         )
 
-        XCTAssertEqual(nativeOneDevice.width, 386)
-        XCTAssertGreaterThan(nativeOneDevice.height, 240)
-        XCTAssertGreaterThan(nativeFiveDevices.height, nativeOneDevice.height)
-        XCTAssertEqual(oneDeviceWithOverview.width, 386)
-        XCTAssertEqual(oneDeviceWithOverview.height, nativeOneDevice.height)
-        XCTAssertGreaterThan(fiveDevicesWithOverview.height, nativeFiveDevices.height)
-        XCTAssertGreaterThan(fiveDevicesWithOverview.height, oneDeviceWithOverview.height)
-        XCTAssertLessThan(fiveDevicesWithOverview.height, 560)
+        XCTAssertEqual(oneDevice.width, 386)
+        XCTAssertGreaterThan(oneDevice.height, 240)
+        XCTAssertGreaterThan(fiveDevices.height, oneDevice.height)
+        XCTAssertLessThan(fiveDevices.height, 560)
     }
 
     func testNativeStatusMenuSizingMatchesRenderedRowChrome() {
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
-            showsOverview: false,
             visibleScreenHeight: 1_000
         )
 
@@ -710,30 +693,20 @@ final class DeviceListPresentationTests: XCTestCase {
     func testStatusWindowConfigurationLoadsDashboardPreferences() {
         let defaults = isolatedDefaults()
         defaults.set(true, forKey: StatusWindowPreferences.showMenuBarBatteryKey)
-        defaults.set(false, forKey: StatusWindowPreferences.showBatteryOverviewKey)
 
         let configuration = StatusWindowConfiguration.load(from: defaults)
 
         XCTAssertTrue(configuration.showsMenuBarBattery)
-        XCTAssertFalse(configuration.showsBatteryOverview)
     }
 
-    func testStatusMenuSizingUsesNativeWidthWithoutLegacyCardHeight() {
-        let withoutOverview = StatusMenuSizing.preferredContentSize(
+    func testStatusMenuSizingUsesNativeWidth() {
+        let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 1,
-            showsOverview: false,
-            visibleScreenHeight: 1_000
-        )
-        let withOverview = StatusMenuSizing.preferredContentSize(
-            dashboardItemCount: 1,
-            showsOverview: true,
             visibleScreenHeight: 1_000
         )
 
-        XCTAssertEqual(withoutOverview.width, 386)
-        XCTAssertEqual(withOverview.width, 386)
-        XCTAssertEqual(withOverview.height, withoutOverview.height)
-        XCTAssertLessThan(withOverview.height, 560)
+        XCTAssertEqual(size.width, 386)
+        XCTAssertLessThan(size.height, 560)
     }
 
     @MainActor
@@ -783,7 +756,6 @@ final class DeviceListPresentationTests: XCTestCase {
     func testStatusMenuSizingCapsToVisibleScreenHeight() {
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 12,
-            showsOverview: true,
             visibleScreenHeight: 720
         )
 
@@ -1450,7 +1422,7 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertTrue(BatteryHUDPreferences.isEnabled(for: .lowBattery, defaults: defaults))
         XCTAssertTrue(BatteryHUDPreferences.isEnabled(for: .charged, defaults: defaults))
         XCTAssertTrue(BatteryHUDPreferences.isAutoDismissEnabled(defaults: defaults))
-        XCTAssertTrue(BatteryHUDPreferences.showsDismissButton(defaults: defaults))
+        XCTAssertFalse(BatteryHUDPreferences.showsDismissButton(defaults: defaults))
         XCTAssertEqual(BatteryHUDPreferences.dismissDelaySeconds(defaults: defaults), 4)
 
         defaults.set(false, forKey: BatteryHUDPreferences.showActionHUDKey)
@@ -1854,11 +1826,7 @@ final class DeviceListPresentationTests: XCTestCase {
 
         controller.update(
             snapshots: snapshots,
-            isRefreshing: false,
-            bluetoothPowerState: .on,
-            onRefresh: {},
-            onOpenSettings: {},
-            onOpenBluetoothSettings: {}
+            onOpenSettings: {}
         )
         guard let firstFrame = controller.debugWindowFrame else {
             XCTFail("Expected desktop widget window frame")
@@ -1870,11 +1838,7 @@ final class DeviceListPresentationTests: XCTestCase {
         controller.close()
         controller.update(
             snapshots: snapshots,
-            isRefreshing: false,
-            bluetoothPowerState: .on,
-            onRefresh: {},
-            onOpenSettings: {},
-            onOpenBluetoothSettings: {}
+            onOpenSettings: {}
         )
         guard let secondFrame = controller.debugWindowFrame else {
             XCTFail("Expected desktop widget window frame after reopening")
@@ -1903,10 +1867,7 @@ final class DeviceListPresentationTests: XCTestCase {
         let view = BatteryDesktopWidgetView(
             snapshots: snapshots,
             style: .expanded,
-            bluetoothPowerState: .on,
-            onRefresh: {},
-            onOpenSettings: {},
-            onOpenBluetoothSettings: {}
+            onOpenSettings: {}
         )
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(x: 0, y: 0, width: DesktopWidgetStyle.expanded.width, height: DesktopWidgetStyle.expanded.height)
@@ -1981,7 +1942,6 @@ final class DeviceListPresentationTests: XCTestCase {
         let hostingView = NSHostingView(rootView: view)
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
-            showsOverview: true,
             visibleScreenHeight: 1_000
         )
         hostingView.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height)
@@ -2030,7 +1990,6 @@ final class DeviceListPresentationTests: XCTestCase {
         let hostingView = NSHostingView(rootView: view)
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 5,
-            showsOverview: true,
             visibleScreenHeight: 1_000
         )
         hostingView.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height)
@@ -2303,7 +2262,6 @@ final class DeviceListPresentationTests: XCTestCase {
         let view = BatteryHubSettingsView(
             snapshots: [],
             notificationAuthorizationState: .denied,
-            latestNotificationDeliveryResult: .failed("Notifications are disabled"),
             onRefresh: {},
             initialPane: .alerts
         )
