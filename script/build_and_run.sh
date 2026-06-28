@@ -10,19 +10,25 @@ SCHEME="BeaconMac"
 DESTINATION="platform=macOS,arch=arm64"
 INSTALL_PATH="/Applications/$APP_NAME.app"
 
+# Sign with a stable Apple Development identity by default so TCC (Bluetooth,
+# notifications) permissions persist across rebuilds. Ad-hoc builds get a new
+# code identity every time, which makes macOS treat each build as a new app and
+# accumulate stale permission entries. Override the team with
+# BEACON_DEVELOPMENT_TEAM, or set it empty to fall back to an ad-hoc build.
+BEACON_DEVELOPMENT_TEAM="${BEACON_DEVELOPMENT_TEAM-3YG3N2J423}"
 BUILD_SIGNING_ARGS=()
-if [[ -n "${BATTERYHUB_DEVELOPMENT_TEAM:-}" ]]; then
+if [[ -n "$BEACON_DEVELOPMENT_TEAM" ]]; then
   BUILD_SIGNING_ARGS+=(
     CODE_SIGNING_ALLOWED=YES
     CODE_SIGN_STYLE=Automatic
-    DEVELOPMENT_TEAM="$BATTERYHUB_DEVELOPMENT_TEAM"
+    DEVELOPMENT_TEAM="$BEACON_DEVELOPMENT_TEAM"
     CODE_SIGN_IDENTITY="Apple Development"
   )
 fi
 
 usage() {
   echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--verify-signing|--install]" >&2
-  echo "Set BATTERYHUB_DEVELOPMENT_TEAM=<team id> to build with Apple Development signing." >&2
+  echo "Signs with Apple Development team $BEACON_DEVELOPMENT_TEAM by default; override with BEACON_DEVELOPMENT_TEAM (set empty for ad-hoc)." >&2
 }
 
 app_path() {
@@ -63,7 +69,7 @@ require_signed_bundle() {
 
   if grep -q "Signature=adhoc" <<<"$details"; then
     echo "Built app is ad-hoc signed. Refusing formal install." >&2
-    echo "Set BATTERYHUB_DEVELOPMENT_TEAM=<team id> and make sure an Apple Development signing identity is installed." >&2
+    echo "Set BEACON_DEVELOPMENT_TEAM=<team id> and make sure an Apple Development signing identity is installed." >&2
     echo "$details" >&2
     exit 1
   fi
