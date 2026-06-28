@@ -50,29 +50,29 @@ Product constraints:
 ## File Structure
 
 Create:
-- `BatteryHub.xcodeproj`
-- `BatteryHub/Shared/BatterySnapshot.swift`: shared device, status, source, and freshness models.
-- `BatteryHub/Shared/BatterySnapshotStore.swift`: in-memory merge and stale-state logic.
-- `BatteryHub/Shared/CloudBatterySync.swift`: iCloud KVS publisher and subscriber for iOS and macOS.
-- `BatteryHub/Shared/DesignTokens.swift`: SwiftUI color, radius, spacing, and motion constants.
-- `BatteryHub/Mac/BatteryHubMacApp.swift`: macOS app entrypoint and MenuBarExtra.
-- `BatteryHub/Mac/StatusMenuView.swift`: polished popover UI.
-- `BatteryHub/Mac/DeviceBatteryRow.swift`: reusable device row.
-- `BatteryHub/Mac/MacPowerSourceReader.swift`: MacBook battery reader.
-- `BatteryHub/Mac/BluetoothBatteryResolver.swift`: multi-provider Bluetooth battery reader.
-- `BatteryHub/Mac/BluetoothDeviceScanner.swift`: connected device enumeration and BLE Battery Service discovery.
-- `BatteryHub/iOS/BatteryHubiOSApp.swift`: iOS companion entrypoint.
-- `BatteryHub/iOS/iPhoneBatteryReporter.swift`: iPhone battery reader and publisher.
-- `BatteryHub/iOS/WatchBatteryRelay.swift`: WatchConnectivity receiver.
-- `BatteryHub/Watch/BatteryHubWatchApp.swift`: watchOS companion entrypoint.
-- `BatteryHub/Watch/WatchBatteryReporter.swift`: Apple Watch battery reader and WatchConnectivity sender.
-- `BatteryHubTests/BatterySnapshotStoreTests.swift`
-- `BatteryHubTests/CloudBatterySyncTests.swift`
-- `BatteryHubTests/BluetoothBatteryResolverTests.swift`
-- `BatteryHubUITests/StatusMenuSnapshotTests.swift`
+- `Beacon.xcodeproj`
+- `Beacon/Shared/BatterySnapshot.swift`: shared device, status, source, and freshness models.
+- `Beacon/Shared/BatterySnapshotStore.swift`: in-memory merge and stale-state logic.
+- `Beacon/Shared/CloudBatterySync.swift`: iCloud KVS publisher and subscriber for iOS and macOS.
+- `Beacon/Shared/DesignTokens.swift`: SwiftUI color, radius, spacing, and motion constants.
+- `Beacon/Mac/BeaconMacApp.swift`: macOS app entrypoint and MenuBarExtra.
+- `Beacon/Mac/StatusMenuView.swift`: polished popover UI.
+- `Beacon/Mac/DeviceBatteryRow.swift`: reusable device row.
+- `Beacon/Mac/MacPowerSourceReader.swift`: MacBook battery reader.
+- `Beacon/Mac/BluetoothBatteryResolver.swift`: multi-provider Bluetooth battery reader.
+- `Beacon/Mac/BluetoothDeviceScanner.swift`: connected device enumeration and BLE Battery Service discovery.
+- `Beacon/iOS/BeaconiOSApp.swift`: iOS companion entrypoint.
+- `Beacon/iOS/iPhoneBatteryReporter.swift`: iPhone battery reader and publisher.
+- `Beacon/iOS/WatchBatteryRelay.swift`: WatchConnectivity receiver.
+- `Beacon/Watch/BeaconWatchApp.swift`: watchOS companion entrypoint.
+- `Beacon/Watch/WatchBatteryReporter.swift`: Apple Watch battery reader and WatchConnectivity sender.
+- `BeaconTests/BatterySnapshotStoreTests.swift`
+- `BeaconTests/CloudBatterySyncTests.swift`
+- `BeaconTests/BluetoothBatteryResolverTests.swift`
+- `BeaconUITests/StatusMenuSnapshotTests.swift`
 
 Modify after Xcode scaffolding:
-- `BatteryHub/Mac/Info.plist`: set `LSUIElement` to `YES`.
+- `Beacon/Mac/Info.plist`: set `LSUIElement` to `YES`.
 - macOS entitlements: enable iCloud KVS and Bluetooth access as required by the final Xcode target settings.
 - iOS entitlements: enable iCloud KVS.
 - watchOS entitlements: enable WatchConnectivity pairing with the companion iOS app.
@@ -80,10 +80,10 @@ Modify after Xcode scaffolding:
 ## Task 1: Scaffold the Apple Project
 
 **Files:**
-- Create: `BatteryHub.xcodeproj`
-- Create: `BatteryHub/`
-- Create: `BatteryHubTests/`
-- Create: `BatteryHubUITests/`
+- Create: `Beacon.xcodeproj`
+- Create: `Beacon/`
+- Create: `BeaconTests/`
+- Create: `BeaconUITests/`
 
 - [ ] **Step 1: Create the Xcode project**
 
@@ -92,7 +92,7 @@ Use Xcode:
 File > New > Project
 Platform: Multiplatform
 Template: App
-Product Name: BatteryHub
+Product Name: Beacon
 Organization Identifier: com.isaacyslin
 Interface: SwiftUI
 Language: Swift
@@ -103,11 +103,11 @@ Include Tests: Yes
 
 In Xcode, add:
 ```text
-macOS App target: BatteryHubMac
-iOS App target: BatteryHubiOS
-watchOS App target: BatteryHubWatch
-Unit Test target: BatteryHubTests
-UI Test target: BatteryHubUITests
+macOS App target: BeaconMac
+iOS App target: BeaconiOS
+watchOS App target: BeaconWatch
+Unit Test target: BeaconTests
+UI Test target: BeaconUITests
 ```
 
 - [ ] **Step 3: Configure signing**
@@ -116,18 +116,18 @@ Set all targets to the same Apple Developer Team.
 
 Bundle identifiers:
 ```text
-com.isaacyslin.BatteryHub.mac
-com.isaacyslin.BatteryHub.ios
-com.isaacyslin.BatteryHub.watch
+com.isaacyslin.Beacon.mac
+com.isaacyslin.Beacon.ios
+com.isaacyslin.Beacon.watch
 ```
 
 - [ ] **Step 4: Configure capabilities**
 
 Enable:
 ```text
-BatteryHubMac: iCloud Key-value storage, Bluetooth
-BatteryHubiOS: iCloud Key-value storage
-BatteryHubWatch: Watch Connectivity
+BeaconMac: iCloud Key-value storage, Bluetooth
+BeaconiOS: iCloud Key-value storage
+BeaconWatch: Watch Connectivity
 ```
 
 - [ ] **Step 5: Hide the Mac app from Dock**
@@ -142,7 +142,7 @@ Add this key to the macOS target Info.plist:
 
 Run:
 ```bash
-xcodebuild -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' build
+xcodebuild -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' build
 ```
 
 Expected: build succeeds with exit code 0.
@@ -150,23 +150,23 @@ Expected: build succeeds with exit code 0.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add BatteryHub.xcodeproj BatteryHub BatteryHubTests BatteryHubUITests
+git add Beacon.xcodeproj Beacon BeaconTests BeaconUITests
 git commit -m "chore: scaffold battery hub apple targets"
 ```
 
 ## Task 2: Add Shared Battery Models
 
 **Files:**
-- Create: `BatteryHub/Shared/BatterySnapshot.swift`
-- Create: `BatteryHub/Shared/BatterySnapshotStore.swift`
-- Test: `BatteryHubTests/BatterySnapshotStoreTests.swift`
+- Create: `Beacon/Shared/BatterySnapshot.swift`
+- Create: `Beacon/Shared/BatterySnapshotStore.swift`
+- Test: `BeaconTests/BatterySnapshotStoreTests.swift`
 
 - [ ] **Step 1: Write model tests**
 
-Create `BatteryHubTests/BatterySnapshotStoreTests.swift`:
+Create `BeaconTests/BatterySnapshotStoreTests.swift`:
 ```swift
 import XCTest
-@testable import BatteryHub
+@testable import Beacon
 
 final class BatterySnapshotStoreTests: XCTestCase {
     func testMergeKeepsNewestSnapshotPerDevice() {
@@ -237,14 +237,14 @@ final class BatterySnapshotStoreTests: XCTestCase {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BatterySnapshotStoreTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BatterySnapshotStoreTests
 ```
 
 Expected: FAIL because `BatterySnapshot` and `BatterySnapshotStore` do not exist.
 
 - [ ] **Step 3: Implement shared models**
 
-Create `BatteryHub/Shared/BatterySnapshot.swift`:
+Create `Beacon/Shared/BatterySnapshot.swift`:
 ```swift
 import Foundation
 
@@ -315,7 +315,7 @@ public struct DecoratedBatterySnapshot: Equatable, Identifiable, Sendable {
 }
 ```
 
-Create `BatteryHub/Shared/BatterySnapshotStore.swift`:
+Create `Beacon/Shared/BatterySnapshotStore.swift`:
 ```swift
 import Foundation
 
@@ -379,7 +379,7 @@ private extension DeviceKind {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BatterySnapshotStoreTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BatterySnapshotStoreTests
 ```
 
 Expected: PASS.
@@ -387,22 +387,22 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add BatteryHub/Shared BatteryHubTests/BatterySnapshotStoreTests.swift
+git add Beacon/Shared BeaconTests/BatterySnapshotStoreTests.swift
 git commit -m "feat: add shared battery snapshot model"
 ```
 
 ## Task 3: Add MacBook Battery Reader
 
 **Files:**
-- Create: `BatteryHub/Mac/MacPowerSourceReader.swift`
-- Test: `BatteryHubTests/MacPowerSourceReaderTests.swift`
+- Create: `Beacon/Mac/MacPowerSourceReader.swift`
+- Test: `BeaconTests/MacPowerSourceReaderTests.swift`
 
 - [ ] **Step 1: Write parser test**
 
-Create `BatteryHubTests/MacPowerSourceReaderTests.swift`:
+Create `BeaconTests/MacPowerSourceReaderTests.swift`:
 ```swift
 import XCTest
-@testable import BatteryHub
+@testable import Beacon
 
 final class MacPowerSourceReaderTests: XCTestCase {
     func testSnapshotFromPowerSourceDictionary() {
@@ -427,14 +427,14 @@ final class MacPowerSourceReaderTests: XCTestCase {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/MacPowerSourceReaderTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/MacPowerSourceReaderTests
 ```
 
 Expected: FAIL because `MacPowerSourceReader` does not exist.
 
 - [ ] **Step 3: Implement reader**
 
-Create `BatteryHub/Mac/MacPowerSourceReader.swift`:
+Create `Beacon/Mac/MacPowerSourceReader.swift`:
 ```swift
 import Foundation
 import IOKit.ps
@@ -487,7 +487,7 @@ public struct MacPowerSourceReader {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/MacPowerSourceReaderTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/MacPowerSourceReaderTests
 ```
 
 Expected: PASS.
@@ -495,23 +495,23 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add BatteryHub/Mac/MacPowerSourceReader.swift BatteryHubTests/MacPowerSourceReaderTests.swift
+git add Beacon/Mac/MacPowerSourceReader.swift BeaconTests/MacPowerSourceReaderTests.swift
 git commit -m "feat: read macbook battery state"
 ```
 
 ## Task 4: Add Bluetooth Battery Resolver
 
 **Files:**
-- Create: `BatteryHub/Mac/BluetoothBatteryResolver.swift`
-- Create: `BatteryHub/Mac/BluetoothDeviceScanner.swift`
-- Test: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
+- Create: `Beacon/Mac/BluetoothBatteryResolver.swift`
+- Create: `Beacon/Mac/BluetoothDeviceScanner.swift`
+- Test: `BeaconTests/BluetoothBatteryResolverTests.swift`
 
 - [ ] **Step 1: Write resolver tests**
 
-Create `BatteryHubTests/BluetoothBatteryResolverTests.swift`:
+Create `BeaconTests/BluetoothBatteryResolverTests.swift`:
 ```swift
 import XCTest
-@testable import BatteryHub
+@testable import Beacon
 
 final class BluetoothBatteryResolverTests: XCTestCase {
     func testIORegistryBatteryPercentCreatesKeyboardSnapshot() {
@@ -550,14 +550,14 @@ final class BluetoothBatteryResolverTests: XCTestCase {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests
 ```
 
 Expected: FAIL because Bluetooth resolver types do not exist.
 
 - [ ] **Step 3: Implement resolver**
 
-Create `BatteryHub/Mac/BluetoothBatteryResolver.swift`:
+Create `Beacon/Mac/BluetoothBatteryResolver.swift`:
 ```swift
 import Foundation
 
@@ -620,7 +620,7 @@ public struct BluetoothBatteryResolver {
 
 - [ ] **Step 4: Implement scanner shell with safe fallbacks**
 
-Create `BatteryHub/Mac/BluetoothDeviceScanner.swift`:
+Create `Beacon/Mac/BluetoothDeviceScanner.swift`:
 ```swift
 import Foundation
 import IOBluetooth
@@ -705,7 +705,7 @@ public struct BluetoothDeviceScanner {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests
 ```
 
 Expected: PASS.
@@ -724,22 +724,22 @@ No duplicate rows for the same HID device
 - [ ] **Step 7: Commit**
 
 ```bash
-git add BatteryHub/Mac/BluetoothBatteryResolver.swift BatteryHub/Mac/BluetoothDeviceScanner.swift BatteryHubTests/BluetoothBatteryResolverTests.swift
+git add Beacon/Mac/BluetoothBatteryResolver.swift Beacon/Mac/BluetoothDeviceScanner.swift BeaconTests/BluetoothBatteryResolverTests.swift
 git commit -m "feat: resolve bluetooth battery snapshots"
 ```
 
 ## Task 5: Add iCloud Battery Sync
 
 **Files:**
-- Create: `BatteryHub/Shared/CloudBatterySync.swift`
-- Test: `BatteryHubTests/CloudBatterySyncTests.swift`
+- Create: `Beacon/Shared/CloudBatterySync.swift`
+- Test: `BeaconTests/CloudBatterySyncTests.swift`
 
 - [ ] **Step 1: Write encode/decode tests**
 
-Create `BatteryHubTests/CloudBatterySyncTests.swift`:
+Create `BeaconTests/CloudBatterySyncTests.swift`:
 ```swift
 import XCTest
-@testable import BatteryHub
+@testable import Beacon
 
 final class CloudBatterySyncTests: XCTestCase {
     func testEnvelopeRoundTrip() throws {
@@ -773,14 +773,14 @@ final class CloudBatterySyncTests: XCTestCase {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/CloudBatterySyncTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/CloudBatterySyncTests
 ```
 
 Expected: FAIL because `SyncEnvelope` and coders do not exist.
 
 - [ ] **Step 3: Implement sync envelope**
 
-Create `BatteryHub/Shared/CloudBatterySync.swift`:
+Create `Beacon/Shared/CloudBatterySync.swift`:
 ```swift
 import Foundation
 
@@ -814,7 +814,7 @@ public extension JSONDecoder {
 }
 
 public final class CloudBatterySync {
-    public static let storageKey = "BatteryHub.SyncEnvelope.v1"
+    public static let storageKey = "Beacon.SyncEnvelope.v1"
     private let store: NSUbiquitousKeyValueStore
 
     public init(store: NSUbiquitousKeyValueStore = .default) {
@@ -841,7 +841,7 @@ public final class CloudBatterySync {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/CloudBatterySyncTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/CloudBatterySyncTests
 ```
 
 Expected: PASS.
@@ -849,20 +849,20 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add BatteryHub/Shared/CloudBatterySync.swift BatteryHubTests/CloudBatterySyncTests.swift
+git add Beacon/Shared/CloudBatterySync.swift BeaconTests/CloudBatterySyncTests.swift
 git commit -m "feat: add icloud battery sync envelope"
 ```
 
 ## Task 6: Add iPhone and Watch Reporters
 
 **Files:**
-- Create: `BatteryHub/iOS/iPhoneBatteryReporter.swift`
-- Create: `BatteryHub/iOS/WatchBatteryRelay.swift`
-- Create: `BatteryHub/Watch/WatchBatteryReporter.swift`
+- Create: `Beacon/iOS/iPhoneBatteryReporter.swift`
+- Create: `Beacon/iOS/WatchBatteryRelay.swift`
+- Create: `Beacon/Watch/WatchBatteryReporter.swift`
 
 - [ ] **Step 1: Implement iPhone battery reporter**
 
-Create `BatteryHub/iOS/iPhoneBatteryReporter.swift`:
+Create `Beacon/iOS/iPhoneBatteryReporter.swift`:
 ```swift
 import Foundation
 import UIKit
@@ -906,7 +906,7 @@ public final class iPhoneBatteryReporter {
 
 - [ ] **Step 2: Implement WatchConnectivity relay**
 
-Create `BatteryHub/iOS/WatchBatteryRelay.swift`:
+Create `Beacon/iOS/WatchBatteryRelay.swift`:
 ```swift
 import Foundation
 import WatchConnectivity
@@ -953,7 +953,7 @@ public final class WatchBatteryRelay: NSObject, WCSessionDelegate {
 
 - [ ] **Step 3: Implement watch battery reporter**
 
-Create `BatteryHub/Watch/WatchBatteryReporter.swift`:
+Create `Beacon/Watch/WatchBatteryReporter.swift`:
 ```swift
 import Foundation
 import WatchConnectivity
@@ -1019,8 +1019,8 @@ In the watchOS app entrypoint, create one `WatchBatteryReporter`, call `start()`
 
 Run:
 ```bash
-xcodebuild -project BatteryHub.xcodeproj -scheme BatteryHubiOS -destination 'generic/platform=iOS' build
-xcodebuild -project BatteryHub.xcodeproj -scheme BatteryHubWatch -destination 'generic/platform=watchOS' build
+xcodebuild -project Beacon.xcodeproj -scheme BeaconiOS -destination 'generic/platform=iOS' build
+xcodebuild -project Beacon.xcodeproj -scheme BeaconWatch -destination 'generic/platform=watchOS' build
 ```
 
 Expected: both builds succeed.
@@ -1039,22 +1039,22 @@ Mac popover: iPhone and Apple Watch rows show percent plus last updated timestam
 - [ ] **Step 7: Commit**
 
 ```bash
-git add BatteryHub/iOS BatteryHub/Watch
+git add Beacon/iOS Beacon/Watch
 git commit -m "feat: sync iphone and apple watch battery snapshots"
 ```
 
 ## Task 7: Build the Elegant Menu Bar UI
 
 **Files:**
-- Create: `BatteryHub/Shared/DesignTokens.swift`
-- Create: `BatteryHub/Mac/BatteryHubMacApp.swift`
-- Create: `BatteryHub/Mac/StatusMenuView.swift`
-- Create: `BatteryHub/Mac/DeviceBatteryRow.swift`
-- Test: `BatteryHubUITests/StatusMenuSnapshotTests.swift`
+- Create: `Beacon/Shared/DesignTokens.swift`
+- Create: `Beacon/Mac/BeaconMacApp.swift`
+- Create: `Beacon/Mac/StatusMenuView.swift`
+- Create: `Beacon/Mac/DeviceBatteryRow.swift`
+- Test: `BeaconUITests/StatusMenuSnapshotTests.swift`
 
 - [ ] **Step 1: Implement design tokens**
 
-Create `BatteryHub/Shared/DesignTokens.swift`:
+Create `Beacon/Shared/DesignTokens.swift`:
 ```swift
 import SwiftUI
 
@@ -1091,7 +1091,7 @@ public enum DesignTokens {
 
 - [ ] **Step 2: Implement row view**
 
-Create `BatteryHub/Mac/DeviceBatteryRow.swift`:
+Create `Beacon/Mac/DeviceBatteryRow.swift`:
 ```swift
 import SwiftUI
 
@@ -1173,7 +1173,7 @@ struct DeviceBatteryRow: View {
 
 - [ ] **Step 3: Implement status popover**
 
-Create `BatteryHub/Mac/StatusMenuView.swift`:
+Create `Beacon/Mac/StatusMenuView.swift`:
 ```swift
 import SwiftUI
 
@@ -1201,7 +1201,7 @@ struct StatusMenuView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("BatteryHub")
+                Text("Beacon")
                     .font(.system(size: 15, weight: .semibold))
                 Text("Devices at a glance")
                     .font(.system(size: 11))
@@ -1234,12 +1234,12 @@ struct StatusMenuView: View {
 
 - [ ] **Step 4: Implement macOS entrypoint**
 
-Create `BatteryHub/Mac/BatteryHubMacApp.swift`:
+Create `Beacon/Mac/BeaconMacApp.swift`:
 ```swift
 import SwiftUI
 
 @main
-struct BatteryHubMacApp: App {
+struct BeaconMacApp: App {
     @State private var store = BatterySnapshotStore()
 
     var body: some Scene {
@@ -1256,7 +1256,7 @@ struct BatteryHubMacApp: App {
 
     private var summaryText: String {
         let percents = store.snapshots.compactMap(\.percent)
-        guard let lowest = percents.min() else { return "BatteryHub" }
+        guard let lowest = percents.min() else { return "Beacon" }
         return "\(lowest)%"
     }
 
@@ -1274,7 +1274,7 @@ struct BatteryHubMacApp: App {
 
 - [ ] **Step 5: Add UI snapshot smoke test**
 
-Create `BatteryHubUITests/StatusMenuSnapshotTests.swift`:
+Create `BeaconUITests/StatusMenuSnapshotTests.swift`:
 ```swift
 import XCTest
 
@@ -1291,7 +1291,7 @@ final class StatusMenuSnapshotTests: XCTestCase {
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubUITests/StatusMenuSnapshotTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconUITests/StatusMenuSnapshotTests
 ```
 
 Expected: PASS.
@@ -1313,7 +1313,7 @@ The UI does not use large marketing headers, generic cards, purple-blue gradient
 - [ ] **Step 8: Commit**
 
 ```bash
-git add BatteryHub/Shared/DesignTokens.swift BatteryHub/Mac BatteryHubUITests/StatusMenuSnapshotTests.swift
+git add Beacon/Shared/DesignTokens.swift Beacon/Mac BeaconUITests/StatusMenuSnapshotTests.swift
 git commit -m "feat: add polished menu bar battery ui"
 ```
 
@@ -1326,7 +1326,7 @@ git commit -m "feat: add polished menu bar battery ui"
 
 Run:
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS'
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS'
 ```
 
 Expected: PASS.
@@ -1335,7 +1335,7 @@ Expected: PASS.
 
 Run:
 ```bash
-xcodebuild -project BatteryHub.xcodeproj -scheme BatteryHubiOS -destination 'generic/platform=iOS' build
+xcodebuild -project Beacon.xcodeproj -scheme BeaconiOS -destination 'generic/platform=iOS' build
 ```
 
 Expected: PASS.
@@ -1344,7 +1344,7 @@ Expected: PASS.
 
 Run:
 ```bash
-xcodebuild -project BatteryHub.xcodeproj -scheme BatteryHubWatch -destination 'generic/platform=watchOS' build
+xcodebuild -project Beacon.xcodeproj -scheme BeaconWatch -destination 'generic/platform=watchOS' build
 ```
 
 Expected: PASS.
@@ -1381,7 +1381,7 @@ Panel still reads as a utility, not a landing page.
 
 If Step 1 through Step 5 required fixes:
 ```bash
-git add BatteryHub BatteryHubTests BatteryHubUITests
+git add Beacon BeaconTests BeaconUITests
 git commit -m "fix: polish battery hub verification issues"
 ```
 

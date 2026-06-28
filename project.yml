@@ -1,4 +1,4 @@
-name: BatteryHub
+name: Beacon
 options:
   bundleIdPrefix: com.isaacyslin
   deploymentTarget:
@@ -10,57 +10,57 @@ settings:
     CODE_SIGNING_ALLOWED: "NO"
     CODE_SIGN_STYLE: Manual
 targets:
-  BatteryHubMac:
+  BeaconMac:
     type: application
     platform: macOS
     sources:
-      - path: BatteryHub/Shared
-      - path: BatteryHub/Mac
+      - path: Beacon/Shared
+      - path: Beacon/Mac
     info:
-      path: BatteryHub/Mac/Info.plist
+      path: Beacon/Mac/Info.plist
       properties:
-        CFBundleDisplayName: BatteryHub
+        CFBundleDisplayName: Beacon
         LSUIElement: true
-        NSBluetoothAlwaysUsageDescription: BatteryHub reads connected Bluetooth device battery reports when available.
+        NSBluetoothAlwaysUsageDescription: Beacon reads connected Bluetooth device battery reports when available.
     entitlements:
-      path: BatteryHub/Mac/BatteryHubMac.entitlements
+      path: Beacon/Mac/BeaconMac.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.device.bluetooth: true
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.BatteryHub.mac
-        PRODUCT_MODULE_NAME: BatteryHub
-  BatteryHubTests:
+        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.Beacon.mac
+        PRODUCT_MODULE_NAME: Beacon
+  BeaconTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: BatteryHubTests
+      - path: BeaconTests
     dependencies:
-      - target: BatteryHubMac
+      - target: BeaconMac
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.BatteryHub.tests
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/BatteryHubMac.app/Contents/MacOS/BatteryHubMac
+        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.Beacon.tests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/BeaconMac.app/Contents/MacOS/BeaconMac
         BUNDLE_LOADER: $(TEST_HOST)
-  BatteryHubUITests:
+  BeaconUITests:
     type: bundle.ui-testing
     platform: macOS
     sources:
-      - path: BatteryHubUITests
+      - path: BeaconUITests
     dependencies:
-      - target: BatteryHubMac
+      - target: BeaconMac
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.BatteryHub.uitests
-        TEST_TARGET_NAME: BatteryHubMac
+        PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.Beacon.uitests
+        TEST_TARGET_NAME: BeaconMac
 schemes:
-  BatteryHubMac:
+  BeaconMac:
     build:
       targets:
-        BatteryHubMac: all
+        BeaconMac: all
     test:
       targets:
-        - BatteryHubTests
+        - BeaconTests
       gatherCoverageData: false

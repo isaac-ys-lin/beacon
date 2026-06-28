@@ -2,19 +2,19 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT="$ROOT_DIR/BatteryHub.xcodeproj"
-SCHEME="BatteryHubMac"
+PROJECT="$ROOT_DIR/Beacon.xcodeproj"
+SCHEME="BeaconMac"
 CONFIGURATION="${CONFIGURATION:-Release}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$ROOT_DIR/build/DerivedData}"
 DIST_DIR="${DIST_DIR:-$ROOT_DIR/dist}"
 STAGING_DIR="$ROOT_DIR/build/dmg-staging"
-APP_NAME="BatteryHubMac.app"
-VOLUME_NAME="${VOLUME_NAME:-BatteryHub}"
-DMG_NAME="${DMG_NAME:-BatteryHub.dmg}"
+APP_NAME="BeaconMac.app"
+VOLUME_NAME="${VOLUME_NAME:-Beacon}"
+DMG_NAME="${DMG_NAME:-Beacon.dmg}"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME"
 DMG_PATH="$DIST_DIR/$DMG_NAME"
-ENTITLEMENTS="$ROOT_DIR/BatteryHub/Mac/BatteryHubMac.entitlements"
-RESOLVED_ENTITLEMENTS="$ROOT_DIR/build/BatteryHubMac.resolved.entitlements"
+ENTITLEMENTS="$ROOT_DIR/Beacon/Mac/BeaconMac.entitlements"
+RESOLVED_ENTITLEMENTS="$ROOT_DIR/build/BeaconMac.resolved.entitlements"
 
 require_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then

@@ -8,7 +8,7 @@ struct IconSlot {
 
 let appIconRoot = URL(
     fileURLWithPath: CommandLine.arguments.dropFirst().first
-        ?? "BatteryHub/Mac/Assets.xcassets/AppIcon.appiconset"
+        ?? "Beacon/Mac/Assets.xcassets/AppIcon.appiconset"
 )
 let assetCatalogRoot = appIconRoot.deletingLastPathComponent()
 try FileManager.default.createDirectory(at: appIconRoot, withIntermediateDirectories: true)
@@ -44,7 +44,7 @@ func bitmap(pixelSize: Int, draw: (CGFloat, CGRect) -> Void) throws -> Data {
         bytesPerRow: 0,
         bitsPerPixel: 0
     ) else {
-        throw NSError(domain: "BatteryHubIcon", code: 1)
+        throw NSError(domain: "BeaconIcon", code: 1)
     }
     rep.size = NSSize(width: pixelSize, height: pixelSize)
 
@@ -59,7 +59,7 @@ func bitmap(pixelSize: Int, draw: (CGFloat, CGRect) -> Void) throws -> Data {
     NSGraphicsContext.restoreGraphicsState()
 
     guard let data = rep.representation(using: .png, properties: [:]) else {
-        throw NSError(domain: "BatteryHubIcon", code: 2)
+        throw NSError(domain: "BeaconIcon", code: 2)
     }
     return data
 }
@@ -541,7 +541,7 @@ func writeImageSet(
 }
 
 try writeImageSet(
-    name: "BatteryHubAppIcon",
+    name: "BeaconAppIcon",
     basePixelSize: 32,
     renderer: renderAppIconPNG
 )

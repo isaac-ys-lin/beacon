@@ -2,24 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make iPhone battery readings reliable, diagnosable, and honest in the BatteryHub UI.
+**Goal:** Make iPhone battery readings reliable, diagnosable, and honest in the Beacon UI.
 
 **Architecture:** Split raw battery collection from snapshot presentation by adding provider metadata, diagnostics, iPhone identity normalization, and a safe optional USB fallback path. Keep CoreBluetooth as the primary path and report why a refresh is stale instead of implying hotspot-based readings.
 
 **Tech Stack:** Swift, SwiftUI, CoreBluetooth, IOKit, UserDefaults, XCTest, optional `ideviceinfo` command discovery.
 
-**Status:** Completed 2026-06-24. Verified with full `BatteryHubMac` test suite and app build.
+**Status:** Completed 2026-06-24. Verified with full `BeaconMac` test suite and app build.
 
 ---
 
 ### Task 1: Provider Metadata and iPhone Identity
 
 **Files:**
-- Modify: `BatteryHub/Shared/BatterySnapshot.swift`
-- Modify: `BatteryHub/Mac/BluetoothBatteryResolver.swift`
-- Modify: `BatteryHub/Shared/BatterySnapshotStore.swift`
-- Test: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
-- Test: `BatteryHubTests/BatterySnapshotStoreTests.swift`
+- Modify: `Beacon/Shared/BatterySnapshot.swift`
+- Modify: `Beacon/Mac/BluetoothBatteryResolver.swift`
+- Modify: `Beacon/Shared/BatterySnapshotStore.swift`
+- Test: `BeaconTests/BluetoothBatteryResolverTests.swift`
+- Test: `BeaconTests/BatterySnapshotStoreTests.swift`
 
 - [x] Add snapshot metadata for provider, confidence, and latest attempt state.
 - [x] Classify BLE names containing iPhone as `.iPhone`.
@@ -29,22 +29,22 @@
 ### Task 2: Refresh Diagnostics
 
 **Files:**
-- Modify: `BatteryHub/Shared/BatterySnapshot.swift`
-- Modify: `BatteryHub/Mac/BluetoothDeviceScanner.swift`
-- Modify: `BatteryHub/Mac/BluetoothBatteryResolver.swift`
-- Modify: `BatteryHub/Mac/BatteryHubMacApp.swift`
-- Test: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
+- Modify: `Beacon/Shared/BatterySnapshot.swift`
+- Modify: `Beacon/Mac/BluetoothDeviceScanner.swift`
+- Modify: `Beacon/Mac/BluetoothBatteryResolver.swift`
+- Modify: `Beacon/Mac/BeaconMacApp.swift`
+- Test: `BeaconTests/BluetoothBatteryResolverTests.swift`
 
 - [x] Track provider attempts for local HID, system profiler, BLE, and optional USB.
-- [x] Preserve latest diagnostics on `BatteryHubModel`.
+- [x] Preserve latest diagnostics on `BeaconModel`.
 - [x] Expose diagnostics to settings support views without changing refresh behavior.
 
 ### Task 3: UX Honesty for Stale iPhone Data
 
 **Files:**
-- Modify: `BatteryHub/Mac/DeviceBatteryRow.swift`
-- Modify: `BatteryHub/Mac/BatteryHubSettingsSupportViews.swift`
-- Test: `BatteryHubTests/DeviceListPresentationTests.swift`
+- Modify: `Beacon/Mac/DeviceBatteryRow.swift`
+- Modify: `Beacon/Mac/BeaconSettingsSupportViews.swift`
+- Test: `BeaconTests/DeviceListPresentationTests.swift`
 
 - [x] Show source labels that distinguish Bluetooth Battery Service from hotspot/Wi-Fi.
 - [x] Show last updated relative text for stale/expired device rows.
@@ -53,9 +53,9 @@
 ### Task 4: Optional USB Fallback
 
 **Files:**
-- Modify: `BatteryHub/Mac/BluetoothBatteryResolver.swift`
-- Modify: `BatteryHub/Mac/BluetoothDeviceScanner.swift`
-- Test: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
+- Modify: `Beacon/Mac/BluetoothBatteryResolver.swift`
+- Modify: `Beacon/Mac/BluetoothDeviceScanner.swift`
+- Test: `BeaconTests/BluetoothBatteryResolverTests.swift`
 
 - [x] Add a safe optional `ideviceinfo` parser for `BatteryCurrentCapacity`.
 - [x] Only run the provider when `ideviceinfo` is installed.

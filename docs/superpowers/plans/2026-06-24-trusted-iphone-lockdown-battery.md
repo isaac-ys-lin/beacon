@@ -12,52 +12,52 @@
 
 ## File Structure
 
-- Create: `BatteryHub/Mac/TrustedIPhoneRegistry.swift`
-  - Owns the BatteryHub-local iPhone allowlist stored in UserDefaults.
-- Create: `BatteryHub/Mac/IPhoneLockdownBatteryProvider.swift`
+- Create: `Beacon/Mac/TrustedIPhoneRegistry.swift`
+  - Owns the Beacon-local iPhone allowlist stored in UserDefaults.
+- Create: `Beacon/Mac/IPhoneLockdownBatteryProvider.swift`
   - Discovers command-line tools, lists USB/network lockdown devices, reads battery payloads, and converts allowlisted devices into `BluetoothBatteryCandidate` values.
-- Modify: `BatteryHub/Mac/BluetoothBatteryResolver.swift`
+- Modify: `Beacon/Mac/BluetoothBatteryResolver.swift`
   - Adds `.lockdownNetwork` transport, blocks BLE iPhones in report creation, and gives trusted iPhones UDID-based IDs.
-- Modify: `BatteryHub/Mac/BluetoothDeviceScanner.swift`
+- Modify: `Beacon/Mac/BluetoothDeviceScanner.swift`
   - Calls the lockdown provider and merges only trusted iPhone candidates.
-- Modify: `BatteryHub/Shared/BatterySnapshotStore.swift`
+- Modify: `Beacon/Shared/BatterySnapshotStore.swift`
   - Adds removal by device ID so Forget removes stale trusted iPhone snapshots immediately.
-- Modify: `BatteryHub/Mac/BatteryHubMacApp.swift`
+- Modify: `Beacon/Mac/BeaconMacApp.swift`
   - Publishes trusted iPhone registry state and enrollment result from the model.
-- Modify: `BatteryHub/Mac/BatteryHubSettingsWindowController.swift`
+- Modify: `Beacon/Mac/BeaconSettingsWindowController.swift`
   - Passes trusted iPhone state, diagnostics, and enrollment callbacks to Settings.
-- Modify: `BatteryHub/Mac/BatteryHubSettingsView.swift`
+- Modify: `Beacon/Mac/BeaconSettingsView.swift`
   - Adds iPhone setup and diagnostics UI in the Devices pane.
-- Modify: `BatteryHub/Mac/BatteryHubSettingsSupportViews.swift`
+- Modify: `Beacon/Mac/BeaconSettingsSupportViews.swift`
   - Adds reusable trusted iPhone setup/status views.
-- Modify: `BatteryHub/Mac/DeviceBatteryRow.swift`
+- Modify: `Beacon/Mac/DeviceBatteryRow.swift`
   - Labels `.ideviceInfo` as `Trusted iPhone`.
-- Modify: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
+- Modify: `BeaconTests/BluetoothBatteryResolverTests.swift`
   - Tests provider parsing, allowlist filtering, missing command diagnostics, BLE iPhone suppression, and UDID-based IDs.
-- Modify: `BatteryHubTests/BatterySnapshotStoreTests.swift`
+- Modify: `BeaconTests/BatterySnapshotStoreTests.swift`
   - Tests removal by device ID.
-- Modify: `BatteryHubTests/DeviceListPresentationTests.swift`
+- Modify: `BeaconTests/DeviceListPresentationTests.swift`
   - Tests label and Settings rendering.
 - Inspect: `project.yml`
-  - Existing source directories already include `BatteryHub/Mac` and `BatteryHubTests`, so no target changes are required.
-- Modify: `BatteryHub.xcodeproj/project.pbxproj`
+  - Existing source directories already include `Beacon/Mac` and `BeaconTests`, so no target changes are required.
+- Modify: `Beacon.xcodeproj/project.pbxproj`
   - Regenerate with `xcodegen generate` after creating new source files.
 
 ## Task 1: Trusted iPhone Registry and Store Removal
 
 **Files:**
-- Create: `BatteryHub/Mac/TrustedIPhoneRegistry.swift`
-- Modify: `BatteryHub/Shared/BatterySnapshotStore.swift`
-- Test: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
-- Test: `BatteryHubTests/BatterySnapshotStoreTests.swift`
+- Create: `Beacon/Mac/TrustedIPhoneRegistry.swift`
+- Modify: `Beacon/Shared/BatterySnapshotStore.swift`
+- Test: `BeaconTests/BluetoothBatteryResolverTests.swift`
+- Test: `BeaconTests/BatterySnapshotStoreTests.swift`
 
 - [ ] **Step 1: Write failing registry tests**
 
-Append these tests to `BatteryHubTests/BluetoothBatteryResolverTests.swift`:
+Append these tests to `BeaconTests/BluetoothBatteryResolverTests.swift`:
 
 ```swift
 func testTrustedIPhoneRegistryPersistsAllowlistedUDIDs() throws {
-    let suiteName = "BatteryHubTests.TrustedIPhoneRegistry.\(UUID().uuidString)"
+    let suiteName = "BeaconTests.TrustedIPhoneRegistry.\(UUID().uuidString)"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
 
@@ -99,7 +99,7 @@ func testTrustedIPhoneRegistryUpdatesExistingUDIDWithoutDuplicating() {
 }
 ```
 
-Append this test to `BatteryHubTests/BatterySnapshotStoreTests.swift`:
+Append this test to `BeaconTests/BatterySnapshotStoreTests.swift`:
 
 ```swift
 func testRemoveDeviceIDsDropsTrustedIPhoneSnapshot() {
@@ -136,14 +136,14 @@ func testRemoveDeviceIDsDropsTrustedIPhoneSnapshot() {
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests -only-testing:BatteryHubTests/BatterySnapshotStoreTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests -only-testing:BeaconTests/BatterySnapshotStoreTests
 ```
 
 Expected: FAIL with missing `TrustedIPhone`, missing `TrustedIPhoneRegistry`, and missing `removeDeviceIDs`.
 
 - [ ] **Step 3: Add registry implementation**
 
-Create `BatteryHub/Mac/TrustedIPhoneRegistry.swift`:
+Create `Beacon/Mac/TrustedIPhoneRegistry.swift`:
 
 ```swift
 import Foundation
@@ -162,7 +162,7 @@ public struct TrustedIPhone: Codable, Equatable, Identifiable, Sendable {
 }
 
 public struct TrustedIPhoneRegistry: Equatable, Sendable {
-    public static let defaultsKey = "BatteryHub.trustedIPhones"
+    public static let defaultsKey = "Beacon.trustedIPhones"
 
     public let devices: [TrustedIPhone]
 
@@ -206,7 +206,7 @@ public struct TrustedIPhoneRegistry: Equatable, Sendable {
 }
 ```
 
-Modify `BatteryHub/Shared/BatterySnapshotStore.swift` by adding this method after `merge(_:)`:
+Modify `Beacon/Shared/BatterySnapshotStore.swift` by adding this method after `merge(_:)`:
 
 ```swift
 public mutating func removeDeviceIDs(_ deviceIDs: Set<String>) {
@@ -224,14 +224,14 @@ Run:
 xcodegen generate
 ```
 
-Expected: `BatteryHub.xcodeproj/project.pbxproj` includes `TrustedIPhoneRegistry.swift`.
+Expected: `Beacon.xcodeproj/project.pbxproj` includes `TrustedIPhoneRegistry.swift`.
 
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests -only-testing:BatteryHubTests/BatterySnapshotStoreTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests -only-testing:BeaconTests/BatterySnapshotStoreTests
 ```
 
 Expected: PASS.
@@ -239,19 +239,19 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add BatteryHub/Mac/TrustedIPhoneRegistry.swift BatteryHub/Shared/BatterySnapshotStore.swift BatteryHubTests/BluetoothBatteryResolverTests.swift BatteryHubTests/BatterySnapshotStoreTests.swift BatteryHub.xcodeproj/project.pbxproj
+git add Beacon/Mac/TrustedIPhoneRegistry.swift Beacon/Shared/BatterySnapshotStore.swift BeaconTests/BluetoothBatteryResolverTests.swift BeaconTests/BatterySnapshotStoreTests.swift Beacon.xcodeproj/project.pbxproj
 git commit -m "feat: add trusted iPhone registry"
 ```
 
 ## Task 2: Lockdown Provider With Allowlist Filtering
 
 **Files:**
-- Create: `BatteryHub/Mac/IPhoneLockdownBatteryProvider.swift`
-- Test: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
+- Create: `Beacon/Mac/IPhoneLockdownBatteryProvider.swift`
+- Test: `BeaconTests/BluetoothBatteryResolverTests.swift`
 
 - [ ] **Step 1: Write failing provider tests**
 
-Append these helpers and tests to `BatteryHubTests/BluetoothBatteryResolverTests.swift`:
+Append these helpers and tests to `BeaconTests/BluetoothBatteryResolverTests.swift`:
 
 ```swift
 private struct FakeIPhoneLockdownRunner: IPhoneLockdownCommandRunning {
@@ -374,14 +374,14 @@ func testIPhoneLockdownDiscoveryListsUSBDevicesForEnrollment() async throws {
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests
 ```
 
 Expected: FAIL with missing lockdown provider types and missing `.lockdownNetwork`.
 
 - [ ] **Step 3: Add lockdown provider**
 
-Create `BatteryHub/Mac/IPhoneLockdownBatteryProvider.swift`:
+Create `Beacon/Mac/IPhoneLockdownBatteryProvider.swift`:
 
 ```swift
 import Foundation
@@ -720,7 +720,7 @@ public enum IPhoneLockdownBatteryProvider {
 
 - [ ] **Step 4: Add network transport case**
 
-Modify `BatteryHub/Mac/BluetoothBatteryResolver.swift`:
+Modify `Beacon/Mac/BluetoothBatteryResolver.swift`:
 
 ```swift
 public enum BluetoothTransport: Equatable, Sendable {
@@ -748,14 +748,14 @@ Run:
 xcodegen generate
 ```
 
-Expected: `BatteryHub.xcodeproj/project.pbxproj` includes `IPhoneLockdownBatteryProvider.swift`.
+Expected: `Beacon.xcodeproj/project.pbxproj` includes `IPhoneLockdownBatteryProvider.swift`.
 
 - [ ] **Step 6: Run provider tests**
 
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests
 ```
 
 Expected: PASS.
@@ -763,20 +763,20 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add BatteryHub/Mac/IPhoneLockdownBatteryProvider.swift BatteryHub/Mac/BluetoothBatteryResolver.swift BatteryHubTests/BluetoothBatteryResolverTests.swift BatteryHub.xcodeproj/project.pbxproj
+git add Beacon/Mac/IPhoneLockdownBatteryProvider.swift Beacon/Mac/BluetoothBatteryResolver.swift BeaconTests/BluetoothBatteryResolverTests.swift Beacon.xcodeproj/project.pbxproj
 git commit -m "feat: add iOS lockdown battery provider"
 ```
 
 ## Task 3: Wire Provider and Suppress BLE iPhones
 
 **Files:**
-- Modify: `BatteryHub/Mac/BluetoothBatteryResolver.swift`
-- Modify: `BatteryHub/Mac/BluetoothDeviceScanner.swift`
-- Test: `BatteryHubTests/BluetoothBatteryResolverTests.swift`
+- Modify: `Beacon/Mac/BluetoothBatteryResolver.swift`
+- Modify: `Beacon/Mac/BluetoothDeviceScanner.swift`
+- Test: `BeaconTests/BluetoothBatteryResolverTests.swift`
 
 - [ ] **Step 1: Write failing resolver tests**
 
-Append these tests to `BatteryHubTests/BluetoothBatteryResolverTests.swift`:
+Append these tests to `BeaconTests/BluetoothBatteryResolverTests.swift`:
 
 ```swift
 func testResolverReportDropsBLEIPhoneCandidates() {
@@ -832,14 +832,14 @@ func testTrustedIPhoneSnapshotUsesUDIDIdentity() {
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests
 ```
 
 Expected: FAIL because BLE iPhones are still emitted or trusted iPhone IDs still use display-name identity.
 
 - [ ] **Step 3: Filter BLE iPhones in resolver reports**
 
-Modify `BatteryHub/Mac/BluetoothBatteryResolver.swift`:
+Modify `Beacon/Mac/BluetoothBatteryResolver.swift`:
 
 ```swift
 static func report(from scanReport: BluetoothCandidateScanReport, now: Date) -> BluetoothBatteryReadReport {
@@ -880,7 +880,7 @@ private static func stableDeviceID(for candidate: BluetoothBatteryCandidate, kin
 
 - [ ] **Step 4: Replace the old USB provider call**
 
-In `BatteryHub/Mac/BluetoothDeviceScanner.swift`, replace:
+In `Beacon/Mac/BluetoothDeviceScanner.swift`, replace:
 
 ```swift
 let usb = await IPhoneUSBBatteryProvider.readCandidate(now: now)
@@ -902,11 +902,11 @@ for candidate in trustedIPhones.candidates {
 }
 ```
 
-Remove `IPhoneUSBBatteryReading` and `IPhoneUSBBatteryProvider` from `BatteryHub/Mac/BluetoothBatteryResolver.swift`. Their parsing coverage is replaced by `IPhoneLockdownBatteryProvider.parseBatteryPercent(_:)` tests.
+Remove `IPhoneUSBBatteryReading` and `IPhoneUSBBatteryProvider` from `Beacon/Mac/BluetoothBatteryResolver.swift`. Their parsing coverage is replaced by `IPhoneLockdownBatteryProvider.parseBatteryPercent(_:)` tests.
 
 - [ ] **Step 5: Update existing USB tests**
 
-In `BatteryHubTests/BluetoothBatteryResolverTests.swift`, remove `testIPhoneUSBBatteryParserReadsCapacityAndDeviceName` and `testIPhoneUSBBatteryCandidateCreatesUSBProviderSnapshot`.
+In `BeaconTests/BluetoothBatteryResolverTests.swift`, remove `testIPhoneUSBBatteryParserReadsCapacityAndDeviceName` and `testIPhoneUSBBatteryCandidateCreatesUSBProviderSnapshot`.
 
 Add:
 
@@ -926,7 +926,7 @@ func testIPhoneLockdownBatteryParserReadsCapacity() {
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests
 ```
 
 Expected: PASS.
@@ -934,22 +934,22 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add BatteryHub/Mac/BluetoothBatteryResolver.swift BatteryHub/Mac/BluetoothDeviceScanner.swift BatteryHubTests/BluetoothBatteryResolverTests.swift
+git add Beacon/Mac/BluetoothBatteryResolver.swift Beacon/Mac/BluetoothDeviceScanner.swift BeaconTests/BluetoothBatteryResolverTests.swift
 git commit -m "fix: only show trusted iPhone battery reports"
 ```
 
 ## Task 4: Enrollment, Forget, and Diagnostics in Settings
 
 **Files:**
-- Modify: `BatteryHub/Mac/BatteryHubMacApp.swift`
-- Modify: `BatteryHub/Mac/BatteryHubSettingsWindowController.swift`
-- Modify: `BatteryHub/Mac/BatteryHubSettingsView.swift`
-- Modify: `BatteryHub/Mac/BatteryHubSettingsSupportViews.swift`
-- Test: `BatteryHubTests/DeviceListPresentationTests.swift`
+- Modify: `Beacon/Mac/BeaconMacApp.swift`
+- Modify: `Beacon/Mac/BeaconSettingsWindowController.swift`
+- Modify: `Beacon/Mac/BeaconSettingsView.swift`
+- Modify: `Beacon/Mac/BeaconSettingsSupportViews.swift`
+- Test: `BeaconTests/DeviceListPresentationTests.swift`
 
 - [ ] **Step 1: Write failing Settings tests**
 
-Append these tests to `BatteryHubTests/DeviceListPresentationTests.swift`:
+Append these tests to `BeaconTests/DeviceListPresentationTests.swift`:
 
 ```swift
 func testBatteryProviderLabelUsesTrustedIPhoneCopy() {
@@ -987,7 +987,7 @@ func testAddDeviceGuideRendersIPhoneSetupRow() throws {
 
 @MainActor
 func testSettingsWindowRendersDiagnostics() throws {
-    let view = BatteryHubSettingsView(
+    let view = BeaconSettingsView(
         snapshots: [],
         latestRefreshDiagnostics: BatteryRefreshDiagnostics(
             attempts: [
@@ -1034,21 +1034,21 @@ func testSettingsWindowRendersDiagnostics() throws {
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/DeviceListPresentationTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/DeviceListPresentationTests
 ```
 
 Expected: FAIL with missing initializer parameters and old provider label copy.
 
 - [ ] **Step 3: Add model state and actions**
 
-Modify `BatteryHub/Mac/BatteryHubMacApp.swift` inside `BatteryHubModel`:
+Modify `Beacon/Mac/BeaconMacApp.swift` inside `BeaconModel`:
 
 ```swift
 @Published private(set) var trustedIPhoneRegistry = TrustedIPhoneRegistry.load()
 @Published private(set) var trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport?
 ```
 
-Add methods inside `BatteryHubModel`:
+Add methods inside `BeaconModel`:
 
 ```swift
 func trustConnectedIPhones() {
@@ -1079,7 +1079,7 @@ func forgetTrustedIPhone(udid: String) {
 
 - [ ] **Step 4: Pass Settings dependencies**
 
-Modify `BatteryHub/Mac/BatteryHubSettingsWindowController.swift` inside `updateContent()`:
+Modify `Beacon/Mac/BeaconSettingsWindowController.swift` inside `updateContent()`:
 
 ```swift
 latestRefreshDiagnostics: model.latestRefreshDiagnostics,
@@ -1095,7 +1095,7 @@ onForgetTrustedIPhone: { [weak model] udid in
 
 Place those arguments after `latestNotificationDeliveryResult:` and before `onRefresh:`.
 
-Modify `BatteryHub/Mac/BatteryHubStatusController.swift` so Settings refreshes when trust state changes:
+Modify `Beacon/Mac/BeaconStatusController.swift` so Settings refreshes when trust state changes:
 
 ```swift
 private var trustedIPhoneObserver: AnyCancellable?
@@ -1117,7 +1117,7 @@ trustedIPhoneEnrollmentObserver = model.$trustedIPhoneEnrollmentResult.sink { [w
 
 - [ ] **Step 5: Extend Settings view initializer**
 
-Modify `BatteryHub/Mac/BatteryHubSettingsView.swift` properties:
+Modify `Beacon/Mac/BeaconSettingsView.swift` properties:
 
 ```swift
 let latestRefreshDiagnostics: BatteryRefreshDiagnostics
@@ -1180,7 +1180,7 @@ ScrollView(showsIndicators: false) {
 
 - [ ] **Step 6: Add Settings support views**
 
-Modify `BatteryHub/Mac/BatteryHubSettingsSupportViews.swift`:
+Modify `Beacon/Mac/BeaconSettingsSupportViews.swift`:
 
 ```swift
 struct TrustedIPhoneSettingsCard: View {
@@ -1206,7 +1206,7 @@ struct TrustedIPhoneSettingsCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Trusted iPhone")
                         .font(DesignTokens.Typography.captionEmphasis)
-                    Text("Connect by USB, unlock, Trust this Mac, then add it to BatteryHub.")
+                    Text("Connect by USB, unlock, Trust this Mac, then add it to Beacon.")
                         .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
@@ -1272,7 +1272,7 @@ struct TrustedIPhoneSettingsCard: View {
         diagnostics.attempts
             .last { $0.provider == .ideviceInfo }
             .map(\.message)
-            ?? "No trusted iPhone has been added to BatteryHub."
+            ?? "No trusted iPhone has been added to Beacon."
     }
 }
 ```
@@ -1301,7 +1301,7 @@ AddDeviceGuideRow(
 
 - [ ] **Step 7: Update provider label**
 
-Modify `batteryProviderLabel(source:provider:)` in `BatteryHub/Mac/DeviceBatteryRow.swift`:
+Modify `batteryProviderLabel(source:provider:)` in `Beacon/Mac/DeviceBatteryRow.swift`:
 
 ```swift
 case .ideviceInfo: return "Trusted iPhone"
@@ -1312,7 +1312,7 @@ case .ideviceInfo: return "Trusted iPhone"
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/DeviceListPresentationTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/DeviceListPresentationTests
 ```
 
 Expected: PASS.
@@ -1320,7 +1320,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add BatteryHub/Mac/BatteryHubMacApp.swift BatteryHub/Mac/BatteryHubSettingsWindowController.swift BatteryHub/Mac/BatteryHubStatusController.swift BatteryHub/Mac/BatteryHubSettingsView.swift BatteryHub/Mac/BatteryHubSettingsSupportViews.swift BatteryHub/Mac/DeviceBatteryRow.swift BatteryHubTests/DeviceListPresentationTests.swift
+git add Beacon/Mac/BeaconMacApp.swift Beacon/Mac/BeaconSettingsWindowController.swift Beacon/Mac/BeaconStatusController.swift Beacon/Mac/BeaconSettingsView.swift Beacon/Mac/BeaconSettingsSupportViews.swift Beacon/Mac/DeviceBatteryRow.swift BeaconTests/DeviceListPresentationTests.swift
 git commit -m "feat: add trusted iPhone settings"
 ```
 
@@ -1334,7 +1334,7 @@ git commit -m "feat: add trusted iPhone settings"
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests/BluetoothBatteryResolverTests -only-testing:BatteryHubTests/BatterySnapshotStoreTests -only-testing:BatteryHubTests/DeviceListPresentationTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests/BluetoothBatteryResolverTests -only-testing:BeaconTests/BatterySnapshotStoreTests -only-testing:BeaconTests/DeviceListPresentationTests
 ```
 
 Expected: PASS.
@@ -1344,7 +1344,7 @@ Expected: PASS.
 Run:
 
 ```bash
-xcodebuild test -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS' -only-testing:BatteryHubTests
+xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS' -only-testing:BeaconTests
 ```
 
 Expected: PASS.
@@ -1373,7 +1373,7 @@ idevice_id -l
 Expected:
 
 - If tools exist and the iPhone is trusted over USB, `idevice_id -l` prints the iPhone UDID.
-- If tools are missing, BatteryHub still builds and Settings diagnostics show `idevice_id or ideviceinfo command not found`.
+- If tools are missing, Beacon still builds and Settings diagnostics show `idevice_id or ideviceinfo command not found`.
 
 - [ ] **Step 5: Build and install to Applications**
 
@@ -1386,36 +1386,36 @@ BATTERYHUB_DEVELOPMENT_TEAM=SM2Y9TGWH3 ./script/build_and_run.sh --install
 If that fails with `No signing certificate "Mac Development" found`, use the known local fallback:
 
 ```bash
-xcodebuild -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS,arch=arm64' -configuration Debug CODE_SIGNING_ALLOWED=NO build
-APP_BUNDLE="$(xcodebuild -project BatteryHub.xcodeproj -scheme BatteryHubMac -destination 'platform=macOS,arch=arm64' -showBuildSettings 2>/dev/null | awk -F'= ' '$1 ~ /^[[:space:]]*BUILT_PRODUCTS_DIR[[:space:]]*$/ { dir=$2 } $1 ~ /^[[:space:]]*FULL_PRODUCT_NAME[[:space:]]*$/ { name=$2 } END { print dir "/" name }')"
-STAGING="/Applications/.BatteryHubMac.app.installing.$$"
-pkill -x BatteryHubMac || true
+xcodebuild -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS,arch=arm64' -configuration Debug CODE_SIGNING_ALLOWED=NO build
+APP_BUNDLE="$(xcodebuild -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS,arch=arm64' -showBuildSettings 2>/dev/null | awk -F'= ' '$1 ~ /^[[:space:]]*BUILT_PRODUCTS_DIR[[:space:]]*$/ { dir=$2 } $1 ~ /^[[:space:]]*FULL_PRODUCT_NAME[[:space:]]*$/ { name=$2 } END { print dir "/" name }')"
+STAGING="/Applications/.BeaconMac.app.installing.$$"
+pkill -x BeaconMac || true
 rm -rf "$STAGING"
 ditto "$APP_BUNDLE" "$STAGING"
-codesign --force --deep --sign "Apple Development: Yi-Sung Lin (SM2Y9TGWH3)" --entitlements BatteryHub/Mac/BatteryHubMac.entitlements "$STAGING"
+codesign --force --deep --sign "Apple Development: Yi-Sung Lin (SM2Y9TGWH3)" --entitlements Beacon/Mac/BeaconMac.entitlements "$STAGING"
 codesign --verify --deep --strict "$STAGING"
-rm -rf /Applications/BatteryHubMac.app
-mv "$STAGING" /Applications/BatteryHubMac.app
-open -n /Applications/BatteryHubMac.app
+rm -rf /Applications/BeaconMac.app
+mv "$STAGING" /Applications/BeaconMac.app
+open -n /Applications/BeaconMac.app
 ```
 
-Expected: `/Applications/BatteryHubMac.app` launches.
+Expected: `/Applications/BeaconMac.app` launches.
 
 - [ ] **Step 6: Prove the running app path**
 
 Run:
 
 ```bash
-PID="$(pgrep -x BatteryHubMac | head -1)"
+PID="$(pgrep -x BeaconMac | head -1)"
 ps -p "$PID" -o pid=,comm=
-lsof -p "$PID" | rg '/Applications/BatteryHubMac.app/Contents/MacOS/BatteryHubMac'
-codesign --verify --deep --strict /Applications/BatteryHubMac.app
-codesign -d --entitlements :- /Applications/BatteryHubMac.app 2>/dev/null | rg 'com.apple.security.app-sandbox|com.apple.security.device.bluetooth'
+lsof -p "$PID" | rg '/Applications/BeaconMac.app/Contents/MacOS/BeaconMac'
+codesign --verify --deep --strict /Applications/BeaconMac.app
+codesign -d --entitlements :- /Applications/BeaconMac.app 2>/dev/null | rg 'com.apple.security.app-sandbox|com.apple.security.device.bluetooth'
 ```
 
 Expected:
 
-- `lsof` shows `/Applications/BatteryHubMac.app/Contents/MacOS/BatteryHubMac`.
+- `lsof` shows `/Applications/BeaconMac.app/Contents/MacOS/BeaconMac`.
 - `codesign --verify --deep --strict` exits 0.
 - Entitlements include sandbox and Bluetooth.
 
@@ -1429,7 +1429,7 @@ ideviceinfo -u <UDID_FROM_IDEVICE_ID> -k DeviceName
 ideviceinfo -u <UDID_FROM_IDEVICE_ID> -q com.apple.mobile.battery
 ```
 
-Then in `/Applications/BatteryHubMac.app`:
+Then in `/Applications/BeaconMac.app`:
 
 1. Open Settings.
 2. Open Add Device.

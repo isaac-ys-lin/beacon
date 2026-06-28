@@ -2,11 +2,11 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="BatteryHubMac"
-BUNDLE_ID="com.isaacyslin.BatteryHub.mac"
+APP_NAME="BeaconMac"
+BUNDLE_ID="com.isaacyslin.Beacon.mac"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT="$ROOT_DIR/BatteryHub.xcodeproj"
-SCHEME="BatteryHubMac"
+PROJECT="$ROOT_DIR/Beacon.xcodeproj"
+SCHEME="BeaconMac"
 DESTINATION="platform=macOS,arch=arm64"
 INSTALL_PATH="/Applications/$APP_NAME.app"
 
