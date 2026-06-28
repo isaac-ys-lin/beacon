@@ -40,21 +40,21 @@ final class BeaconStatusController: NSObject {
             button.toolTip = "Beacon"
         }
 
-        storeObserver = model.$store.sink { [weak self] _ in
-            self?.updateStatusButton()
-            self?.updateStatusMenuContent()
-            self?.settingsWindowController.updateContent()
+        storeObserver = model.$store.sink { [weak self] store in
+            self?.updateStatusButton(store: store)
+            self?.updateStatusMenuContent(store: store)
+            self?.settingsWindowController.updateContent(store: store)
+            self?.updateDesktopWidget(store: store)
+        }
+        refreshStateObserver = model.$isRefreshing.sink { [weak self] isRefreshing in
+            self?.updateStatusButton(isRefreshing: isRefreshing)
+            self?.updateStatusMenuContent(isRefreshing: isRefreshing)
+            self?.settingsWindowController.updateContent(isRefreshing: isRefreshing)
             self?.updateDesktopWidget()
         }
-        refreshStateObserver = model.$isRefreshing.sink { [weak self] _ in
-            self?.updateStatusButton()
+        notificationAuthorizationObserver = model.$notificationAuthorizationState.sink { [weak self] authorizationState in
             self?.updateStatusMenuContent()
-            self?.settingsWindowController.updateContent()
-            self?.updateDesktopWidget()
-        }
-        notificationAuthorizationObserver = model.$notificationAuthorizationState.sink { [weak self] _ in
-            self?.updateStatusMenuContent()
-            self?.settingsWindowController.updateContent()
+            self?.settingsWindowController.updateContent(notificationAuthorizationState: authorizationState)
         }
         notificationDeliveryObserver = model.$latestNotificationDeliveryResult.sink { [weak self] _ in
             self?.settingsWindowController.updateContent()
@@ -116,14 +116,23 @@ final class BeaconStatusController: NSObject {
         }
     }
 
-    private func updateStatusMenuContent(screen: NSScreen? = NSScreen.main) {
+    private func updateStatusMenuContent(
+        screen: NSScreen? = NSScreen.main,
+        store: BatterySnapshotStore? = nil,
+        isRefreshing: Bool? = nil
+    ) {
         let configuration = StatusWindowConfiguration.load()
-        let nextSize = preferredPopoverContentSize(screen: screen, configuration: configuration)
+        let renderedStore = store ?? model.store
+        let nextSize = preferredPopoverContentSize(
+            screen: screen,
+            configuration: configuration,
+            store: renderedStore
+        )
 
         statusMenuPanelController.install(
             rootView: StatusMenuView(
-                snapshots: model.store.decoratedSnapshots,
-                isRefreshing: model.isRefreshing,
+                snapshots: renderedStore.decoratedSnapshots,
+                isRefreshing: isRefreshing ?? model.isRefreshing,
                 isPreviewingData: model.isUsingPreviewData,
                 configuration: configuration,
                 onRefresh: { [weak model] in
@@ -167,12 +176,14 @@ final class BeaconStatusController: NSObject {
 
     private func preferredPopoverContentSize(
         screen: NSScreen? = NSScreen.main,
-        configuration: StatusWindowConfiguration = .load()
+        configuration: StatusWindowConfiguration = .load(),
+        store: BatterySnapshotStore? = nil
     ) -> NSSize {
         let defaults = UserDefaults.standard
         let preferences = DeviceDisplayPreferences.load(from: defaults)
+        let renderedStore = store ?? model.store
         let sections = statusMenuDeviceSections(
-            model.store.decoratedSnapshots,
+            renderedStore.decoratedSnapshots,
             preferences: preferences
         )
         let dashboardItemCount = sections.reduce(0) { partial, section in
@@ -194,9 +205,10 @@ final class BeaconStatusController: NSObject {
         updateDesktopWidget()
     }
 
-    private func updateDesktopWidget() {
+    private func updateDesktopWidget(store: BatterySnapshotStore? = nil) {
+        let renderedStore = store ?? model.store
         desktopWidgetController.update(
-            snapshots: model.store.decoratedSnapshots,
+            snapshots: renderedStore.decoratedSnapshots,
             onOpenSettings: { [weak self] in
                 self?.showSettingsWindow(initialPane: .dashboard)
             }
@@ -265,11 +277,16 @@ final class BeaconStatusController: NSObject {
         }
     }
 
-    private func updateStatusButton() {
+    private func updateStatusButton(
+        store: BatterySnapshotStore? = nil,
+        isRefreshing: Bool? = nil
+    ) {
         guard let button = statusItem.button else { return }
         let configuration = StatusWindowConfiguration.load()
+        let renderedStore = store ?? model.store
+        let renderedIsRefreshing = isRefreshing ?? model.isRefreshing
         let batteryText = configuration.showsMenuBarBattery
-            ? MenuBarBatteryFormatter.menuBarText(for: model.store.decoratedSnapshots)
+            ? MenuBarBatteryFormatter.menuBarText(for: renderedStore.decoratedSnapshots)
             : nil
 
         if let batteryText {
@@ -284,7 +301,7 @@ final class BeaconStatusController: NSObject {
 
         button.image = BeaconStatusIconImage.make()
         button.imageScaling = .scaleProportionallyUpOrDown
-        if model.isRefreshing {
+        if renderedIsRefreshing {
             button.toolTip = "Beacon · refreshing"
         } else {
             button.toolTip = batteryText.map { "Beacon · \($0)" } ?? "Beacon"

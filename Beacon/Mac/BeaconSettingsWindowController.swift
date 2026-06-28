@@ -40,13 +40,18 @@ final class BeaconSettingsWindowController {
         logger.info("Settings window opened pane=\(initialPane.rawValue, privacy: .public) hasSelectedDevice=\(hasSelectedDevice, privacy: .public) addDeviceGuide=\(showsAddDeviceGuide, privacy: .public)")
     }
 
-    func updateContent() {
+    func updateContent(
+        store: BatterySnapshotStore? = nil,
+        isRefreshing: Bool? = nil,
+        notificationAuthorizationState: NotificationCenterAuthorizationState? = nil
+    ) {
         guard let window else { return }
+        let renderedStore = store ?? model.store
         let rootView = BeaconSettingsView(
-            snapshots: model.store.decoratedSnapshots,
-            isRefreshing: model.isRefreshing,
+            snapshots: renderedStore.decoratedSnapshots,
+            isRefreshing: isRefreshing ?? model.isRefreshing,
             isPreviewingData: model.isUsingPreviewData,
-            notificationAuthorizationState: model.notificationAuthorizationState,
+            notificationAuthorizationState: notificationAuthorizationState ?? model.notificationAuthorizationState,
             onRefresh: { [weak model] in
                 Task { await model?.refresh() }
             },

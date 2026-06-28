@@ -65,6 +65,7 @@ final class DeviceListPresentationTests: XCTestCase {
         return defaults
     }
 
+    @MainActor
     private func scrollViews(in view: NSView) -> [NSScrollView] {
         let current = view as? NSScrollView
         return view.subviews.reduce(current.map { [$0] } ?? []) { partial, subview in
@@ -2382,5 +2383,48 @@ final class DeviceListPresentationTests: XCTestCase {
 
         try pngData?.write(to: outputURL, options: .atomic)
         XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testSettingsWindowClearsRefreshingStateAfterRefreshCompletes() async throws {
+        let model = BeaconModel(environment: ["BATTERYHUB_PREVIEW_DATA": "1"])
+        let statusController = BeaconStatusController(model: model)
+        let settingsWindowController: BeaconSettingsWindowController = try XCTUnwrap(
+            mirroredValue(in: statusController, label: "settingsWindowController")
+        )
+
+        settingsWindowController.showWindow()
+        defer {
+            let window: NSWindow? = mirroredValue(in: settingsWindowController, label: "window")
+            window?.close()
+        }
+
+        XCTAssertFalse(try settingsRootView(in: settingsWindowController).isRefreshing)
+
+        await model.refresh()
+
+        XCTAssertFalse(try settingsRootView(in: settingsWindowController).isRefreshing)
+    }
+
+    @MainActor
+    private func settingsRootView(in controller: BeaconSettingsWindowController) throws -> BeaconSettingsView {
+        let hostingController: NSHostingController<BeaconSettingsView> = try XCTUnwrap(
+            mirroredValue(in: controller, label: "hostingController")
+        )
+        return hostingController.rootView
+    }
+
+    private func mirroredValue<T>(in object: Any, label: String) -> T? {
+        guard let value = Mirror(reflecting: object).children.first(where: { $0.label == label })?.value else {
+            return nil
+        }
+        if let typedValue = value as? T {
+            return typedValue
+        }
+        let mirror = Mirror(reflecting: value)
+        if mirror.displayStyle == .optional {
+            return mirror.children.first?.value as? T
+        }
+        return nil
     }
 }
