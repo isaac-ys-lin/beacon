@@ -375,6 +375,29 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertFalse(BatteryHistoryStore.isChargingByTrend(samples: samples, now: now))
     }
 
+    // Regression: a flat device left overnight read 82% before sleep and 83%
+    // on the first post-wake poll. The latest reading is fresh, but it straddles
+    // a ~12h gap, so the +1% is recalibration/jitter — not active charging.
+    // Previously this lit up the Keychron as "charging" right after wake.
+    func testIsChargingByTrendRejectsRiseAcrossSleepGap() {
+        let now = Date(timeIntervalSince1970: 100_000)
+        let samples = [
+            BatteryHistorySample(deviceID: "kbd", percent: 82, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-43_200)),
+            BatteryHistorySample(deviceID: "kbd", percent: 83, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-30)),
+        ]
+        XCTAssertFalse(BatteryHistoryStore.isChargingByTrend(samples: samples, now: now))
+    }
+
+    // A rise measured across a normal poll interval is still detected as charging.
+    func testIsChargingByTrendDetectsRiseWithinPollInterval() {
+        let now = Date(timeIntervalSince1970: 100_000)
+        let samples = [
+            BatteryHistorySample(deviceID: "kbd", percent: 82, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-200)),
+            BatteryHistorySample(deviceID: "kbd", percent: 83, chargeState: .unknown, source: .coreBluetooth, recordedAt: now.addingTimeInterval(-30)),
+        ]
+        XCTAssertTrue(BatteryHistoryStore.isChargingByTrend(samples: samples, now: now))
+    }
+
     func testIsChargingByTrendNeedsTwoSamples() {
         let now = Date(timeIntervalSince1970: 10_000)
         let samples = [

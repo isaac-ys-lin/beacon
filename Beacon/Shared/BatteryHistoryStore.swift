@@ -91,7 +91,14 @@ public enum BatteryHistoryStore {
         let latest = sorted[sorted.count - 1]
         let previous = sorted[sorted.count - 2]
         guard latest.percent > previous.percent else { return false }
-        return now.timeIntervalSince(latest.recordedAt) <= maxStepAge
+        // The rise must be recent...
+        guard now.timeIntervalSince(latest.recordedAt) <= maxStepAge else { return false }
+        // ...and the two readings that show it must be close together in time.
+        // A large gap means they straddle a sleep/disconnect window: the first
+        // reading after wake sitting a point above the pre-sleep reading is
+        // recalibration/jitter, not active charging — so a flat device left
+        // overnight must not light up as charging the moment the Mac wakes.
+        return latest.recordedAt.timeIntervalSince(previous.recordedAt) <= maxStepAge
     }
 
     private static func shouldAppend(
