@@ -73,6 +73,17 @@ require_signed_bundle() {
     echo "$details" >&2
     exit 1
   fi
+
+  # Beacon must NOT be sandboxed: it shells out to ideviceinfo to read USB iPhone
+  # battery, which the App Sandbox blocks. Enforced signing once silently
+  # re-enabled the sandbox and broke iPhone-over-USB — refuse to ship that again.
+  if grep -q "com.apple.security.app-sandbox" <<<"$details"; then
+    echo "Built app is sandboxed. Refusing install: the sandbox blocks the" >&2
+    echo "ideviceinfo subprocess, so USB iPhone battery never appears." >&2
+    echo "Remove com.apple.security.app-sandbox from Beacon/Mac/BeaconMac.entitlements." >&2
+    echo "$details" >&2
+    exit 1
+  fi
 }
 
 install_app() {

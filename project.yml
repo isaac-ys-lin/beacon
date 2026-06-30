@@ -25,7 +25,10 @@ targets:
     entitlements:
       path: Beacon/Mac/BeaconMac.entitlements
       properties:
-        com.apple.security.app-sandbox: true
+        # NOT sandboxed: Beacon shells out to ideviceinfo (outside the bundle,
+        # talking to usbmuxd) to read USB iPhone battery. The App Sandbox blocks
+        # spawning external binaries, so enabling it silently breaks iPhone-over-
+        # USB. Keep this app non-sandboxed (no MAS) — see docs / design notes.
         com.apple.security.device.bluetooth: true
     settings:
       base:
