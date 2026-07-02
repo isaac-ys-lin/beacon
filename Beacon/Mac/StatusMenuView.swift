@@ -145,7 +145,9 @@ struct StatusMenuView: View {
             BeaconHeaderControls(
                 theme: theme,
                 onOpenSettings: { onOpenSettings(.devices, nil) },
-                onQuit: { NSApp.terminate(nil) }
+                onRefresh: onRefresh,
+                onQuit: { NSApp.terminate(nil) },
+                isRefreshing: isRefreshing
             )
         }
         .padding(.horizontal, 16)
@@ -153,14 +155,12 @@ struct StatusMenuView: View {
     }
 
     private var nativeHeaderSubtitle: String {
-        if isRefreshing {
-            return "Scanning nearby"
-        }
-        if visibleItemCount == 0 {
-            return "No reporting devices"
-        }
-        let deviceLabel = visibleItemCount == 1 ? "device" : "devices"
-        return "\(visibleItemCount) \(deviceLabel)"
+        statusMenuHeaderSubtitle(
+            isRefreshing: isRefreshing,
+            isPreviewingData: isPreviewingData,
+            visibleItemCount: visibleItemCount,
+            latestUpdatedAt: latestStatusMenuUpdateDate(for: nativeItems)
+        )
     }
 
     private var appearanceTheme: BeaconAppearanceTheme {
@@ -258,15 +258,6 @@ struct StatusMenuView: View {
         sections.reduce(0) { partial, section in partial + section.items.count }
     }
 
-    private var latestUpdateText: String {
-        guard let latest = snapshots.map(\.snapshot.updatedAt).max() else { return "No devices" }
-        let interval = abs(latest.timeIntervalSinceNow)
-        if interval < 60 { return "Updated now" }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return "Updated \(formatter.localizedString(for: latest, relativeTo: Date()))"
-    }
-
     private var statusWindowWidth: CGFloat {
         StatusMenuSizing.width
     }
@@ -325,6 +316,67 @@ struct StatusMenuView: View {
         }
     }
 
+}
+
+func statusMenuHeaderSubtitle(
+    isRefreshing: Bool,
+    isPreviewingData: Bool,
+    visibleItemCount: Int,
+    latestUpdatedAt: Date?,
+    now: Date = Date()
+) -> String {
+    if isRefreshing {
+        return "Scanning nearby"
+    }
+    if visibleItemCount == 0 {
+        return "No reporting devices"
+    }
+
+    let countLabel = statusMenuDeviceCountLabel(visibleItemCount)
+    if isPreviewingData {
+        return "Preview data · \(countLabel)"
+    }
+    guard let latestUpdatedAt else {
+        return countLabel
+    }
+
+    return "\(countLabel) · Updated \(statusMenuCompactAgeText(updatedAt: latestUpdatedAt, now: now))"
+}
+
+func latestStatusMenuUpdateDate(for items: [DeviceListItem]) -> Date? {
+    items.compactMap { item -> Date? in
+        switch item {
+        case .device(let decorated):
+            return decorated.snapshot.updatedAt
+        case .airPods(_, _, let components):
+            return components.map(\.updatedAt).max()
+        }
+    }
+    .max()
+}
+
+private func statusMenuDeviceCountLabel(_ count: Int) -> String {
+    "\(count) \(count == 1 ? "device" : "devices")"
+}
+
+private func statusMenuCompactAgeText(updatedAt: Date, now: Date) -> String {
+    let elapsedSeconds = max(0, Int(now.timeIntervalSince(updatedAt)))
+    if elapsedSeconds < 60 {
+        return "now"
+    }
+
+    let elapsedMinutes = elapsedSeconds / 60
+    if elapsedMinutes < 60 {
+        return "\(elapsedMinutes)m ago"
+    }
+
+    let elapsedHours = elapsedMinutes / 60
+    if elapsedHours < 24 {
+        return "\(elapsedHours)h ago"
+    }
+
+    let elapsedDays = elapsedHours / 24
+    return "\(elapsedDays)d ago"
 }
 
 // MARK: - Settings preview
@@ -403,8 +455,11 @@ struct StatusWindowPreview: View {
             BeaconHeaderControls(
                 theme: previewTheme,
                 onOpenSettings: {},
+                onRefresh: {},
+                onQuit: {},
                 frameSize: 20,
                 settingsGlyphSize: 11,
+                refreshGlyphSize: 11,
                 spacing: 4
             )
             .allowsHitTesting(false)

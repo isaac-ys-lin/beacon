@@ -93,13 +93,32 @@ struct BeaconHeaderRefreshIcon: View {
     let color: Color
     var glyphSize: CGFloat = 13
     var frameSize: CGFloat = 28
+    var isRefreshing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isSpinning = false
 
     var body: some View {
         Image(systemName: "arrow.clockwise")
             .font(.system(size: glyphSize, weight: .semibold))
             .foregroundStyle(color)
+            .rotationEffect(.degrees(isSpinning && !reduceMotion ? 360 : 0))
+            .animation(refreshAnimation, value: isSpinning)
             .frame(width: frameSize, height: frameSize)
-            .accessibilityLabel("Refresh")
+            .accessibilityLabel(isRefreshing ? "Refreshing" : "Refresh")
+            .onAppear { updateSpinState() }
+            .onChange(of: isRefreshing) { _, _ in updateSpinState() }
+            .onChange(of: reduceMotion) { _, _ in updateSpinState() }
+    }
+
+    private var refreshAnimation: Animation? {
+        guard isSpinning && !reduceMotion else {
+            return .easeOut(duration: DesignTokens.Motion.quick)
+        }
+        return .linear(duration: 0.9).repeatForever(autoreverses: false)
+    }
+
+    private func updateSpinState() {
+        isSpinning = isRefreshing && !reduceMotion
     }
 }
 
@@ -137,6 +156,7 @@ struct BluetoothSettingsIcon: View {
 
 struct BeaconUtilityIconButtonStyle: ButtonStyle {
     let theme: BeaconThemePalette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -145,8 +165,11 @@ struct BeaconUtilityIconButtonStyle: ButtonStyle {
                 Circle()
                     .fill(configuration.isPressed ? theme.hover : Color.clear)
             )
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .animation(.easeOut(duration: DesignTokens.Motion.quick), value: configuration.isPressed)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.94 : 1))
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: DesignTokens.Motion.quick),
+                value: configuration.isPressed
+            )
             .contentShape(Circle())
     }
 }
@@ -154,23 +177,28 @@ struct BeaconUtilityIconButtonStyle: ButtonStyle {
 struct BeaconHeaderControls: View {
     let theme: BeaconThemePalette
     let onOpenSettings: () -> Void
+    var onRefresh: (() -> Void)?
     var onQuit: (() -> Void)?
+    var isRefreshing = false
     var frameSize: CGFloat = 28
     var settingsGlyphSize: CGFloat = 13
+    var refreshGlyphSize: CGFloat = 13
     var spacing: CGFloat = 8
 
     var body: some View {
         HStack(spacing: spacing) {
-            if let onQuit {
-                Button(action: onQuit) {
-                    Image(systemName: "power")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(theme.textPrimary)
-                        .frame(width: frameSize, height: frameSize)
-                        .contentShape(Circle())
+            if let onRefresh {
+                Button(action: onRefresh) {
+                    BeaconHeaderRefreshIcon(
+                        color: isRefreshing ? theme.accent : theme.textPrimary,
+                        glyphSize: refreshGlyphSize,
+                        frameSize: frameSize,
+                        isRefreshing: isRefreshing
+                    )
                 }
                 .buttonStyle(BeaconUtilityIconButtonStyle(theme: theme))
-                .help("Quit Beacon")
+                .accessibilityLabel(isRefreshing ? "Refreshing Batteries" : "Refresh Batteries")
+                .help(isRefreshing ? "Refreshing Batteries" : "Refresh Batteries")
             }
 
             Button(action: onOpenSettings) {
@@ -181,7 +209,21 @@ struct BeaconHeaderControls: View {
                 )
             }
             .buttonStyle(BeaconUtilityIconButtonStyle(theme: theme))
+            .accessibilityLabel("Open Beacon Settings")
             .help("Open Beacon Settings")
+
+            if let onQuit {
+                Button(action: onQuit) {
+                    Image(systemName: "power")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(theme.textMuted)
+                        .frame(width: frameSize, height: frameSize)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(BeaconUtilityIconButtonStyle(theme: theme))
+                .accessibilityLabel("Quit Beacon")
+                .help("Quit Beacon")
+            }
         }
     }
 }

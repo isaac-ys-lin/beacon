@@ -729,6 +729,144 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertTrue(coordinator.hostingController === firstController)
     }
 
+    func testStatusMenuHeaderSubtitlePrioritizesRefreshing() {
+        let now = Date(timeIntervalSince1970: 10_000)
+
+        XCTAssertEqual(
+            statusMenuHeaderSubtitle(
+                isRefreshing: true,
+                isPreviewingData: false,
+                visibleItemCount: 3,
+                latestUpdatedAt: now.addingTimeInterval(-12 * 60),
+                now: now
+            ),
+            "Scanning nearby"
+        )
+    }
+
+    func testStatusMenuHeaderSubtitleKeepsEmptyState() {
+        let now = Date(timeIntervalSince1970: 10_000)
+
+        XCTAssertEqual(
+            statusMenuHeaderSubtitle(
+                isRefreshing: false,
+                isPreviewingData: false,
+                visibleItemCount: 0,
+                latestUpdatedAt: now,
+                now: now
+            ),
+            "No reporting devices"
+        )
+    }
+
+    func testStatusMenuHeaderSubtitleAvoidsLiveFreshnessForPreviewData() {
+        let now = Date(timeIntervalSince1970: 10_000)
+
+        XCTAssertEqual(
+            statusMenuHeaderSubtitle(
+                isRefreshing: false,
+                isPreviewingData: true,
+                visibleItemCount: 3,
+                latestUpdatedAt: now,
+                now: now
+            ),
+            "Preview data · 3 devices"
+        )
+    }
+
+    func testStatusMenuHeaderSubtitleShowsLiveSingleDeviceUpdatedNow() {
+        let now = Date(timeIntervalSince1970: 10_000)
+
+        XCTAssertEqual(
+            statusMenuHeaderSubtitle(
+                isRefreshing: false,
+                isPreviewingData: false,
+                visibleItemCount: 1,
+                latestUpdatedAt: now.addingTimeInterval(-12),
+                now: now
+            ),
+            "1 device · Updated now"
+        )
+    }
+
+    func testStatusMenuHeaderSubtitleShowsLiveMultipleDevicesUpdatedMinutesAgo() {
+        let now = Date(timeIntervalSince1970: 10_000)
+
+        XCTAssertEqual(
+            statusMenuHeaderSubtitle(
+                isRefreshing: false,
+                isPreviewingData: false,
+                visibleItemCount: 3,
+                latestUpdatedAt: now.addingTimeInterval(-2 * 60),
+                now: now
+            ),
+            "3 devices · Updated 2m ago"
+        )
+    }
+
+    func testStatusMenuHeaderLatestUpdateUsesVisibleItemsOnly() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let hiddenNewer = makeDecorated(
+            deviceID: "hidden",
+            displayName: "Hidden Mouse",
+            kind: .mouse,
+            percent: 88,
+            updatedAt: now
+        )
+        let visibleOlder = makeDecorated(
+            deviceID: "visible",
+            displayName: "Visible Keyboard",
+            kind: .keyboard,
+            percent: 72,
+            updatedAt: now.addingTimeInterval(-5 * 60)
+        )
+        let preferences = DeviceDisplayPreferences(hiddenDeviceIDs: ["hidden"])
+        let visibleItems = statusMenuDeviceSections(
+            [hiddenNewer, visibleOlder],
+            preferences: preferences
+        ).flatMap(\.items)
+
+        XCTAssertEqual(latestStatusMenuUpdateDate(for: visibleItems), visibleOlder.snapshot.updatedAt)
+        XCTAssertEqual(
+            statusMenuHeaderSubtitle(
+                isRefreshing: false,
+                isPreviewingData: false,
+                visibleItemCount: visibleItems.count,
+                latestUpdatedAt: latestStatusMenuUpdateDate(for: visibleItems),
+                now: now
+            ),
+            "1 device · Updated 5m ago"
+        )
+    }
+
+    @MainActor
+    func testHeaderControlsRenderCompactRefreshAffordance() throws {
+        let view = BeaconHeaderControls(
+            theme: .light,
+            onOpenSettings: {},
+            onRefresh: {},
+            onQuit: {},
+            isRefreshing: true,
+            frameSize: 28,
+            settingsGlyphSize: 13,
+            refreshGlyphSize: 13,
+            spacing: 8
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 116, height: 40)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 900)
+    }
+
     @MainActor
     func testStatusMenuPanelUsesRoundedContentMaskInsteadOfRectangularShadow() {
         let coordinator = StatusMenuPanelController()

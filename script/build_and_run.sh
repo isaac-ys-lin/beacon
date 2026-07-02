@@ -8,6 +8,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="$ROOT_DIR/Beacon.xcodeproj"
 SCHEME="BeaconMac"
 DESTINATION="platform=macOS,arch=arm64"
+DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$ROOT_DIR/build/DerivedData}"
 INSTALL_PATH="/Applications/$APP_NAME.app"
 
 # Sign with a stable Apple Development identity by default so TCC (Bluetooth,
@@ -35,6 +36,7 @@ app_path() {
   xcodebuild -project "$PROJECT" \
     -scheme "$SCHEME" \
     -destination "$DESTINATION" \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
     -showBuildSettings 2>/dev/null |
     awk -F'= ' '
       $1 ~ /^[[:space:]]*BUILT_PRODUCTS_DIR[[:space:]]*$/ { dir=$2 }
@@ -104,11 +106,46 @@ install_app() {
   echo "Installed signed app to $INSTALL_PATH"
 }
 
+unregister_launch_services_copy() {
+  local bundle="$1"
+  if [[ -d "$bundle" ]]; then
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+      -u -R "$bundle" >/dev/null 2>&1 || true
+  fi
+}
+
+verify_running_app() {
+  local expected_bundle="$1"
+  local expected_executable="$expected_bundle/Contents/MacOS/$APP_NAME"
+  local pid
+  local command_line
+  local seen_processes=()
+
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    command_line="$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)"
+    seen_processes+=("pid=$pid command=$command_line")
+    if [[ "$command_line" == "$expected_executable"* ]]; then
+      echo "Verified active app: pid=$pid executable=$expected_executable"
+      return
+    fi
+  done < <(/usr/bin/pgrep -x "$APP_NAME" || true)
+
+  echo "No running $APP_NAME process matched expected executable:" >&2
+  echo "  $expected_executable" >&2
+  if [[ ${#seen_processes[@]} -gt 0 ]]; then
+    printf 'Observed processes:\n' >&2
+    printf '  %s\n' "${seen_processes[@]}" >&2
+  fi
+  exit 1
+}
+
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
 xcodebuild -project "$PROJECT" \
   -scheme "$SCHEME" \
   -destination "$DESTINATION" \
+  -derivedDataPath "$DERIVED_DATA_PATH" \
   -configuration Debug \
   ${BUILD_SIGNING_ARGS[@]+"${BUILD_SIGNING_ARGS[@]}"} \
   build
@@ -137,16 +174,17 @@ case "$MODE" in
   --verify|verify)
     open_app "$APP_BUNDLE"
     sleep 1
-    pgrep -x "$APP_NAME" >/dev/null
+    verify_running_app "$APP_BUNDLE"
     ;;
   --verify-signing|verify-signing)
     require_signed_bundle "$APP_BUNDLE"
     ;;
   --install|install)
     install_app "$APP_BUNDLE"
+    unregister_launch_services_copy "$APP_BUNDLE"
     open_app "$INSTALL_PATH"
     sleep 1
-    pgrep -x "$APP_NAME" >/dev/null
+    verify_running_app "$INSTALL_PATH"
     ;;
   *)
     usage

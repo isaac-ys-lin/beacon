@@ -199,6 +199,30 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(snapshot.chargeState, .charging)
     }
 
+    func testMergedCandidatePreservesLatestChargeState() {
+        let existing = BluetoothBatteryCandidate(
+            deviceID: "ble-uuid",
+            displayName: "YiSungiPhone",
+            transport: .ble,
+            batteryPercent: 80,
+            kindHint: .iPhone,
+            chargeState: .unknown
+        )
+        let usbUpdate = BluetoothBatteryCandidate(
+            deviceID: "usb-yisungiphone",
+            displayName: "YiSungiPhone",
+            transport: .usb,
+            batteryPercent: 100,
+            kindHint: .iPhone,
+            chargeState: .full
+        )
+
+        let merged = BluetoothDeviceScanner.mergedCandidate(existing: existing, with: usbUpdate)
+
+        XCTAssertEqual(merged.batteryPercent, 100)
+        XCTAssertEqual(merged.chargeState, .full)
+    }
+
     func testCollapsingDuplicateIPhonesKeepsBatteryBearingAcrossDifferentNames() {
         let bleIPhone = BluetoothBatteryCandidate(
             deviceID: "ble-uuid",
@@ -380,7 +404,7 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(merged.transport, .ble)
     }
 
-    func testSystemProfilerParserKeepsOnlyConnectedBatteryDevices() throws {
+    func testSystemProfilerParserIncludesDisconnectedBatteryDevicesWithReadings() throws {
         let json = """
         {
           "SPBluetoothDataType" : [
@@ -415,10 +439,15 @@ final class BluetoothBatteryResolverTests: XCTestCase {
 
         let candidates = BluetoothDeviceScanner.parseSystemProfilerBluetoothData(Data(json.utf8))
 
-        XCTAssertEqual(candidates.count, 1)
+        XCTAssertEqual(candidates.map(\.displayName), [
+            "Keychron K3 Max",
+            "Yi Sung’s AirPods Pro Left",
+            "Yi Sung’s AirPods Pro Right"
+        ])
+        XCTAssertEqual(candidates.map(\.batteryPercent), [100, 100, 92])
+        XCTAssertEqual(candidates.map(\.connectionState), [.connected, .disconnected, .disconnected])
+
         let candidate = try XCTUnwrap(candidates.first)
-        XCTAssertEqual(candidate.displayName, "Keychron K3 Max")
-        XCTAssertEqual(candidate.batteryPercent, 100)
 
         let snapshot = BluetoothBatteryResolver.snapshot(
             from: candidate,
@@ -440,17 +469,6 @@ final class BluetoothBatteryResolverTests: XCTestCase {
                     "device_batteryLevelCase" : "70%",
                     "device_batteryLevelLeft" : "100%",
                     "device_batteryLevelRight" : "92%",
-                    "device_minorType" : "Headphones"
-                  }
-                }
-              ],
-              "device_not_connected" : [
-                {
-                  "Old AirPods" : {
-                    "device_address" : "AA:BB:CC:DD:EE:FF",
-                    "device_batteryLevelCase" : "10%",
-                    "device_batteryLevelLeft" : "11%",
-                    "device_batteryLevelRight" : "12%",
                     "device_minorType" : "Headphones"
                   }
                 }

@@ -310,7 +310,7 @@ public struct BluetoothDeviceScanner {
                     return candidates(fromSystemProfilerDeviceNamed: name, device: device, connectionState: .disconnected)
                 }
             }
-            return fromConnected
+            return fromConnected + fromDisconnected
         }
     }
 
@@ -510,7 +510,8 @@ public struct BluetoothDeviceScanner {
             transport: candidate.transport,
             batteryPercent: candidate.batteryPercent,
             kindHint: candidate.kindHint ?? existing.kindHint,
-            connectionState: candidate.connectionState
+            connectionState: candidate.connectionState,
+            chargeState: candidate.chargeState
         )
     }
 
