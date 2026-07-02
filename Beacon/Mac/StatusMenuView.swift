@@ -349,7 +349,7 @@ func latestStatusMenuUpdateDate(for items: [DeviceListItem]) -> Date? {
         case .device(let decorated):
             return decorated.snapshot.updatedAt
         case .airPods(_, _, let components):
-            return components.map(\.updatedAt).max()
+            return activeAirPodsComponents(components).map(\.updatedAt).max()
         }
     }
     .max()

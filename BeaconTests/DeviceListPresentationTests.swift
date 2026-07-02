@@ -196,6 +196,40 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(dashboardDevice.airPodsComponents.map(\.percent), [53, 100, 100])
     }
 
+    func testDashboardBatteryDeviceDropsExpiredAirPodsComponentsFromDisplay() {
+        let addr = "7C-F3-4D-74-56-78"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 4, freshness: .expired),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 82),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 79),
+        ]
+
+        let sections = groupedDeviceItems(snapshots)
+        let dashboardDevice = DashboardBatteryDevice(item: sections[0].items[0])
+
+        XCTAssertEqual(dashboardDevice.percent, 79)
+        XCTAssertEqual(dashboardDevice.freshness, .fresh)
+        XCTAssertEqual(dashboardDevice.airPodsComponents.map(\.slot), [.left, .right])
+        XCTAssertEqual(dashboardDevice.airPodsComponents.map(\.percent), [82, 79])
+    }
+
+    func testAirPodsOverviewIgnoresExpiredLowComponent() {
+        let addr = "7C-F3-4D-74-56-78"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 4, freshness: .expired),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 82),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 79),
+        ]
+        let sections = groupedDeviceItems(snapshots)
+
+        let overviewDevices = batteryOverviewDevices(for: sections)
+        let summary = batteryOverviewSummary(for: sections, lowBatteryThreshold: 20)
+
+        XCTAssertEqual(overviewDevices.first?.percent, 79)
+        XCTAssertEqual(summary.lowBatteryItemCount, 0)
+        XCTAssertEqual(summary.lowestPercent, 79)
+    }
+
     func testDashboardBatteryDeviceKeepsAggregatedAirPodsLatestUpdateTime() {
         let addr = "7C-F3-4D-74-56-78"
         let older = Date(timeIntervalSince1970: 2_000)
@@ -531,6 +565,41 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(dashboardItems.map(\.displayName), ["Keychron K3 Max"])
     }
 
+    func testStatusMenuHidesAirPodsWhenAllComponentsExpired() {
+        let addr = "7C-F3-4D-74-56-78"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 53, freshness: .expired),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 82, freshness: .expired),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 79, freshness: .expired),
+            makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 92),
+        ]
+
+        let items = statusMenuDeviceSections(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        ).flatMap(\.items)
+
+        XCTAssertEqual(items.map(\.displayName), ["Keychron K3 Max"])
+    }
+
+    func testInspectorTreatsFullyExpiredAirPodsAsUnavailable() {
+        let addr = "7C-F3-4D-74-56-78"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 53, freshness: .expired),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 82, freshness: .expired),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 79, freshness: .expired),
+        ]
+
+        let inspectorItems = deviceInspectorItems(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        )
+
+        XCTAssertEqual(inspectorItems.map(\.displayName), ["Yi Sung’s AirPods Pro"])
+        XCTAssertEqual(inspectorItems.map(\.isUnavailable), [true])
+        XCTAssertTrue(displayedDeviceInspectorItems(inspectorItems, showHiddenUnavailable: false).isEmpty)
+    }
+
     func testInspectorKeepsConnectedDevicesWithoutBatteryReportVisible() {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keychron", displayName: "Keychron K3 Max", kind: .keyboard, percent: 89),
@@ -837,6 +906,22 @@ final class DeviceListPresentationTests: XCTestCase {
             ),
             "1 device · Updated 5m ago"
         )
+    }
+
+    func testStatusMenuHeaderLatestUpdateIgnoresExpiredAirPodsComponents() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let addr = "7C-F3-4D-74-56-78"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 4, freshness: .expired, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 82, updatedAt: now.addingTimeInterval(-120)),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 79, updatedAt: now.addingTimeInterval(-180)),
+        ]
+        let visibleItems = statusMenuDeviceSections(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        ).flatMap(\.items)
+
+        XCTAssertEqual(latestStatusMenuUpdateDate(for: visibleItems), now.addingTimeInterval(-120))
     }
 
     @MainActor

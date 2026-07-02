@@ -504,7 +504,7 @@ public func isDashboardVisibleItem(_ item: DeviceListItem) -> Bool {
             && decorated.snapshot.percent != nil
             && decorated.freshness != .expired
     case .airPods(_, _, let components):
-        return components.contains { $0.percent != nil && $0.freshness != .expired }
+        return activeAirPodsComponents(components).contains { $0.percent != nil }
     }
 }
 
@@ -516,8 +516,12 @@ public func isStatusMenuFallbackVisibleItem(_ item: DeviceListItem) -> Bool {
             && decorated.freshness != .expired
     case .airPods(_, _, let components):
         return item.connectionState == .connected
-            && components.contains { $0.freshness != .expired }
+            && !activeAirPodsComponents(components).isEmpty
     }
+}
+
+func activeAirPodsComponents(_ components: [AirPodsComponent]) -> [AirPodsComponent] {
+    components.filter { $0.freshness != .expired }
 }
 
 public func deviceInspectorItems(
@@ -560,7 +564,13 @@ public func isInspectorHiddenItem(
 }
 
 public func isConnectionUnavailableItem(_ item: DeviceListItem) -> Bool {
-    item.connectionState == .disconnected
+    switch item {
+    case .device:
+        return item.connectionState == .disconnected
+    case .airPods(_, _, let components):
+        return item.connectionState == .disconnected
+            || activeAirPodsComponents(components).isEmpty
+    }
 }
 
 public func displayedDeviceInspectorItems(
@@ -605,13 +615,14 @@ public func batteryOverviewSummary(
                 }
 
             case .airPods(_, _, let components):
-                let percents = components.compactMap(\.percent)
+                let activeComponents = activeAirPodsComponents(components)
+                let percents = activeComponents.compactMap(\.percent)
                 if let componentLowest = percents.min() {
                     reportedItemCount += 1
                     lowestPercent = minPercent(lowestPercent, componentLowest)
                 }
 
-                if components.contains(where: { component in
+                if activeComponents.contains(where: { component in
                     guard let percent = component.percent else { return false }
                     return percent <= threshold
                         && component.chargeState != .charging
@@ -619,10 +630,10 @@ public func batteryOverviewSummary(
                 }) {
                     lowBatteryItemCount += 1
                 }
-                if components.contains(where: { $0.chargeState == .charging }) {
+                if activeComponents.contains(where: { $0.chargeState == .charging }) {
                     chargingItemCount += 1
                 }
-                if components.contains(where: { $0.freshness != .fresh }) {
+                if activeComponents.contains(where: { $0.freshness != .fresh }) {
                     staleItemCount += 1
                 }
             }
@@ -664,15 +675,14 @@ public func batteryOverviewDevices(
                 )
 
             case .airPods(let name, let id, let components):
-                let percents = components.compactMap(\.percent)
+                let activeComponents = activeAirPodsComponents(components)
+                let percents = activeComponents.compactMap(\.percent)
                 guard let lowestPercent = percents.min() else { continue }
-                let chargeState: ChargeState = components.contains { $0.chargeState == .charging || $0.chargeState == .full }
+                let chargeState: ChargeState = activeComponents.contains { $0.chargeState == .charging || $0.chargeState == .full }
                     ? .charging
                     : .unplugged
-                let freshness: Freshness = components.contains { $0.freshness == .expired }
-                    ? .expired
-                    : (components.contains { $0.freshness == .stale } ? .stale : .fresh)
-                let updatedAt = components.map(\.updatedAt).max() ?? .distantPast
+                let freshness: Freshness = activeComponents.contains { $0.freshness == .stale } ? .stale : .fresh
+                let updatedAt = activeComponents.map(\.updatedAt).max() ?? .distantPast
                 devices.append(
                     BatteryOverviewDevice(
                         id: id,
@@ -761,7 +771,7 @@ private func controlSortPercent(_ item: DeviceListItem) -> Int {
     case .device(let decorated):
         return decorated.snapshot.percent ?? Int.max
     case .airPods(_, _, let components):
-        return components.compactMap(\.percent).min() ?? Int.max
+        return activeAirPodsComponents(components).compactMap(\.percent).min() ?? Int.max
     }
 }
 

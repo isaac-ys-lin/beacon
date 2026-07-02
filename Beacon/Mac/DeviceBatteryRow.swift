@@ -94,31 +94,21 @@ struct BeaconHeaderRefreshIcon: View {
     var glyphSize: CGFloat = 13
     var frameSize: CGFloat = 28
     var isRefreshing = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isSpinning = false
 
     var body: some View {
-        Image(systemName: "arrow.clockwise")
-            .font(.system(size: glyphSize, weight: .semibold))
-            .foregroundStyle(color)
-            .rotationEffect(.degrees(isSpinning && !reduceMotion ? 360 : 0))
-            .animation(refreshAnimation, value: isSpinning)
-            .frame(width: frameSize, height: frameSize)
-            .accessibilityLabel(isRefreshing ? "Refreshing" : "Refresh")
-            .onAppear { updateSpinState() }
-            .onChange(of: isRefreshing) { _, _ in updateSpinState() }
-            .onChange(of: reduceMotion) { _, _ in updateSpinState() }
-    }
-
-    private var refreshAnimation: Animation? {
-        guard isSpinning && !reduceMotion else {
-            return .easeOut(duration: DesignTokens.Motion.quick)
+        Group {
+            if isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: glyphSize, height: glyphSize)
+            } else {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: glyphSize, weight: .semibold))
+                    .foregroundStyle(color)
+            }
         }
-        return .linear(duration: 0.9).repeatForever(autoreverses: false)
-    }
-
-    private func updateSpinState() {
-        isSpinning = isRefreshing && !reduceMotion
+        .frame(width: frameSize, height: frameSize)
+        .accessibilityLabel(isRefreshing ? "Refreshing" : "Refresh")
     }
 }
 
@@ -441,20 +431,21 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
                 isPinned: isPinned
             )
         case .airPods(let name, let id, let components):
-            let percents = components.compactMap(\.percent)
+            let activeComponents = activeAirPodsComponents(components)
+            let percents = activeComponents.compactMap(\.percent)
             let chargeState: ChargeState
-            if components.contains(where: { $0.chargeState == .charging }) {
+            if activeComponents.contains(where: { $0.chargeState == .charging }) {
                 chargeState = .charging
-            } else if !components.isEmpty,
-                      components.allSatisfy({ $0.chargeState == .full || $0.percent == 100 }) {
+            } else if !activeComponents.isEmpty,
+                      activeComponents.allSatisfy({ $0.chargeState == .full || $0.percent == 100 }) {
                 chargeState = .full
             } else {
                 chargeState = .unplugged
             }
-            let freshness: Freshness = components.contains { $0.freshness == .expired }
+            let freshness: Freshness = activeComponents.isEmpty
                 ? .expired
-                : (components.contains { $0.freshness == .stale } ? .stale : .fresh)
-            let updatedAt = components.map(\.updatedAt).max() ?? .distantPast
+                : (activeComponents.contains { $0.freshness == .stale } ? .stale : .fresh)
+            let updatedAt = activeComponents.map(\.updatedAt).max() ?? .distantPast
             self.init(
                 id: id,
                 displayName: name,
@@ -466,7 +457,7 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
                 provider: .coreBluetoothBatteryService,
                 updatedAt: updatedAt,
                 isPinned: isPinned,
-                airPodsComponents: components
+                airPodsComponents: activeComponents
             )
         }
     }

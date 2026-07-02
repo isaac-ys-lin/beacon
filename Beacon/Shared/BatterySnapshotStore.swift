@@ -71,13 +71,29 @@ public struct BatterySnapshotStore: Sendable {
         guard !liveBluetooth.isEmpty else { return }
 
         let liveKeys = Set(liveBluetooth.map(Self.reconciliationKey))
+        let hasLiveIdeviceInfoIPhone = liveBluetooth.contains { snapshot in
+            snapshot.kind == .iPhone
+                && snapshot.source == .ideviceInfo
+                && snapshot.percent != nil
+        }
         snapshotsByID = snapshotsByID.filter { _, existing in
-            !existing.source.isBluetoothRelated || liveKeys.contains(Self.reconciliationKey(existing))
+            !existing.source.isBluetoothRelated
+                || liveKeys.contains(Self.reconciliationKey(existing))
+                || Self.shouldPreserveTrustedIPhone(existing, hasLiveIdeviceInfoIPhone: hasLiveIdeviceInfoIPhone)
         }
     }
 
     private static func reconciliationKey(_ snapshot: BatterySnapshot) -> String {
         "\(snapshot.kind)|\(snapshot.displayName.normalizedDeviceName)"
+    }
+
+    private static func shouldPreserveTrustedIPhone(
+        _ snapshot: BatterySnapshot,
+        hasLiveIdeviceInfoIPhone: Bool
+    ) -> Bool {
+        snapshot.kind == .iPhone
+            && snapshot.source == .ideviceInfo
+            && !hasLiveIdeviceInfoIPhone
     }
 
     /// Replaces each stored snapshot's charge state with `resolve(snapshot)`.
@@ -121,6 +137,10 @@ public struct BatterySnapshotStore: Sendable {
             return false
         }
 
+        if hasTrustedIPhoneBatteryReport(matching: snapshot) {
+            return true
+        }
+
         let normalizedName = snapshot.displayName.normalizedDeviceName
         return snapshotsByID.contains { id, existing in
             id != snapshot.deviceID
@@ -129,6 +149,24 @@ public struct BatterySnapshotStore: Sendable {
                 && existing.displayName.normalizedDeviceName == normalizedName
                 && existing.percent != nil
                 && existing.updatedAt >= snapshot.updatedAt
+        }
+    }
+
+    private func hasTrustedIPhoneBatteryReport(matching snapshot: BatterySnapshot) -> Bool {
+        guard snapshot.kind == .iPhone,
+              snapshot.source == .ideviceInfo
+        else {
+            return false
+        }
+
+        let normalizedName = snapshot.displayName.normalizedDeviceName
+        return snapshotsByID.contains { _, existing in
+            existing.source == .ideviceInfo
+                && existing.kind == .iPhone
+                && existing.percent != nil
+                && Self.freshness(for: existing, now: now()) != .expired
+                && (existing.deviceID == snapshot.deviceID
+                    || existing.displayName.normalizedDeviceName == normalizedName)
         }
     }
 

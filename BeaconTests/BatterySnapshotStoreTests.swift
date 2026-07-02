@@ -230,20 +230,20 @@ final class BatterySnapshotStoreTests: XCTestCase {
             source: .coreBluetooth,
             updatedAt: now
         )
-        let iphone = BatterySnapshot(
-            deviceID: "usb-iphone-yisungiphone",
-            displayName: "YiSungiPhone",
-            kind: .iPhone,
+        let mouse = BatterySnapshot(
+            deviceID: "mouse",
+            displayName: "Magic Mouse",
+            kind: .mouse,
             percent: 52,
             chargeState: .unplugged,
-            source: .ideviceInfo,
+            source: .coreBluetooth,
             updatedAt: now
         )
 
         var store = BatterySnapshotStore(now: { now.addingTimeInterval(20) })
-        store.merge([keyboard, iphone])
+        store.merge([keyboard, mouse])
 
-        // Next live read only sees the keyboard (iPhone disconnected/removed).
+        // Next live read only sees the keyboard, so the missing Bluetooth mouse is pruned.
         let keyboardNext = BatterySnapshot(
             deviceID: "keyboard",
             displayName: "Magic Keyboard",
@@ -258,10 +258,10 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots.map(\.deviceID), ["keyboard"])
     }
 
-    func testReconcileRemovesStaleIPhoneEvenWhenNameDiffersFromLiveRead() {
+    func testReconcilePreservesTrustedIPhoneWhenIdeviceInfoMissesLiveRead() {
         let now = Date(timeIntervalSince1970: 100)
-        // Stale connected iPhone captured earlier under the iOS DeviceName.
-        let staleUSBIPhone = BatterySnapshot(
+        // iPhone captured earlier through the higher-confidence lockdown path.
+        let trustedIPhone = BatterySnapshot(
             deviceID: "usb-iphone-yisung-s-iphone",
             displayName: "YiSung's iPhone",
             kind: .iPhone,
@@ -281,10 +281,9 @@ final class BatterySnapshotStoreTests: XCTestCase {
         )
 
         var store = BatterySnapshotStore(now: { now.addingTimeInterval(20) })
-        store.merge([staleUSBIPhone, keyboard])
+        store.merge([trustedIPhone, keyboard])
 
-        // iPhone now only visible over Bluetooth as disconnected, under its
-        // Bluetooth name (different normalized name than the USB DeviceName).
+        // A partial Bluetooth refresh can miss lockdown/iPhone while still seeing peripherals.
         let liveKeyboard = BatterySnapshot(
             deviceID: "keyboard",
             displayName: "Magic Keyboard",
@@ -296,7 +295,37 @@ final class BatterySnapshotStoreTests: XCTestCase {
         )
         store.reconcile(with: [liveKeyboard])
 
-        XCTAssertEqual(store.snapshots.map(\.deviceID), ["keyboard"])
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["usb-iphone-yisung-s-iphone", "keyboard"])
+    }
+
+    func testReconcileKeepsTrustedIPhoneBatteryWhenLiveIdeviceInfoHasNoPercent() {
+        let now = Date(timeIntervalSince1970: 100)
+        let trustedIPhone = BatterySnapshot(
+            deviceID: "usb-iphone-yisung-s-iphone",
+            displayName: "YiSung's iPhone",
+            kind: .iPhone,
+            percent: 60,
+            chargeState: .charging,
+            source: .ideviceInfo,
+            updatedAt: now
+        )
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(20) })
+        store.merge([trustedIPhone])
+
+        let noReportIPhone = BatterySnapshot(
+            deviceID: "usb-iphone-yisung-s-iphone",
+            displayName: "YiSung's iPhone",
+            kind: .iPhone,
+            percent: nil,
+            chargeState: .unknown,
+            source: .ideviceInfo,
+            updatedAt: now.addingTimeInterval(45)
+        )
+        store.reconcile(with: [noReportIPhone])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["usb-iphone-yisung-s-iphone"])
+        XCTAssertEqual(store.snapshots.first?.percent, 60)
+        XCTAssertEqual(store.snapshots.first?.updatedAt, now)
     }
 
     func testReconcileSkipsPruneWhenLiveReadHasNoBluetoothDevices() {
