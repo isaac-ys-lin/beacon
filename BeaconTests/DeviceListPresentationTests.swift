@@ -2309,7 +2309,11 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertNotNil(pngData)
 
         try pngData?.write(to: outputURL, options: .atomic)
-        XCTAssertGreaterThan((pngData ?? Data()).count, 18_000)
+        // With no devices this state renders header-only, and PNG size scales
+        // with the backing store (Retina 2x locally, 1x on CI runners, ~10KB).
+        // A blank render of this frame is under 2KB, so 6KB still proves
+        // non-blank content without depending on display scale.
+        XCTAssertGreaterThan((pngData ?? Data()).count, 6_000)
     }
 
     @MainActor
