@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "8FE3A089DEDFACC3C20459FA"
+               BlueprintIdentifier = "22D8EF4F0C30F481675D65B8"
                BuildableName = "BeaconMac.app"
                BlueprintName = "BeaconMac"
                ReferencedContainer = "container:Beacon.xcodeproj">
@@ -32,7 +32,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "8FE3A089DEDFACC3C20459FA"
+            BlueprintIdentifier = "22D8EF4F0C30F481675D65B8"
             BuildableName = "BeaconMac.app"
             BlueprintName = "BeaconMac"
             ReferencedContainer = "container:Beacon.xcodeproj">
@@ -44,7 +44,7 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "538BC0F47517CB9FFC3CA37B"
+               BlueprintIdentifier = "096F5A749F555B74DAE0D4F7"
                BuildableName = "BeaconTests.xctest"
                BlueprintName = "BeaconTests"
                ReferencedContainer = "container:Beacon.xcodeproj">
@@ -68,7 +68,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "8FE3A089DEDFACC3C20459FA"
+            BlueprintIdentifier = "22D8EF4F0C30F481675D65B8"
             BuildableName = "BeaconMac.app"
             BlueprintName = "BeaconMac"
             ReferencedContainer = "container:Beacon.xcodeproj">
@@ -85,7 +85,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "8FE3A089DEDFACC3C20459FA"
+            BlueprintIdentifier = "22D8EF4F0C30F481675D65B8"
             BuildableName = "BeaconMac.app"
             BlueprintName = "BeaconMac"
             ReferencedContainer = "container:Beacon.xcodeproj">

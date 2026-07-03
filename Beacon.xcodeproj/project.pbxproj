@@ -7,176 +7,176 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		07DB1584A760AE080C17CB52 /* DeviceBatteryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 668D7469010F9F52672D0768 /* DeviceBatteryRow.swift */; };
-		22A60593E9CA65517ECAF04C /* QuickActionsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = D670F4B706EB72F9D7EA8382 /* QuickActionsSettingsPane.swift */; };
-		176743D6BAAD897908EDDE84 /* BluetoothBatteryResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */; };
-		1ADEC2C6139CA398650A4395 /* DeviceListPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0275CC5FE052D0ECABE095 /* DeviceListPresentationTests.swift */; };
-		1AE7293BAC161E692265635E /* BeaconHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63DC6E3AC4281AEFEEC8E6CB /* BeaconHUDView.swift */; };
-		21BF229FC1379A98B647A82E /* MacPowerSourceReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E7ECC1AA68CD0E74B08E1BA /* MacPowerSourceReaderTests.swift */; };
-		32FA20A2BF036886CCAFFD31 /* LowBatteryNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */; };
-		3ED50C7F21988EBE6F76466C /* BeaconHUDController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0A59E051CD8A43C982C32B /* BeaconHUDController.swift */; };
-		3E35364E3690DA8E20556AFA /* MacPowerSourceReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */; };
-		42EAB0D28902C87A454CFEA0 /* DeviceListPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 809F1103BFF7C13AF6817CFD /* DeviceListPresentation.swift */; };
-		5E4A9F15A4474DE7A0D4EED6 /* BeaconSettingsSupportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4A9F14A4474DE7A0D4EED6 /* BeaconSettingsSupportViews.swift */; };
-		65E3DA4242EBA1A3E3BBDBC2 /* DashboardSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63A70C016A8CACCF30F258F /* DashboardSettingsPane.swift */; };
-		77128A015A82A3BED1E24041 /* BeaconSettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4858E0DA38F279CF22BEC78 /* BeaconSettingsWindowController.swift */; };
-		633BA44DDF2636BB9218B3D5 /* BeaconSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96BAA8C3EF93B7718365B9A /* BeaconSettingsView.swift */; };
-		759798D6E876B82A8304FD26 /* BeaconQuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D83E21BB5DAA9F07874BBB7 /* BeaconQuickActions.swift */; };
-		782801FDEA2CCDE36533BA6E /* BluetoothDeviceScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */; };
-		B5E8E23CC09B46785927F0B9 /* BeaconStatusController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E9DE4B5D39D54F65C48C75 /* BeaconStatusController.swift */; };
-		BDC818564899E78A325ACE5A /* StatusMenuPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C2F16AB4A3CEA41577DE41 /* StatusMenuPanelController.swift */; };
-		CE68F84230A99E95528FD531 /* ActionHUDSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C96A0FC2C48AE9903F6945D /* ActionHUDSettingsPane.swift */; };
-		942FE4611CC7E0C6850F6065 /* BluetoothBatteryResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3F20615717ABC149F0CE39 /* BluetoothBatteryResolver.swift */; };
-		98C96F7E9FA25DB0D45FA1E1 /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C254213BB0D5DADF9F1F5FD /* StatusMenuView.swift */; };
-		A2BA350B57FACA9D5C264272 /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */; };
-		A2F311CF66BE5F52F4C17DA3 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1CB66F60CA615057985048 /* DesignTokens.swift */; };
-		A9A322DF46A684350664A338 /* BeaconAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4260712686B7861989BCC55 /* BeaconAppShortcuts.swift */; };
-		BDF61E5A2AE7158894FCBE6B /* BeaconMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1343648981A02CD9D854CEE7 /* BeaconMacApp.swift */; };
-		C0620F1CA7C7E0F1BFA8A080 /* BeaconDesktopWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A216E0E33A07ACCFEF7A538 /* BeaconDesktopWidgetView.swift */; };
-		C1669D9406E67FD6232BB5DB /* StatusMenuSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EDBB2E81DFB38D0D14D8485 /* StatusMenuSnapshotTests.swift */; };
-		C4E1936C3EC4F1ED867BF35A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4D0C2EBF7CA59337799C6669 /* Assets.xcassets */; };
-		CCBFFE1E65F837E55F13113A /* BatteryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC84EB3EC9E078DA35FD209 /* BatteryHistoryStore.swift */; };
-		CD35FB78B215C978A0464AD2 /* BatterySnapshotStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CBBFCBDA160193064A02179 /* BatterySnapshotStoreTests.swift */; };
-		CFDF5EADE3731BA8A03B20A7 /* BatterySnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */; };
+		04BC3F76E0EDFDC270D9CF0C /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B301DB1DFC1AEAD9FFD407 /* BatterySnapshot.swift */; };
+		0E0DE066DF399483F5AAFAFF /* BeaconHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA14437C753C2C72E7DCF4AA /* BeaconHUDView.swift */; };
+		144D530D5C2CE0B5BCD61AE7 /* BeaconQuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83003948902C5FE7458516EE /* BeaconQuickActions.swift */; };
+		1D2571D4A04FFCD5F6F21A8A /* BeaconSettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE98B7B5C78C9741FAEA0A75 /* BeaconSettingsWindowController.swift */; };
+		1EE94522FFC39C4D79D3F76F /* BatterySnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF12E505932A7869669DBDB9 /* BatterySnapshotStore.swift */; };
+		2238DCC0CD90A32F21014B6C /* BatteryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F16D3C33EE768C2BB31D7C /* BatteryHistoryStore.swift */; };
+		230198441D082928C94CAE47 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6765EC1A3AC0B4385ECA7805 /* Assets.xcassets */; };
+		39D59897D914543FDE7B70F3 /* BeaconHUDController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AEC0B7B0A3C5597B299A2B5 /* BeaconHUDController.swift */; };
+		4670576BE3981977733DA905 /* BeaconStatusController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D70580BC57793CE0FADEF0 /* BeaconStatusController.swift */; };
+		4A65059572403B13720EB6EC /* DeviceBatteryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AFAF2B21F32B40BCE0DDA23 /* DeviceBatteryRow.swift */; };
+		51AED715AB0260398EA3545E /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8F5CFA3EE741ED116550AFB /* StatusMenuView.swift */; };
+		53073ECBB082D056B27B050F /* BeaconAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F3CF1AFAD597E2693F9D08 /* BeaconAppShortcuts.swift */; };
+		58FB82C93A5920099D0A9E04 /* LowBatteryNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3024F441E85EF1AF639F9032 /* LowBatteryNotifier.swift */; };
+		591B40AEC84C0C58177B0528 /* MacPowerSourceReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45F7C9F077041B590FEF567 /* MacPowerSourceReader.swift */; };
+		5B7D1A21024B8E1E55A43919 /* StatusMenuPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4D64755B98EE7C45D25BC8 /* StatusMenuPanelController.swift */; };
+		6ABE8E950AB7F96716D0B1C1 /* QuickActionsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51CC15AD0413CC94BA3FA1CF /* QuickActionsSettingsPane.swift */; };
+		6CF367F09AA9229ECE312EBC /* MacPowerSourceReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6FCB206871E20A2F0D12BB /* MacPowerSourceReaderTests.swift */; };
+		70F23A8F0D2355F94C0B5121 /* BeaconMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0572BDAF185BEAAA9EE6DDEB /* BeaconMacApp.swift */; };
+		757D87D1560E861C813D43C5 /* BatterySnapshotStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2247AA89FCDB5CCFE789F0 /* BatterySnapshotStoreTests.swift */; };
+		8E288E3C8B3231E85EB0FB63 /* ActionHUDSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 712158D8A1D5055A40B71EED /* ActionHUDSettingsPane.swift */; };
+		A31ACFD3EDCB4768C9EE3082 /* BluetoothBatteryResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0922ECCDF04EFE6136C64551 /* BluetoothBatteryResolver.swift */; };
+		B482AA509249A81FE5F56778 /* DeviceListPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DBB0F2D5F8FF9FFCB1AD693 /* DeviceListPresentation.swift */; };
+		B67A46A69A7E2B90FD534E21 /* BluetoothDeviceScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550C0817368D56189D384E48 /* BluetoothDeviceScanner.swift */; };
+		C8E65576C4B592832F6EBC90 /* DeviceListPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2854B69F96AEFF5C6596BAFB /* DeviceListPresentationTests.swift */; };
+		CF8AD3BFEDE12AFB2B19E25B /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6628EF4A0FE3A1028C2E7DE /* DesignTokens.swift */; };
+		D34D7FADF14D90A27D49D1AE /* BeaconSettingsSupportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C076A50AB2933A2E15E880E4 /* BeaconSettingsSupportViews.swift */; };
+		D805A3AC420A4F1F4E08DE48 /* BeaconSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4738A433E5F28FC4D87CFDD6 /* BeaconSettingsView.swift */; };
+		DE4F73DCD277B829888A4845 /* BeaconDesktopWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */; };
+		DFC559BACEFC876F5A35E41A /* DashboardSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69BDB8AD2B4CC24408772E50 /* DashboardSettingsPane.swift */; };
+		E8AA626A2247A7F79EFCE42E /* BluetoothBatteryResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F7F5FC1C8BDDCD77A766720 /* BluetoothBatteryResolverTests.swift */; };
+		F81474E0D1FF064777791D2F /* StatusMenuSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9924F50E7814A7E4CF7477B /* StatusMenuSnapshotTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		15B59720232588C5B2692BB2 /* PBXContainerItemProxy */ = {
+		7877CCD569985AE16EF5944D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 45C328C8416135D15329479F /* Project object */;
+			containerPortal = C6CDC17607DFF5D714886E77 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 8FE3A089DEDFACC3C20459FA;
+			remoteGlobalIDString = 22D8EF4F0C30F481675D65B8;
 			remoteInfo = BeaconMac;
 		};
-		27611F2940FC7620B5933676 /* PBXContainerItemProxy */ = {
+		9A67925E1DEB2CA8947952F7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 45C328C8416135D15329479F /* Project object */;
+			containerPortal = C6CDC17607DFF5D714886E77 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 8FE3A089DEDFACC3C20459FA;
+			remoteGlobalIDString = 22D8EF4F0C30F481675D65B8;
 			remoteInfo = BeaconMac;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		0C254213BB0D5DADF9F1F5FD /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
-		0EDBB2E81DFB38D0D14D8485 /* StatusMenuSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuSnapshotTests.swift; sourceTree = "<group>"; };
-		1343648981A02CD9D854CEE7 /* BeaconMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconMacApp.swift; sourceTree = "<group>"; };
-		1E7ECC1AA68CD0E74B08E1BA /* MacPowerSourceReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPowerSourceReaderTests.swift; sourceTree = "<group>"; };
-		20C940CE61834B35B25A743C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		2CBBFCBDA160193064A02179 /* BatterySnapshotStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStoreTests.swift; sourceTree = "<group>"; };
-		32CDA0F767C9BF310917A8DE /* BeaconTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BeaconTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		44C2F16AB4A3CEA41577DE41 /* StatusMenuPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuPanelController.swift; sourceTree = "<group>"; };
-		4D0C2EBF7CA59337799C6669 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		4D83E21BB5DAA9F07874BBB7 /* BeaconQuickActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconQuickActions.swift; sourceTree = "<group>"; };
-		520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowBatteryNotifier.swift; sourceTree = "<group>"; };
-		5E4A9F14A4474DE7A0D4EED6 /* BeaconSettingsSupportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsSupportViews.swift; sourceTree = "<group>"; };
-		5C3F20615717ABC149F0CE39 /* BluetoothBatteryResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolver.swift; sourceTree = "<group>"; };
-		63DC6E3AC4281AEFEEC8E6CB /* BeaconHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconHUDView.swift; sourceTree = "<group>"; };
-		668D7469010F9F52672D0768 /* DeviceBatteryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceBatteryRow.swift; sourceTree = "<group>"; };
-		668E2DA35CD366B6E678909C /* BeaconMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeaconMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		6B00AD3E1F4EF43274A4551F /* BeaconUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BeaconUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothDeviceScanner.swift; sourceTree = "<group>"; };
-		7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshot.swift; sourceTree = "<group>"; };
-		7B0275CC5FE052D0ECABE095 /* DeviceListPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceListPresentationTests.swift; sourceTree = "<group>"; };
-		809F1103BFF7C13AF6817CFD /* DeviceListPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceListPresentation.swift; sourceTree = "<group>"; };
-		8C96A0FC2C48AE9903F6945D /* ActionHUDSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionHUDSettingsPane.swift; sourceTree = "<group>"; };
-		9A216E0E33A07ACCFEF7A538 /* BeaconDesktopWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconDesktopWidgetView.swift; sourceTree = "<group>"; };
-		A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolverTests.swift; sourceTree = "<group>"; };
-		A9E9DE4B5D39D54F65C48C75 /* BeaconStatusController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconStatusController.swift; sourceTree = "<group>"; };
-		A96BAA8C3EF93B7718365B9A /* BeaconSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsView.swift; sourceTree = "<group>"; };
-		B4858E0DA38F279CF22BEC78 /* BeaconSettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsWindowController.swift; sourceTree = "<group>"; };
-		B63A70C016A8CACCF30F258F /* DashboardSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSettingsPane.swift; sourceTree = "<group>"; };
-		BA0A59E051CD8A43C982C32B /* BeaconHUDController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconHUDController.swift; sourceTree = "<group>"; };
-		BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPowerSourceReader.swift; sourceTree = "<group>"; };
-		CC1CB66F60CA615057985048 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
-		D6D524F32ABC5FD0DA0B5410 /* BeaconMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeaconMac.entitlements; sourceTree = "<group>"; };
-		D670F4B706EB72F9D7EA8382 /* QuickActionsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsSettingsPane.swift; sourceTree = "<group>"; };
-		EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStore.swift; sourceTree = "<group>"; };
-		F4260712686B7861989BCC55 /* BeaconAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconAppShortcuts.swift; sourceTree = "<group>"; };
-		FFC84EB3EC9E078DA35FD209 /* BatteryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryHistoryStore.swift; sourceTree = "<group>"; };
+		035F8236D253BBD9B56A6F07 /* BeaconUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BeaconUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0572BDAF185BEAAA9EE6DDEB /* BeaconMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconMacApp.swift; sourceTree = "<group>"; };
+		0922ECCDF04EFE6136C64551 /* BluetoothBatteryResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolver.swift; sourceTree = "<group>"; };
+		0A4D64755B98EE7C45D25BC8 /* StatusMenuPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuPanelController.swift; sourceTree = "<group>"; };
+		0AFAF2B21F32B40BCE0DDA23 /* DeviceBatteryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceBatteryRow.swift; sourceTree = "<group>"; };
+		0E213AC3FB1B698F6CEEC722 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		27D70580BC57793CE0FADEF0 /* BeaconStatusController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconStatusController.swift; sourceTree = "<group>"; };
+		2854B69F96AEFF5C6596BAFB /* DeviceListPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceListPresentationTests.swift; sourceTree = "<group>"; };
+		3024F441E85EF1AF639F9032 /* LowBatteryNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowBatteryNotifier.swift; sourceTree = "<group>"; };
+		37F3CF1AFAD597E2693F9D08 /* BeaconAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconAppShortcuts.swift; sourceTree = "<group>"; };
+		39B301DB1DFC1AEAD9FFD407 /* BatterySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshot.swift; sourceTree = "<group>"; };
+		4738A433E5F28FC4D87CFDD6 /* BeaconSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsView.swift; sourceTree = "<group>"; };
+		51CC15AD0413CC94BA3FA1CF /* QuickActionsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsSettingsPane.swift; sourceTree = "<group>"; };
+		550C0817368D56189D384E48 /* BluetoothDeviceScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothDeviceScanner.swift; sourceTree = "<group>"; };
+		58F16D3C33EE768C2BB31D7C /* BatteryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryHistoryStore.swift; sourceTree = "<group>"; };
+		5DBB0F2D5F8FF9FFCB1AD693 /* DeviceListPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceListPresentation.swift; sourceTree = "<group>"; };
+		6765EC1A3AC0B4385ECA7805 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		69BDB8AD2B4CC24408772E50 /* DashboardSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSettingsPane.swift; sourceTree = "<group>"; };
+		712158D8A1D5055A40B71EED /* ActionHUDSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionHUDSettingsPane.swift; sourceTree = "<group>"; };
+		757E016D3707EE4CB64CFAEC /* BeaconTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BeaconTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7F7F5FC1C8BDDCD77A766720 /* BluetoothBatteryResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolverTests.swift; sourceTree = "<group>"; };
+		83003948902C5FE7458516EE /* BeaconQuickActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconQuickActions.swift; sourceTree = "<group>"; };
+		880527582A8993BB88F33C39 /* BeaconMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeaconMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8AEC0B7B0A3C5597B299A2B5 /* BeaconHUDController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconHUDController.swift; sourceTree = "<group>"; };
+		8B6FCB206871E20A2F0D12BB /* MacPowerSourceReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPowerSourceReaderTests.swift; sourceTree = "<group>"; };
+		A11F3FCBE3CCB0BFC94851DE /* BeaconMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeaconMac.entitlements; sourceTree = "<group>"; };
+		A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconDesktopWidgetView.swift; sourceTree = "<group>"; };
+		AE98B7B5C78C9741FAEA0A75 /* BeaconSettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsWindowController.swift; sourceTree = "<group>"; };
+		B45F7C9F077041B590FEF567 /* MacPowerSourceReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPowerSourceReader.swift; sourceTree = "<group>"; };
+		B8F5CFA3EE741ED116550AFB /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
+		C076A50AB2933A2E15E880E4 /* BeaconSettingsSupportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsSupportViews.swift; sourceTree = "<group>"; };
+		CF12E505932A7869669DBDB9 /* BatterySnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStore.swift; sourceTree = "<group>"; };
+		D6628EF4A0FE3A1028C2E7DE /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		DA14437C753C2C72E7DCF4AA /* BeaconHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconHUDView.swift; sourceTree = "<group>"; };
+		F9924F50E7814A7E4CF7477B /* StatusMenuSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuSnapshotTests.swift; sourceTree = "<group>"; };
+		FC2247AA89FCDB5CCFE789F0 /* BatterySnapshotStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		002DB446C47AEBFC67BC451D = {
+		1168A4BC81DD0ED8F231522A /* Shared */ = {
 			isa = PBXGroup;
 			children = (
-				A25D63E858AC942BE4051AEF /* BeaconTests */,
-				328521B4309C71949BD3ACAF /* BeaconUITests */,
-				9B84D13D5425442172270129 /* Mac */,
-				2F8F90AF62AB6A7A80AAE6CC /* Shared */,
-				65F597F12CEF68259C141AC9 /* Products */,
-			);
-			sourceTree = "<group>";
-		};
-		2F8F90AF62AB6A7A80AAE6CC /* Shared */ = {
-			isa = PBXGroup;
-			children = (
-				FFC84EB3EC9E078DA35FD209 /* BatteryHistoryStore.swift */,
-				7AF618688DB082ECC8E5AD32 /* BatterySnapshot.swift */,
-				EB7DCA380D32FDF0FD9165F0 /* BatterySnapshotStore.swift */,
-				CC1CB66F60CA615057985048 /* DesignTokens.swift */,
+				58F16D3C33EE768C2BB31D7C /* BatteryHistoryStore.swift */,
+				39B301DB1DFC1AEAD9FFD407 /* BatterySnapshot.swift */,
+				CF12E505932A7869669DBDB9 /* BatterySnapshotStore.swift */,
+				D6628EF4A0FE3A1028C2E7DE /* DesignTokens.swift */,
 			);
 			name = Shared;
 			path = Beacon/Shared;
 			sourceTree = "<group>";
 		};
-		328521B4309C71949BD3ACAF /* BeaconUITests */ = {
+		310A6E5613670DF7E7DF9A13 /* BeaconUITests */ = {
 			isa = PBXGroup;
 			children = (
-				0EDBB2E81DFB38D0D14D8485 /* StatusMenuSnapshotTests.swift */,
+				F9924F50E7814A7E4CF7477B /* StatusMenuSnapshotTests.swift */,
 			);
 			path = BeaconUITests;
 			sourceTree = "<group>";
 		};
-		65F597F12CEF68259C141AC9 /* Products */ = {
+		3775047BE660E575CD18F67A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				668E2DA35CD366B6E678909C /* BeaconMac.app */,
-				32CDA0F767C9BF310917A8DE /* BeaconTests.xctest */,
-				6B00AD3E1F4EF43274A4551F /* BeaconUITests.xctest */,
+				880527582A8993BB88F33C39 /* BeaconMac.app */,
+				757E016D3707EE4CB64CFAEC /* BeaconTests.xctest */,
+				035F8236D253BBD9B56A6F07 /* BeaconUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		9B84D13D5425442172270129 /* Mac */ = {
+		44875F991DE96925758A1F7C /* Mac */ = {
 			isa = PBXGroup;
 			children = (
-				4D0C2EBF7CA59337799C6669 /* Assets.xcassets */,
-				F4260712686B7861989BCC55 /* BeaconAppShortcuts.swift */,
-				9A216E0E33A07ACCFEF7A538 /* BeaconDesktopWidgetView.swift */,
-				BA0A59E051CD8A43C982C32B /* BeaconHUDController.swift */,
-				63DC6E3AC4281AEFEEC8E6CB /* BeaconHUDView.swift */,
-				D6D524F32ABC5FD0DA0B5410 /* BeaconMac.entitlements */,
-				1343648981A02CD9D854CEE7 /* BeaconMacApp.swift */,
-				4D83E21BB5DAA9F07874BBB7 /* BeaconQuickActions.swift */,
-				5E4A9F14A4474DE7A0D4EED6 /* BeaconSettingsSupportViews.swift */,
-				B4858E0DA38F279CF22BEC78 /* BeaconSettingsWindowController.swift */,
-				A96BAA8C3EF93B7718365B9A /* BeaconSettingsView.swift */,
-				A9E9DE4B5D39D54F65C48C75 /* BeaconStatusController.swift */,
-				5C3F20615717ABC149F0CE39 /* BluetoothBatteryResolver.swift */,
-				75CD001755981B5C0042F848 /* BluetoothDeviceScanner.swift */,
-				8C96A0FC2C48AE9903F6945D /* ActionHUDSettingsPane.swift */,
-				B63A70C016A8CACCF30F258F /* DashboardSettingsPane.swift */,
-				668D7469010F9F52672D0768 /* DeviceBatteryRow.swift */,
-				809F1103BFF7C13AF6817CFD /* DeviceListPresentation.swift */,
-				20C940CE61834B35B25A743C /* Info.plist */,
-				520A5E8BE09019884BA5EB05 /* LowBatteryNotifier.swift */,
-				BB4F794BE22605BCF1F8EB12 /* MacPowerSourceReader.swift */,
-				D670F4B706EB72F9D7EA8382 /* QuickActionsSettingsPane.swift */,
-				44C2F16AB4A3CEA41577DE41 /* StatusMenuPanelController.swift */,
-				0C254213BB0D5DADF9F1F5FD /* StatusMenuView.swift */,
+				712158D8A1D5055A40B71EED /* ActionHUDSettingsPane.swift */,
+				6765EC1A3AC0B4385ECA7805 /* Assets.xcassets */,
+				37F3CF1AFAD597E2693F9D08 /* BeaconAppShortcuts.swift */,
+				A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */,
+				8AEC0B7B0A3C5597B299A2B5 /* BeaconHUDController.swift */,
+				DA14437C753C2C72E7DCF4AA /* BeaconHUDView.swift */,
+				A11F3FCBE3CCB0BFC94851DE /* BeaconMac.entitlements */,
+				0572BDAF185BEAAA9EE6DDEB /* BeaconMacApp.swift */,
+				83003948902C5FE7458516EE /* BeaconQuickActions.swift */,
+				C076A50AB2933A2E15E880E4 /* BeaconSettingsSupportViews.swift */,
+				4738A433E5F28FC4D87CFDD6 /* BeaconSettingsView.swift */,
+				AE98B7B5C78C9741FAEA0A75 /* BeaconSettingsWindowController.swift */,
+				27D70580BC57793CE0FADEF0 /* BeaconStatusController.swift */,
+				0922ECCDF04EFE6136C64551 /* BluetoothBatteryResolver.swift */,
+				550C0817368D56189D384E48 /* BluetoothDeviceScanner.swift */,
+				69BDB8AD2B4CC24408772E50 /* DashboardSettingsPane.swift */,
+				0AFAF2B21F32B40BCE0DDA23 /* DeviceBatteryRow.swift */,
+				5DBB0F2D5F8FF9FFCB1AD693 /* DeviceListPresentation.swift */,
+				0E213AC3FB1B698F6CEEC722 /* Info.plist */,
+				3024F441E85EF1AF639F9032 /* LowBatteryNotifier.swift */,
+				B45F7C9F077041B590FEF567 /* MacPowerSourceReader.swift */,
+				51CC15AD0413CC94BA3FA1CF /* QuickActionsSettingsPane.swift */,
+				0A4D64755B98EE7C45D25BC8 /* StatusMenuPanelController.swift */,
+				B8F5CFA3EE741ED116550AFB /* StatusMenuView.swift */,
 			);
 			name = Mac;
 			path = Beacon/Mac;
 			sourceTree = "<group>";
 		};
-		A25D63E858AC942BE4051AEF /* BeaconTests */ = {
+		7D305C7354F60FF4F0BA1A1C = {
 			isa = PBXGroup;
 			children = (
-				2CBBFCBDA160193064A02179 /* BatterySnapshotStoreTests.swift */,
-				A35E351EA45D75E1A5DF59AA /* BluetoothBatteryResolverTests.swift */,
-				7B0275CC5FE052D0ECABE095 /* DeviceListPresentationTests.swift */,
-				1E7ECC1AA68CD0E74B08E1BA /* MacPowerSourceReaderTests.swift */,
+				D014B8C60FB1A12368B2921D /* BeaconTests */,
+				310A6E5613670DF7E7DF9A13 /* BeaconUITests */,
+				44875F991DE96925758A1F7C /* Mac */,
+				1168A4BC81DD0ED8F231522A /* Shared */,
+				3775047BE660E575CD18F67A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D014B8C60FB1A12368B2921D /* BeaconTests */ = {
+			isa = PBXGroup;
+			children = (
+				FC2247AA89FCDB5CCFE789F0 /* BatterySnapshotStoreTests.swift */,
+				7F7F5FC1C8BDDCD77A766720 /* BluetoothBatteryResolverTests.swift */,
+				2854B69F96AEFF5C6596BAFB /* DeviceListPresentationTests.swift */,
+				8B6FCB206871E20A2F0D12BB /* MacPowerSourceReaderTests.swift */,
 			);
 			path = BeaconTests;
 			sourceTree = "<group>";
@@ -184,30 +184,30 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		538BC0F47517CB9FFC3CA37B /* BeaconTests */ = {
+		096F5A749F555B74DAE0D4F7 /* BeaconTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F22C3B8D4C8E03444263CFAB /* Build configuration list for PBXNativeTarget "BeaconTests" */;
+			buildConfigurationList = 23F7DF56A173EBF103899977 /* Build configuration list for PBXNativeTarget "BeaconTests" */;
 			buildPhases = (
-				880BE8200FC3A6C748F6C387 /* Sources */,
+				76712B1AAB0F87B25CA1C75F /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				349060F518100472C1DA3FBB /* PBXTargetDependency */,
+				D679C5DCA5769E1AFB96B0DE /* PBXTargetDependency */,
 			);
 			name = BeaconTests;
 			packageProductDependencies = (
 			);
 			productName = BeaconTests;
-			productReference = 32CDA0F767C9BF310917A8DE /* BeaconTests.xctest */;
+			productReference = 757E016D3707EE4CB64CFAEC /* BeaconTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		8FE3A089DEDFACC3C20459FA /* BeaconMac */ = {
+		22D8EF4F0C30F481675D65B8 /* BeaconMac */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 541AAC8F4C20DED83E811B89 /* Build configuration list for PBXNativeTarget "BeaconMac" */;
+			buildConfigurationList = FC6561D19700C0783C1D33D1 /* Build configuration list for PBXNativeTarget "BeaconMac" */;
 			buildPhases = (
-				5D6B88301E66B5D6B6608DF1 /* Sources */,
-				06DDBDDE7709A2CB16684302 /* Resources */,
+				91B77D29DC4DBF92414DE946 /* Sources */,
+				E02B6D39FE9AA781AA762D03 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -217,149 +217,165 @@
 			packageProductDependencies = (
 			);
 			productName = BeaconMac;
-			productReference = 668E2DA35CD366B6E678909C /* BeaconMac.app */;
+			productReference = 880527582A8993BB88F33C39 /* BeaconMac.app */;
 			productType = "com.apple.product-type.application";
 		};
-		FD7E2A60A1255ED6E68C9B93 /* BeaconUITests */ = {
+		752607ECEAF8C53DF8A99AF0 /* BeaconUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 95C208A5A682FD4BF436EF54 /* Build configuration list for PBXNativeTarget "BeaconUITests" */;
+			buildConfigurationList = 174F3405B4A65D94F1324C19 /* Build configuration list for PBXNativeTarget "BeaconUITests" */;
 			buildPhases = (
-				5EB624B027222EFCF8939F9B /* Sources */,
+				9FCBAA2EC543C6C25901D1A8 /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				5D59F708B89F0ACB895FABE1 /* PBXTargetDependency */,
+				50F9F260D8C231C3A4DE8DC7 /* PBXTargetDependency */,
 			);
 			name = BeaconUITests;
 			packageProductDependencies = (
 			);
 			productName = BeaconUITests;
-			productReference = 6B00AD3E1F4EF43274A4551F /* BeaconUITests.xctest */;
+			productReference = 035F8236D253BBD9B56A6F07 /* BeaconUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		45C328C8416135D15329479F /* Project object */ = {
+		C6CDC17607DFF5D714886E77 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					538BC0F47517CB9FFC3CA37B = {
+					096F5A749F555B74DAE0D4F7 = {
 						ProvisioningStyle = Manual;
 					};
-					8FE3A089DEDFACC3C20459FA = {
+					22D8EF4F0C30F481675D65B8 = {
 						ProvisioningStyle = Manual;
 					};
-					FD7E2A60A1255ED6E68C9B93 = {
+					752607ECEAF8C53DF8A99AF0 = {
 						ProvisioningStyle = Manual;
-						TestTargetID = 8FE3A089DEDFACC3C20459FA;
+						TestTargetID = 22D8EF4F0C30F481675D65B8;
 					};
 				};
 			};
-			buildConfigurationList = 1F6D678F0C940761798A05B2 /* Build configuration list for PBXProject "Beacon" */;
+			buildConfigurationList = 880646F2C181B43B6D369452 /* Build configuration list for PBXProject "Beacon" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = 002DB446C47AEBFC67BC451D;
+			mainGroup = 7D305C7354F60FF4F0BA1A1C;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 65F597F12CEF68259C141AC9 /* Products */;
+			productRefGroup = 3775047BE660E575CD18F67A /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				8FE3A089DEDFACC3C20459FA /* BeaconMac */,
-				538BC0F47517CB9FFC3CA37B /* BeaconTests */,
-				FD7E2A60A1255ED6E68C9B93 /* BeaconUITests */,
+				22D8EF4F0C30F481675D65B8 /* BeaconMac */,
+				096F5A749F555B74DAE0D4F7 /* BeaconTests */,
+				752607ECEAF8C53DF8A99AF0 /* BeaconUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		06DDBDDE7709A2CB16684302 /* Resources */ = {
+		E02B6D39FE9AA781AA762D03 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C4E1936C3EC4F1ED867BF35A /* Assets.xcassets in Resources */,
+				230198441D082928C94CAE47 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		5D6B88301E66B5D6B6608DF1 /* Sources */ = {
+		76712B1AAB0F87B25CA1C75F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CCBFFE1E65F837E55F13113A /* BatteryHistoryStore.swift in Sources */,
-				A9A322DF46A684350664A338 /* BeaconAppShortcuts.swift in Sources */,
-				C0620F1CA7C7E0F1BFA8A080 /* BeaconDesktopWidgetView.swift in Sources */,
-				3ED50C7F21988EBE6F76466C /* BeaconHUDController.swift in Sources */,
-				1AE7293BAC161E692265635E /* BeaconHUDView.swift in Sources */,
-				BDF61E5A2AE7158894FCBE6B /* BeaconMacApp.swift in Sources */,
-				759798D6E876B82A8304FD26 /* BeaconQuickActions.swift in Sources */,
-				5E4A9F15A4474DE7A0D4EED6 /* BeaconSettingsSupportViews.swift in Sources */,
-				77128A015A82A3BED1E24041 /* BeaconSettingsWindowController.swift in Sources */,
-				633BA44DDF2636BB9218B3D5 /* BeaconSettingsView.swift in Sources */,
-				B5E8E23CC09B46785927F0B9 /* BeaconStatusController.swift in Sources */,
-				CE68F84230A99E95528FD531 /* ActionHUDSettingsPane.swift in Sources */,
-				65E3DA4242EBA1A3E3BBDBC2 /* DashboardSettingsPane.swift in Sources */,
-				A2BA350B57FACA9D5C264272 /* BatterySnapshot.swift in Sources */,
-				CFDF5EADE3731BA8A03B20A7 /* BatterySnapshotStore.swift in Sources */,
-				942FE4611CC7E0C6850F6065 /* BluetoothBatteryResolver.swift in Sources */,
-				782801FDEA2CCDE36533BA6E /* BluetoothDeviceScanner.swift in Sources */,
-				A2F311CF66BE5F52F4C17DA3 /* DesignTokens.swift in Sources */,
-				07DB1584A760AE080C17CB52 /* DeviceBatteryRow.swift in Sources */,
-				42EAB0D28902C87A454CFEA0 /* DeviceListPresentation.swift in Sources */,
-				22A60593E9CA65517ECAF04C /* QuickActionsSettingsPane.swift in Sources */,
-				BDC818564899E78A325ACE5A /* StatusMenuPanelController.swift in Sources */,
-				32FA20A2BF036886CCAFFD31 /* LowBatteryNotifier.swift in Sources */,
-				3E35364E3690DA8E20556AFA /* MacPowerSourceReader.swift in Sources */,
-				98C96F7E9FA25DB0D45FA1E1 /* StatusMenuView.swift in Sources */,
+				757D87D1560E861C813D43C5 /* BatterySnapshotStoreTests.swift in Sources */,
+				E8AA626A2247A7F79EFCE42E /* BluetoothBatteryResolverTests.swift in Sources */,
+				C8E65576C4B592832F6EBC90 /* DeviceListPresentationTests.swift in Sources */,
+				6CF367F09AA9229ECE312EBC /* MacPowerSourceReaderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		5EB624B027222EFCF8939F9B /* Sources */ = {
+		91B77D29DC4DBF92414DE946 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C1669D9406E67FD6232BB5DB /* StatusMenuSnapshotTests.swift in Sources */,
+				8E288E3C8B3231E85EB0FB63 /* ActionHUDSettingsPane.swift in Sources */,
+				2238DCC0CD90A32F21014B6C /* BatteryHistoryStore.swift in Sources */,
+				04BC3F76E0EDFDC270D9CF0C /* BatterySnapshot.swift in Sources */,
+				1EE94522FFC39C4D79D3F76F /* BatterySnapshotStore.swift in Sources */,
+				53073ECBB082D056B27B050F /* BeaconAppShortcuts.swift in Sources */,
+				DE4F73DCD277B829888A4845 /* BeaconDesktopWidgetView.swift in Sources */,
+				39D59897D914543FDE7B70F3 /* BeaconHUDController.swift in Sources */,
+				0E0DE066DF399483F5AAFAFF /* BeaconHUDView.swift in Sources */,
+				70F23A8F0D2355F94C0B5121 /* BeaconMacApp.swift in Sources */,
+				144D530D5C2CE0B5BCD61AE7 /* BeaconQuickActions.swift in Sources */,
+				D34D7FADF14D90A27D49D1AE /* BeaconSettingsSupportViews.swift in Sources */,
+				D805A3AC420A4F1F4E08DE48 /* BeaconSettingsView.swift in Sources */,
+				1D2571D4A04FFCD5F6F21A8A /* BeaconSettingsWindowController.swift in Sources */,
+				4670576BE3981977733DA905 /* BeaconStatusController.swift in Sources */,
+				A31ACFD3EDCB4768C9EE3082 /* BluetoothBatteryResolver.swift in Sources */,
+				B67A46A69A7E2B90FD534E21 /* BluetoothDeviceScanner.swift in Sources */,
+				DFC559BACEFC876F5A35E41A /* DashboardSettingsPane.swift in Sources */,
+				CF8AD3BFEDE12AFB2B19E25B /* DesignTokens.swift in Sources */,
+				4A65059572403B13720EB6EC /* DeviceBatteryRow.swift in Sources */,
+				B482AA509249A81FE5F56778 /* DeviceListPresentation.swift in Sources */,
+				58FB82C93A5920099D0A9E04 /* LowBatteryNotifier.swift in Sources */,
+				591B40AEC84C0C58177B0528 /* MacPowerSourceReader.swift in Sources */,
+				6ABE8E950AB7F96716D0B1C1 /* QuickActionsSettingsPane.swift in Sources */,
+				5B7D1A21024B8E1E55A43919 /* StatusMenuPanelController.swift in Sources */,
+				51AED715AB0260398EA3545E /* StatusMenuView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		880BE8200FC3A6C748F6C387 /* Sources */ = {
+		9FCBAA2EC543C6C25901D1A8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CD35FB78B215C978A0464AD2 /* BatterySnapshotStoreTests.swift in Sources */,
-				176743D6BAAD897908EDDE84 /* BluetoothBatteryResolverTests.swift in Sources */,
-				1ADEC2C6139CA398650A4395 /* DeviceListPresentationTests.swift in Sources */,
-				21BF229FC1379A98B647A82E /* MacPowerSourceReaderTests.swift in Sources */,
+				F81474E0D1FF064777791D2F /* StatusMenuSnapshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		349060F518100472C1DA3FBB /* PBXTargetDependency */ = {
+		50F9F260D8C231C3A4DE8DC7 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 8FE3A089DEDFACC3C20459FA /* BeaconMac */;
-			targetProxy = 15B59720232588C5B2692BB2 /* PBXContainerItemProxy */;
+			target = 22D8EF4F0C30F481675D65B8 /* BeaconMac */;
+			targetProxy = 9A67925E1DEB2CA8947952F7 /* PBXContainerItemProxy */;
 		};
-		5D59F708B89F0ACB895FABE1 /* PBXTargetDependency */ = {
+		D679C5DCA5769E1AFB96B0DE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 8FE3A089DEDFACC3C20459FA /* BeaconMac */;
-			targetProxy = 27611F2940FC7620B5933676 /* PBXContainerItemProxy */;
+			target = 22D8EF4F0C30F481675D65B8 /* BeaconMac */;
+			targetProxy = 7877CCD569985AE16EF5944D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		365C74A24FC1866CA7A994E2 /* Debug */ = {
+		199343B2CFAE33B9A10B8B84 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.Beacon.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = BeaconMac;
+			};
+			name = Debug;
+		};
+		4BAB7C4A26FEAE877BDDA78F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -375,40 +391,7 @@
 			};
 			name = Debug;
 		};
-		697CF0280665B190E5934A94 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				COMBINE_HIDPI_IMAGES = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.Beacon.uitests;
-				SDKROOT = macosx;
-				TEST_TARGET_NAME = BeaconMac;
-			};
-			name = Debug;
-		};
-		8793B1715C382F2466E9C126 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Beacon/Mac/BeaconMac.entitlements;
-				COMBINE_HIDPI_IMAGES = YES;
-				INFOPLIST_FILE = Beacon/Mac/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.Beacon.mac;
-				PRODUCT_MODULE_NAME = Beacon;
-				SDKROOT = macosx;
-			};
-			name = Debug;
-		};
-		887820935A5A41464502AAFF /* Release */ = {
+		9E40B82DBA9D7E21ACA97B7C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -424,7 +407,7 @@
 			};
 			name = Release;
 		};
-		C6232A31B2AC08D826F18F67 /* Release */ = {
+		AFE7807B1615640FCC7860B0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -483,7 +466,40 @@
 			};
 			name = Release;
 		};
-		D53FF854576EA859E84C085E /* Debug */ = {
+		B7241AF46875D8F983ABD02F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.Beacon.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BeaconMac.app/Contents/MacOS/BeaconMac";
+			};
+			name = Release;
+		};
+		D089BFB129EC4D90B13FBD70 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Beacon/Mac/BeaconMac.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Beacon/Mac/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.Beacon.mac;
+				PRODUCT_MODULE_NAME = Beacon;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		E5817567C45C64BFB73AD6E5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -549,7 +565,7 @@
 			};
 			name = Debug;
 		};
-		FB21BA57E9DED93C53B14B00 /* Release */ = {
+		F1C89BAD52BFDB36B17A6801 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -566,62 +582,46 @@
 			};
 			name = Release;
 		};
-		FE50E76B56FC40C7C66EE113 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				COMBINE_HIDPI_IMAGES = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@loader_path/../Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.isaacyslin.Beacon.tests;
-				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BeaconMac.app/Contents/MacOS/BeaconMac";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1F6D678F0C940761798A05B2 /* Build configuration list for PBXProject "Beacon" */ = {
+		174F3405B4A65D94F1324C19 /* Build configuration list for PBXNativeTarget "BeaconUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D53FF854576EA859E84C085E /* Debug */,
-				C6232A31B2AC08D826F18F67 /* Release */,
+				199343B2CFAE33B9A10B8B84 /* Debug */,
+				9E40B82DBA9D7E21ACA97B7C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		541AAC8F4C20DED83E811B89 /* Build configuration list for PBXNativeTarget "BeaconMac" */ = {
+		23F7DF56A173EBF103899977 /* Build configuration list for PBXNativeTarget "BeaconTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				8793B1715C382F2466E9C126 /* Debug */,
-				FB21BA57E9DED93C53B14B00 /* Release */,
+				4BAB7C4A26FEAE877BDDA78F /* Debug */,
+				B7241AF46875D8F983ABD02F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		95C208A5A682FD4BF436EF54 /* Build configuration list for PBXNativeTarget "BeaconUITests" */ = {
+		880646F2C181B43B6D369452 /* Build configuration list for PBXProject "Beacon" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				697CF0280665B190E5934A94 /* Debug */,
-				887820935A5A41464502AAFF /* Release */,
+				E5817567C45C64BFB73AD6E5 /* Debug */,
+				AFE7807B1615640FCC7860B0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		F22C3B8D4C8E03444263CFAB /* Build configuration list for PBXNativeTarget "BeaconTests" */ = {
+		FC6561D19700C0783C1D33D1 /* Build configuration list for PBXNativeTarget "BeaconMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				365C74A24FC1866CA7A994E2 /* Debug */,
-				FE50E76B56FC40C7C66EE113 /* Release */,
+				D089BFB129EC4D90B13FBD70 /* Debug */,
+				F1C89BAD52BFDB36B17A6801 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 45C328C8416135D15329479F /* Project object */;
+	rootObject = C6CDC17607DFF5D714886E77 /* Project object */;
 }

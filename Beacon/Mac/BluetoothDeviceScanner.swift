@@ -7,6 +7,7 @@ import os
 public struct BluetoothDeviceScanner {
     private static let logger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "bluetooth")
     private static let systemProfilerTimeout: TimeInterval = 5
+    private static let bleBatteryScanTimeout: Duration = .seconds(6)
 
     public init() {}
 
@@ -15,18 +16,24 @@ public struct BluetoothDeviceScanner {
     }
 
     public func connectedCandidateReport(now: Date = Date()) async -> BluetoothCandidateScanReport {
-        var candidates = await readLocalBatteryCandidates()
+        async let localRead = Self.readLocalBatteryCandidates()
+        async let profilerRead = Self.readSystemProfilerBatteryCandidates()
+        async let bleRead = Self.readBLEBatteryCandidates(now: now)
+        async let usbRead = IPhoneUSBBatteryProvider.readCandidate(now: now)
+
+        let (local, profiler, ble, usb) = await (localRead, profilerRead, bleRead, usbRead)
+
+        var candidates = local
         var attempts: [BatteryProviderAttempt] = [
             BatteryProviderAttempt(
                 provider: .ioRegistry,
-                status: Self.status(for: candidates),
-                candidateCount: candidates.count,
-                message: "IORegistry returned \(candidates.count) Bluetooth battery candidates",
+                status: Self.status(for: local),
+                candidateCount: local.count,
+                message: "IORegistry returned \(local.count) Bluetooth battery candidates",
                 attemptedAt: now
             )
         ]
 
-        let profiler = await Self.readSystemProfilerBatteryCandidates()
         Self.logger.info("system_profiler returned \(profiler.count) battery candidates")
         attempts.append(
             BatteryProviderAttempt(
@@ -41,47 +48,12 @@ public struct BluetoothDeviceScanner {
             candidates.upsert(candidate)
         }
 
-        switch CBCentralManager.authorization {
-        case .allowedAlways, .notDetermined:
-            let ble = await BLEBatteryServiceReader().read(timeout: .seconds(6))
-            Self.logger.info("Known BLE scan returned \(ble.count) battery candidates")
-            attempts.append(
-                BatteryProviderAttempt(
-                    provider: .coreBluetoothBatteryService,
-                    status: Self.status(for: ble),
-                    candidateCount: ble.count,
-                    message: "Known BLE scan returned \(ble.count) battery candidates",
-                    attemptedAt: Date()
-                )
-            )
-            for candidate in ble {
-                candidates.upsert(candidate)
-            }
-        case .denied, .restricted:
-            Self.logger.info("Known BLE scan skipped because CoreBluetooth authorization is \(String(describing: CBCentralManager.authorization))")
-            attempts.append(
-                BatteryProviderAttempt(
-                    provider: .coreBluetoothBatteryService,
-                    status: .unauthorized,
-                    candidateCount: 0,
-                    message: "Known BLE scan skipped because CoreBluetooth authorization is \(String(describing: CBCentralManager.authorization))",
-                    attemptedAt: Date()
-                )
-            )
-        @unknown default:
-            Self.logger.info("Known BLE scan skipped because CoreBluetooth authorization is unknown")
-            attempts.append(
-                BatteryProviderAttempt(
-                    provider: .coreBluetoothBatteryService,
-                    status: .unavailable,
-                    candidateCount: 0,
-                    message: "Known BLE scan skipped because CoreBluetooth authorization is unknown",
-                    attemptedAt: Date()
-                )
-            )
+        Self.logger.info("Known BLE scan returned \(ble.candidates.count) battery candidates")
+        attempts.append(ble.attempt)
+        for candidate in ble.candidates {
+            candidates.upsert(candidate)
         }
 
-        let usb = await IPhoneUSBBatteryProvider.readCandidate(now: now)
         Self.logger.info("USB iPhone read returned \(usb.attempt.candidateCount) battery candidates")
         attempts.append(usb.attempt)
         if let candidate = usb.candidate {
@@ -90,6 +62,11 @@ public struct BluetoothDeviceScanner {
 
         let collapsed = Self.collapsingDuplicateIPhones(candidates)
         return BluetoothCandidateScanReport(candidates: collapsed, attempts: attempts)
+    }
+
+    private struct BLEBatteryProviderResult: Sendable {
+        let candidates: [BluetoothBatteryCandidate]
+        let attempt: BatteryProviderAttempt
     }
 
     /// The same iPhone can surface through multiple providers (USB `ideviceinfo`,
@@ -133,7 +110,7 @@ public struct BluetoothDeviceScanner {
         candidates.contains { $0.batteryPercent != nil } ? .reported : .noReport
     }
 
-    private func readLocalBatteryCandidates() async -> [BluetoothBatteryCandidate] {
+    private static func readLocalBatteryCandidates() async -> [BluetoothBatteryCandidate] {
         await Task.detached(priority: .utility) {
             let scanner = BluetoothDeviceScanner()
             var candidates = scanner.readAppleDeviceManagementBatteryCandidates()
@@ -179,25 +156,6 @@ public struct BluetoothDeviceScanner {
         }
 
         return results
-    }
-
-    private func readPairedIOBluetoothDevices() -> [BluetoothBatteryCandidate] {
-        guard let devices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else {
-            return []
-        }
-
-        return devices.compactMap { device -> BluetoothBatteryCandidate? in
-            let name = device.nameOrAddress ?? "Bluetooth Device"
-            let address = device.addressString ?? name
-            return BluetoothBatteryCandidate(
-                deviceID: address,
-                displayName: name,
-                transport: .classic,
-                batteryPercent: nil,
-                kindHint: Self.kindHint(name: name, minorType: ""),
-                connectionState: device.isConnected() ? .connected : .disconnected
-            )
-        }
     }
 
     private func readHIDBatteryCandidates() -> [BluetoothBatteryCandidate] {
@@ -255,13 +213,57 @@ public struct BluetoothDeviceScanner {
         }.value
     }
 
+    @MainActor
+    private static func readBLEBatteryCandidates(now: Date) async -> BLEBatteryProviderResult {
+        switch CBCentralManager.authorization {
+        case .allowedAlways, .notDetermined:
+            let candidates = await BLEBatteryServiceReader().read(timeout: bleBatteryScanTimeout)
+            return BLEBatteryProviderResult(
+                candidates: candidates,
+                attempt: BatteryProviderAttempt(
+                    provider: .coreBluetoothBatteryService,
+                    status: Self.status(for: candidates),
+                    candidateCount: candidates.count,
+                    message: "Known BLE scan returned \(candidates.count) battery candidates",
+                    attemptedAt: Date()
+                )
+            )
+        case .denied, .restricted:
+            let message = "Known BLE scan skipped because CoreBluetooth authorization is \(String(describing: CBCentralManager.authorization))"
+            Self.logger.info("\(message, privacy: .public)")
+            return BLEBatteryProviderResult(
+                candidates: [],
+                attempt: BatteryProviderAttempt(
+                    provider: .coreBluetoothBatteryService,
+                    status: .unauthorized,
+                    candidateCount: 0,
+                    message: message,
+                    attemptedAt: now
+                )
+            )
+        @unknown default:
+            let message = "Known BLE scan skipped because CoreBluetooth authorization is unknown"
+            Self.logger.info("\(message, privacy: .public)")
+            return BLEBatteryProviderResult(
+                candidates: [],
+                attempt: BatteryProviderAttempt(
+                    provider: .coreBluetoothBatteryService,
+                    status: .unavailable,
+                    candidateCount: 0,
+                    message: message,
+                    attemptedAt: now
+                )
+            )
+        }
+    }
+
     private static func systemProfilerBatteryCandidates() -> [BluetoothBatteryCandidate] {
         let process = Process()
         let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
         process.arguments = ["SPBluetoothDataType", "-json"]
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice
 
         let timeoutWorkItem = DispatchWorkItem {
             guard process.isRunning else { return }
@@ -274,16 +276,15 @@ public struct BluetoothDeviceScanner {
                 deadline: .now() + systemProfilerTimeout,
                 execute: timeoutWorkItem
             )
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
+            timeoutWorkItem.cancel()
+            guard process.terminationStatus == 0 else { return [] }
+            return parseSystemProfilerBluetoothData(data)
         } catch {
             timeoutWorkItem.cancel()
             return []
         }
-        timeoutWorkItem.cancel()
-
-        guard process.terminationStatus == 0 else { return [] }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return parseSystemProfilerBluetoothData(data)
     }
 
     static func parseSystemProfilerBluetoothData(_ data: Data) -> [BluetoothBatteryCandidate] {
@@ -737,6 +738,18 @@ enum BLEBatteryReadStatePolicy {
     }
 }
 
+enum BLEBatteryDiscoveryWindow {
+    static let emptyPeripheralTimeout: Duration = .milliseconds(1500)
+
+    static func timeout(
+        configured: Duration,
+        inspectedKnownPeripheral: Bool
+    ) -> Duration {
+        guard !inspectedKnownPeripheral else { return configured }
+        return configured < emptyPeripheralTimeout ? configured : emptyPeripheralTimeout
+    }
+}
+
 @MainActor
 private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentralManagerDelegate, @preconcurrency CBPeripheralDelegate {
     private static let batteryService = CBUUID(string: "180F")
@@ -749,6 +762,8 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     private var peripherals: [UUID: CBPeripheral] = [:]
     private var connectionAttemptIDs = Set<UUID>()
     private var timeoutTask: Task<Void, Never>?
+    private var discoveryWindowTask: Task<Void, Never>?
+    private var configuredTimeout: Duration = .seconds(4)
     /// Peripherals whose battery read is still in flight. Once the initially
     /// connected set has all resolved we can finish without waiting out the
     /// full timeout window — the common case where nothing needs the full scan.
@@ -759,6 +774,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     func read(timeout: Duration = .seconds(4)) async -> [BluetoothBatteryCandidate] {
         await withCheckedContinuation { continuation in
             self.continuation = continuation
+            self.configuredTimeout = timeout
             self.central = CBCentralManager(delegate: self, queue: nil)
             self.timeoutTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: timeout)
@@ -778,10 +794,14 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
             break
         }
 
-        for peripheral in central.retrieveConnectedPeripherals(withServices: [Self.batteryService]) {
+        let batteryPeripherals = central.retrieveConnectedPeripherals(withServices: [Self.batteryService])
+        let hidPeripherals = central.retrieveConnectedPeripherals(withServices: [Self.hidService])
+        let hasKnownPeripheral = !batteryPeripherals.isEmpty || !hidPeripherals.isEmpty
+
+        for peripheral in batteryPeripherals {
             inspect(peripheral)
         }
-        for peripheral in central.retrieveConnectedPeripherals(withServices: [Self.hidService]) {
+        for peripheral in hidPeripherals {
             inspect(peripheral)
         }
 
@@ -791,6 +811,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         )
 
         didStartInitialInspection = true
+        scheduleDiscoveryWindowFinishIfNeeded(inspectedKnownPeripheral: hasKnownPeripheral)
         checkEarlyFinish()
     }
 
@@ -876,9 +897,24 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         finish()
     }
 
+    private func scheduleDiscoveryWindowFinishIfNeeded(inspectedKnownPeripheral: Bool) {
+        let timeout = BLEBatteryDiscoveryWindow.timeout(
+            configured: configuredTimeout,
+            inspectedKnownPeripheral: inspectedKnownPeripheral
+        )
+        guard timeout != configuredTimeout else { return }
+        discoveryWindowTask?.cancel()
+        discoveryWindowTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: timeout)
+            self?.finish()
+        }
+    }
+
     private func finish() {
         timeoutTask?.cancel()
         timeoutTask = nil
+        discoveryWindowTask?.cancel()
+        discoveryWindowTask = nil
         if central?.state == .poweredOn {
             central?.stopScan()
             for peripheral in peripherals.values where connectionAttemptIDs.contains(peripheral.identifier) {

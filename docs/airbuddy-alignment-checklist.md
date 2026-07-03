@@ -48,7 +48,7 @@ Official reference links reviewed:
 | AirPods audio controls | `Beacon/Mac/DeviceListPresentation.swift`, `Beacon/Mac/StatusMenuView.swift`, `Beacon/Mac/BeaconSettingsView.swift` | `testAirPodsAudioPreferencesRoundTripPerDevice`, `testBeaconSettingsWindowCanRenderAirPodsAudioControls` | Safe alternative implemented |
 | Widget/dashboard glanceability | `Beacon/Mac/BeaconDesktopWidgetView.swift`, `Beacon/Mac/BeaconSettingsView.swift`, `Beacon/Shared/BatteryHistoryStore.swift` | `testBatteryDesktopWidgetRenderProducesNonBlankImage`, `testBeaconDashboardSettingsRenderProducesDesktopWidgetPreview`, history trend tests | Complete |
 | Empty/loading/stale/unsupported states | `Beacon/Mac/StatusMenuView.swift`, `Beacon/Mac/BeaconSettingsView.swift`, `Beacon/Mac/DeviceBatteryRow.swift`, `Beacon/Shared/BatterySnapshotStore.swift` | refreshing render tests, `testUnsupportedBluetoothDeviceStaysVisibleWithoutPercent`, freshness/status render coverage | Complete |
-| Preserve existing working behavior | `Beacon/Shared/CloudBatterySync.swift`, `Beacon/Shared/BatterySnapshotStore.swift`, `Beacon/Mac/MacPowerSourceReader.swift`, existing iOS/watch targets | Full current test suite, cloud sync tests, snapshot compatibility tests | Complete |
+| Preserve existing working behavior | `Beacon/Shared/BatterySnapshotStore.swift`, `Beacon/Mac/MacPowerSourceReader.swift`, `Beacon/Mac/BluetoothDeviceScanner.swift`, USB-first `ideviceinfo` iPhone battery provider | Full current test suite, Mac power source tests, resolver tests, snapshot compatibility tests | Complete |
 | Production app folder/build integration | `Beacon.xcodeproj/project.pbxproj`, `script/build_and_run.sh`, `script/package_dmg.sh`, new files under `Beacon/Mac` and `Beacon/Shared` | Xcode build/test/package verification, codesign verify, DMG verify | Complete with signing limits |
 | Device transfer / Magic Handoff exclusion | `Beacon/Mac/BeaconQuickActions.swift` keeps `transferToMac` unsupported and filtered from defaults | `testQuickActionPreferencesDefaultToSafeEnabledActions`, `testQuickActionPreferencesRoundTripAndFilterUnsupportedActions` | Excluded as requested |
 
@@ -68,14 +68,18 @@ alternatives:
 - The scanner degrades quietly for transient Bluetooth/system-profiler misses:
   the status menu shows only fresh connected reports, while Settings can still
   collapse hidden or unavailable devices for recovery.
+- Beacon is currently a macOS-only menu bar app. iPhone battery support is read
+  locally from trusted devices through the external `ideviceinfo` command,
+  preferring USB and falling back to Wi-Fi lockdown when available; there are no
+  active iOS/watch companion targets or iCloud battery sync path in the current
+  project.
 - The local DMG is ad-hoc signed when `DEVELOPER_ID_IDENTITY` is not provided.
-  iCloud entitlements are removed when `TEAM_ID` is not provided. Developer ID
-  signing, notarization, and final iCloud entitlement restoration require those
-  external signing credentials.
+  Developer ID signing and notarization require those external signing
+  credentials.
 
 ## Verification Evidence
 
-Latest evidence from this completion pass:
+Evidence from the original alignment completion pass:
 
 - `git diff --check` passed.
 - `xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS,arch=arm64'` passed with 87 tests and 0 failures.

@@ -46,7 +46,7 @@ enum StatusMenuSizing {
         let rowHeight: CGFloat = 58
         let rowSpacing: CGFloat = dashboardItemCount > 1 ? CGFloat(dashboardItemCount - 1) * 8 : 0
         let listVerticalPadding: CGFloat = dashboardItemCount == 0 ? 0 : 18
-        let emptyHeight: CGFloat = 82
+        let emptyHeight: CGFloat = 0
         let contentHeight = dashboardItemCount == 0
             ? emptyHeight
             : listVerticalPadding + CGFloat(dashboardItemCount) * rowHeight + rowSpacing
@@ -55,7 +55,7 @@ enum StatusMenuSizing {
             + contentHeight
         let minimumHeight: CGFloat
         if dashboardItemCount == 0 {
-            minimumHeight = 260
+            minimumHeight = panelVerticalPadding + headerHeight
         } else {
             minimumHeight = 248
         }
@@ -109,9 +109,7 @@ struct StatusMenuView: View {
                 nativePreviewNotice
             }
 
-            if sections.isEmpty {
-                nativeEmptyState
-            } else {
+            if !sections.isEmpty {
                 nativeDeviceList
             }
 
@@ -217,31 +215,6 @@ struct StatusMenuView: View {
             .padding(.vertical, 10)
         }
         .frame(maxHeight: contentMaxHeight)
-    }
-
-    private var nativeEmptyState: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                BeaconLogoMark(size: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(theme.raised.opacity(0.72))
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("No reporting devices")
-                        .font(DesignTokens.Typography.nativePopoverRowTitle)
-                        .foregroundStyle(theme.textPrimary)
-                    Text(isRefreshing ? "Scanning nearby." : "No connected devices are reporting battery levels.")
-                        .font(DesignTokens.Typography.nativePopoverRowSubtitle)
-                        .foregroundStyle(theme.textMuted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 24)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Computed sections

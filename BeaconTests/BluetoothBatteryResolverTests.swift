@@ -381,6 +381,23 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(BLEBatteryReadStatePolicy.action(for: .unauthorized), .finish)
     }
 
+    func testBLEBatteryScanWindowShrinksWhenNoConnectedPeripheralsAreInspected() {
+        XCTAssertEqual(
+            BLEBatteryDiscoveryWindow.timeout(
+                configured: .seconds(6),
+                inspectedKnownPeripheral: false
+            ),
+            .milliseconds(1500)
+        )
+        XCTAssertEqual(
+            BLEBatteryDiscoveryWindow.timeout(
+                configured: .seconds(6),
+                inspectedKnownPeripheral: true
+            ),
+            .seconds(6)
+        )
+    }
+
     func testBLEBatteryMergePreservesHIDDisplayNameForGenericPeripheralName() {
         let hidCandidate = BluetoothBatteryCandidate(
             deviceID: "9D520BEC-A95A-D7F0-1F4E-FDBAD0D5D0F0",

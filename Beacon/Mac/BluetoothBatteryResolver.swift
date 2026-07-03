@@ -324,12 +324,12 @@ enum IPhoneUSBBatteryProvider {
         process.executableURL = commandURL
         process.arguments = arguments
         process.standardOutput = outputPipe
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice
 
-        var didTimeOut = false
+        let timeoutState = ProcessTimeoutState()
         let timeoutWorkItem = DispatchWorkItem {
             guard process.isRunning else { return }
-            didTimeOut = true
+            timeoutState.markTimedOut()
             process.terminate()
         }
 
@@ -339,18 +339,32 @@ enum IPhoneUSBBatteryProvider {
                 deadline: .now() + timeout,
                 execute: timeoutWorkItem
             )
+            let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
+            timeoutWorkItem.cancel()
+            let output = String(data: data, encoding: .utf8) ?? ""
+            return (process.terminationStatus, output, timeoutState.didTimeOut)
         } catch {
             timeoutWorkItem.cancel()
             return (-1, "", false)
         }
+    }
+}
 
-        timeoutWorkItem.cancel()
-        let output = String(
-            data: outputPipe.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        return (process.terminationStatus, output, didTimeOut)
+private final class ProcessTimeoutState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var timedOut = false
+
+    var didTimeOut: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return timedOut
+    }
+
+    func markTimedOut() {
+        lock.lock()
+        timedOut = true
+        lock.unlock()
     }
 }
 

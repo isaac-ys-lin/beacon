@@ -107,6 +107,33 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.decoratedExternalBatterySnapshots.map(\.snapshot.deviceID), ["keyboard"])
     }
 
+    func testExternalBatterySnapshotsHideDisconnectedLastKnownBatteryReports() {
+        let disconnectedAirPods = BatterySnapshot(
+            deviceID: "airpods-case",
+            displayName: "Yi Sung’s AirPods Pro Case",
+            kind: .airPods,
+            percent: 65,
+            chargeState: .unplugged,
+            connectionState: .disconnected,
+            source: .systemProfiler,
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let keyboard = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 82,
+            chargeState: .unplugged,
+            source: .coreBluetooth,
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 120) })
+        store.merge([disconnectedAirPods, keyboard])
+
+        XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), ["keyboard"])
+    }
+
     func testMergeDeduplicatesSameNamedBluetoothDeviceAcrossSources() {
         let oldUnsupported = BatterySnapshot(
             deviceID: "bluetooth-AA-BB-CC",

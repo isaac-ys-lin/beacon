@@ -114,7 +114,9 @@ public struct BatterySnapshotStore: Sendable {
     }
 
     public static func isVisibleExternalBattery(_ snapshot: BatterySnapshot) -> Bool {
-        snapshot.kind != .macBook && snapshot.percent != nil
+        snapshot.kind != .macBook
+            && snapshot.percent != nil
+            && snapshot.connectionState == .connected
     }
 
     private func hasNewerDuplicateBluetoothSnapshot(matching snapshot: BatterySnapshot) -> Bool {

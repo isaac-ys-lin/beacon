@@ -582,6 +582,41 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(items.map(\.displayName), ["Keychron K3 Max"])
     }
 
+    func testStatusMenuHidesDisconnectedAirPodsWithLastKnownBatteryReports() {
+        let addr = "7C-F3-4D-74-56-78"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 65, connectionState: .disconnected),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 100, connectionState: .disconnected),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 100, connectionState: .disconnected),
+            makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 92),
+        ]
+
+        let items = statusMenuDeviceSections(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        ).flatMap(\.items)
+
+        XCTAssertEqual(items.map(\.displayName), ["Keychron K3 Max"])
+    }
+
+    func testInspectorTreatsDisconnectedAirPodsAsUnavailable() {
+        let addr = "7C-F3-4D-74-56-78"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 65, connectionState: .disconnected),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "Yi Sung’s AirPods Pro Left", kind: .airPods, percent: 100, connectionState: .disconnected),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "Yi Sung’s AirPods Pro Right", kind: .airPods, percent: 100, connectionState: .disconnected),
+        ]
+
+        let inspectorItems = deviceInspectorItems(
+            snapshots,
+            preferences: DeviceDisplayPreferences()
+        )
+
+        XCTAssertEqual(inspectorItems.map(\.displayName), ["Yi Sung’s AirPods Pro"])
+        XCTAssertEqual(inspectorItems.map(\.isUnavailable), [true])
+        XCTAssertTrue(displayedDeviceInspectorItems(inspectorItems, showHiddenUnavailable: false).isEmpty)
+    }
+
     func testInspectorTreatsFullyExpiredAirPodsAsUnavailable() {
         let addr = "7C-F3-4D-74-56-78"
         let snapshots: [DecoratedBatterySnapshot] = [
@@ -758,6 +793,16 @@ final class DeviceListPresentationTests: XCTestCase {
         // + (18 list padding + 5 * 58 rows + 4 * 8 row gaps),
         // with settings moved into the header.
         XCTAssertEqual(size.height, 426)
+    }
+
+    func testStatusMenuSizingUsesHeaderOnlyHeightWhenEmpty() {
+        let size = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: 0,
+            visibleScreenHeight: 1_000
+        )
+
+        XCTAssertEqual(size.width, 386)
+        XCTAssertEqual(size.height, 86)
     }
 
     func testStatusWindowConfigurationLoadsDashboardPreferences() {
@@ -1072,8 +1117,8 @@ final class DeviceListPresentationTests: XCTestCase {
             name: "AirPods Pro",
             id: "bluetooth-20-C1-9B-AA-BB-CC",
             components: [
-                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh, updatedAt: Self.fixedDate),
-                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh, updatedAt: Self.fixedDate),
+                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh, connectionState: .connected, updatedAt: Self.fixedDate),
+                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh, connectionState: .connected, updatedAt: Self.fixedDate),
             ]
         )
 
@@ -1124,8 +1169,8 @@ final class DeviceListPresentationTests: XCTestCase {
             name: "AirPods Pro",
             id: "bluetooth-20-C1-9B-AA-BB-CC",
             components: [
-                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh, updatedAt: Self.fixedDate),
-                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh, updatedAt: Self.fixedDate),
+                AirPodsComponent(slot: .left, percent: 72, chargeState: .unplugged, freshness: .fresh, connectionState: .connected, updatedAt: Self.fixedDate),
+                AirPodsComponent(slot: .right, percent: 68, chargeState: .unplugged, freshness: .fresh, connectionState: .connected, updatedAt: Self.fixedDate),
             ]
         )
         let namedMouse = DeviceListItem.device(
@@ -1954,6 +1999,15 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(MenuBarBatteryFormatter.menuBarText(for: snapshots), "57%")
     }
 
+    func testMenuBarBatteryTextSkipsDisconnectedLastKnownPercent() {
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "airpods-case", displayName: "AirPods Case", kind: .airPods, percent: 65, connectionState: .disconnected),
+            makeDecorated(deviceID: "keyboard", displayName: "Keyboard", kind: .keyboard, percent: 82),
+        ]
+
+        XCTAssertEqual(MenuBarBatteryFormatter.menuBarText(for: snapshots), "82%")
+    }
+
     func testMenuBarBatteryTextReturnsNilWhenNoFreshPercentExists() {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keyboard", displayName: "Keyboard", kind: .keyboard, percent: nil),
@@ -2610,7 +2664,7 @@ final class DeviceListPresentationTests: XCTestCase {
 
     @MainActor
     func testSettingsWindowClearsRefreshingStateAfterRefreshCompletes() async throws {
-        let model = BeaconModel(environment: ["BATTERYHUB_PREVIEW_DATA": "1"])
+        let model = BeaconModel(environment: ["BEACON_PREVIEW_DATA": "1"])
         let statusController = BeaconStatusController(model: model)
         let settingsWindowController: BeaconSettingsWindowController = try XCTUnwrap(
             mirroredValue(in: statusController, label: "settingsWindowController")
