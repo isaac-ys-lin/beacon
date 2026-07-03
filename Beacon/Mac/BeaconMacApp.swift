@@ -282,25 +282,17 @@ final class BeaconModel: ObservableObject {
     /// 45s background poll can run without surfacing the UI spinner.
     private var refreshInFlight = false
     private let usesPreviewData: Bool
-    private let macPowerSourceReader: @MainActor () -> [BatterySnapshot]
-    private let bluetoothReportReader: (@MainActor () async -> BluetoothBatteryReadReport?)?
 
     var isUsingPreviewData: Bool {
         usesPreviewData
     }
 
-    init(
-        environment: [String: String] = ProcessInfo.processInfo.environment,
-        macPowerSourceReader: @escaping @MainActor () -> [BatterySnapshot] = { MacPowerSourceReader().read() },
-        bluetoothReportReader: (@MainActor () async -> BluetoothBatteryReadReport?)? = nil
-    ) {
+    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
         #if DEBUG
         usesPreviewData = environment["BEACON_PREVIEW_DATA"] == "1"
         #else
         usesPreviewData = false
         #endif
-        self.macPowerSourceReader = macPowerSourceReader
-        self.bluetoothReportReader = bluetoothReportReader
     }
 
     func start() {
@@ -345,14 +337,7 @@ final class BeaconModel: ObservableObject {
         }
 
         var nextStore = store
-        let macSnapshots = macPowerSourceReader()
-        let readReport: BluetoothBatteryReadReport?
-        if let bluetoothReportReader {
-            readReport = await bluetoothReportReader()
-        } else {
-            readReport = await readBluetoothSnapshotsWithTimeout()
-        }
-        guard let readReport else {
+        guard let readReport = await readBluetoothSnapshotsWithTimeout() else {
             logger.error("Bluetooth refresh timed out after 8 seconds")
             latestRefreshDiagnostics = BatteryRefreshDiagnostics(
                 attempts: [
@@ -370,10 +355,9 @@ final class BeaconModel: ObservableObject {
             return
         }
         let bluetoothSnapshots = readReport.snapshots
-        let liveSnapshots = macSnapshots + bluetoothSnapshots
         latestRefreshDiagnostics = readReport.diagnostics
-        logger.info("Battery refresh returned \(macSnapshots.count) Mac snapshots and \(bluetoothSnapshots.count) Bluetooth snapshots")
-        nextStore.reconcile(with: liveSnapshots)
+        logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
+        nextStore.reconcile(with: bluetoothSnapshots)
         BatteryHistoryStore.record(nextStore.snapshots)
         let inferenceNow = Date()
         nextStore.applyInferredChargeStates { snapshot in
