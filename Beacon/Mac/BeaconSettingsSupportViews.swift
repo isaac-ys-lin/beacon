@@ -1,5 +1,30 @@
 import SwiftUI
 
+extension View {
+    @ViewBuilder
+    func beaconSettingsCardSurface(
+        cornerRadius: CGFloat = DesignTokens.Radius.card
+    ) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26.0, *) {
+            self
+                .background {
+                    shape
+                        .fill(.regularMaterial)
+                        .glassEffect(.regular, in: shape)
+                        .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
+                }
+        } else {
+            self
+                .background {
+                    shape
+                        .fill(.regularMaterial)
+                        .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
+                }
+        }
+    }
+}
+
 struct AddDeviceGuideView: View {
     let onOpenBluetoothSettings: () -> Void
     let onDismiss: () -> Void
@@ -55,14 +80,7 @@ struct AddDeviceGuideView: View {
         }
         .padding(24)
         .frame(width: 520)
-        .background(
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous)
-                .fill(DesignTokens.Palette.panel)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous)
-                        .stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.8)
-                )
-        )
+        .beaconSettingsCardSurface(cornerRadius: DesignTokens.Radius.panel)
     }
 }
 
@@ -113,18 +131,47 @@ struct AddDeviceGuideRow: View {
             }
             .padding(10)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-                    .fill(DesignTokens.Palette.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-                            .stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.7)
-                    )
-            )
+            .beaconSettingsCardSurface(cornerRadius: DesignTokens.Radius.row)
             .opacity(isEnabled ? 1 : 0.58)
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
+    }
+}
+
+struct SettingsEmptyStateCard: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    var tint = DesignTokens.Palette.accent
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: resolveSymbol(systemImage, fallback: "info.circle"))
+                .font(.system(size: 16, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(tint)
+                .frame(width: 36, height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(DesignTokens.Palette.controlPill)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(DesignTokens.Typography.sectionTitle)
+                    .foregroundStyle(DesignTokens.Palette.text)
+                Text(subtitle)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: 520, alignment: .leading)
+        .beaconSettingsCardSurface()
     }
 }
 
@@ -210,6 +257,7 @@ struct QuickActionSettingsRow: View {
 
                     if action.isSupported {
                         Label("Shortcuts", systemImage: "checkmark.circle.fill")
+                            .labelStyle(.iconOnly)
                             .font(DesignTokens.Typography.caption2Emphasis)
                             .foregroundStyle(DesignTokens.Palette.charging)
                             .padding(.horizontal, 7)
@@ -218,6 +266,7 @@ struct QuickActionSettingsRow: View {
                                 Capsule(style: .continuous)
                                     .fill(DesignTokens.Palette.controlPill)
                             )
+                            .help("Available in macOS Shortcuts")
                     }
                 }
 
@@ -289,6 +338,7 @@ struct AutomationShortcutsBanner: View {
                 HStack(spacing: 6) {
                     ForEach(actions, id: \.0) { action in
                         Label(action.0, systemImage: action.1)
+                            .labelStyle(.iconOnly)
                             .font(DesignTokens.Typography.caption2Emphasis)
                             .lineLimit(1)
                             .foregroundStyle(DesignTokens.Palette.text.opacity(0.82))
@@ -296,8 +346,9 @@ struct AutomationShortcutsBanner: View {
                             .frame(height: 20)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(.white.opacity(0.62))
+                                    .fill(DesignTokens.Palette.controlPill.opacity(0.92))
                             )
+                            .help(action.0)
                     }
                 }
             }
@@ -429,14 +480,7 @@ struct AirPodsAudioControlsCard: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(DesignTokens.Palette.glassStroke, lineWidth: 0.7)
-                )
-        )
+        .beaconSettingsCardSurface()
         .onChange(of: deviceID) { _, nextDeviceID in
             preferences = AirPodsAudioPreferences.load(for: nextDeviceID)
         }
@@ -594,11 +638,13 @@ struct DeviceCurrentStatsCard: View {
             .padding(12)
             .background(settingsGroupBackground)
         }
+        .padding(12)
+        .beaconSettingsCardSurface()
     }
 
     private var settingsGroupBackground: some View {
         RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-            .fill(.regularMaterial)
+            .fill(DesignTokens.Palette.controlPill.opacity(0.62))
             .overlay(
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
                     .stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)

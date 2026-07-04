@@ -65,6 +65,87 @@ final class DeviceListPresentationTests: XCTestCase {
         return defaults
     }
 
+    private func roundedRGBAComponents(for color: NSColor) -> [Int] {
+        let rgbColor = color.usingColorSpace(.deviceRGB) ?? color
+        return [
+            Int((rgbColor.redComponent * 255).rounded()),
+            Int((rgbColor.greenComponent * 255).rounded()),
+            Int((rgbColor.blueComponent * 255).rounded()),
+            Int((rgbColor.alphaComponent * 255).rounded())
+        ]
+    }
+
+    private func pixelCoordinate(_ point: Int, backingScale: CGFloat) -> Int {
+        Int((CGFloat(point) * backingScale).rounded())
+    }
+
+    @MainActor
+    private func backingScale(for bitmap: NSBitmapImageRep, in view: NSView) -> CGFloat {
+        CGFloat(bitmap.pixelsWide) / view.bounds.width
+    }
+
+    private func withAppearanceTheme<T>(
+        _ theme: BeaconAppearanceTheme,
+        perform work: () throws -> T
+    ) rethrows -> T {
+        let previousTheme = UserDefaults.standard.string(forKey: BeaconAppearanceTheme.defaultsKey)
+        UserDefaults.standard.set(theme.rawValue, forKey: BeaconAppearanceTheme.defaultsKey)
+        defer {
+            if let previousTheme {
+                UserDefaults.standard.set(previousTheme, forKey: BeaconAppearanceTheme.defaultsKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: BeaconAppearanceTheme.defaultsKey)
+            }
+        }
+        return try work()
+    }
+
+    private func withQuickActionPreferences<T>(
+        _ preferences: BeaconQuickActionPreferences,
+        perform work: () throws -> T
+    ) rethrows -> T {
+        let previousIDs = UserDefaults.standard.stringArray(forKey: BeaconQuickActionPreferences.enabledActionIDsKey)
+        preferences.save()
+        defer {
+            if let previousIDs {
+                UserDefaults.standard.set(previousIDs, forKey: BeaconQuickActionPreferences.enabledActionIDsKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: BeaconQuickActionPreferences.enabledActionIDsKey)
+            }
+        }
+        return try work()
+    }
+
+    @MainActor
+    private func renderedBitmap<V: View>(
+        for view: V,
+        width: CGFloat,
+        height: CGFloat
+    ) throws -> (NSHostingView<V>, NSBitmapImageRep) {
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = try XCTUnwrap(hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds))
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+        return (hostingView, bitmap)
+    }
+
+    private func sampledColors(
+        in bitmap: NSBitmapImageRep,
+        xValues: StrideTo<Int>,
+        yValues: StrideTo<Int>,
+        backingScale: CGFloat
+    ) -> [NSColor] {
+        xValues.flatMap { x in
+            yValues.compactMap { y in
+                let pixelX = min(max(pixelCoordinate(x, backingScale: backingScale), 0), bitmap.pixelsWide - 1)
+                let pixelY = min(max(pixelCoordinate(y, backingScale: backingScale), 0), bitmap.pixelsHigh - 1)
+                return bitmap.colorAt(x: pixelX, y: pixelY)?.usingColorSpace(.deviceRGB)
+            }
+        }
+    }
+
     @MainActor
     private func scrollViews(in view: NSView) -> [NSScrollView] {
         let current = view as? NSScrollView
@@ -1760,6 +1841,25 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertFalse(restored.isEnabled(.transferToMac))
     }
 
+    func testQuickActionSettingsSummaryReportsSupportedEnabledAndExcludedActions() {
+        let preferences = BeaconQuickActionPreferences(
+            enabledActionIDs: [
+                BeaconQuickAction.showDashboard.id,
+                BeaconQuickAction.openSettings.id,
+                BeaconQuickAction.transferToMac.id
+            ]
+        )
+
+        let summary = quickActionSettingsSummary(for: preferences)
+
+        XCTAssertEqual(summary.supportedActionCount, 7)
+        XCTAssertEqual(summary.defaultEnabledActionCount, 2)
+        XCTAssertEqual(summary.enabledSupportedActions, [.showDashboard, .openSettings])
+        XCTAssertEqual(summary.unsupportedActions, [.transferToMac])
+        XCTAssertEqual(summary.disabledSupportedActions.count, 5)
+        XCTAssertFalse(summary.enabledSupportedActions.contains(.transferToMac))
+    }
+
     @MainActor
     func testBeaconAppShortcutsExposeSupportedAutomationActions() {
         let shortcutCount = BeaconAppShortcuts.appShortcuts.count
@@ -2130,6 +2230,47 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(secondFrame.origin.y, firstFrame.origin.y, accuracy: 0.01)
         XCTAssertEqual(secondFrame.width, firstFrame.width, accuracy: 0.01)
         XCTAssertEqual(secondFrame.height, firstFrame.height, accuracy: 0.01)
+    }
+
+    @MainActor
+    func testBeaconSettingsCardSurfaceModifierRendersNonBlankImage() throws {
+        let view = Text("Settings surface")
+            .font(DesignTokens.Typography.captionEmphasis)
+            .padding(18)
+            .frame(width: 220, height: 72)
+            .beaconSettingsCardSurface()
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 220, height: 72)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+        let scale = backingScale(for: bitmap, in: hostingView)
+
+        let sampledColors = stride(from: 8, to: Int(hostingView.bounds.width), by: 16).flatMap { x in
+            stride(from: 8, to: Int(hostingView.bounds.height), by: 16).compactMap { y in
+                bitmap.colorAt(
+                    x: pixelCoordinate(x, backingScale: scale),
+                    y: pixelCoordinate(y, backingScale: scale)
+                )?.usingColorSpace(.deviceRGB)
+            }
+        }
+
+        XCTAssertGreaterThan(sampledColors.filter { $0.alphaComponent > 0.05 }.count, 8)
+        XCTAssertGreaterThan(
+            Set(sampledColors.map { color in
+                [
+                    Int((color.redComponent * 255).rounded()),
+                    Int((color.greenComponent * 255).rounded()),
+                    Int((color.blueComponent * 255).rounded()),
+                    Int((color.alphaComponent * 255).rounded())
+                ]
+            }).count,
+            1
+        )
     }
 
     @MainActor
@@ -2566,6 +2707,106 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testDevicesAndAlertsSettingsSelectorColumnUsesSurfacedPanel() throws {
+        withAppearanceTheme(.light) {
+            let snapshots: [DecoratedBatterySnapshot] = [
+                makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+                makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31),
+                makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18),
+            ]
+
+            for pane in [SettingsPane.devices, .alerts] {
+                let view = BeaconSettingsView(
+                    snapshots: snapshots,
+                    notificationAuthorizationState: .authorized,
+                    onRefresh: {},
+                    initialPane: pane,
+                    initialSelectedDeviceID: "keyboard"
+                )
+                let hostingView = NSHostingView(rootView: view)
+                hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+                hostingView.layoutSubtreeIfNeeded()
+
+                let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+                XCTAssertNotNil(bitmap)
+
+                guard let bitmap else { return }
+                hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+                let scale = backingScale(for: bitmap, in: hostingView)
+
+                // Golden-layout guard for the 900x620 Settings render: these point ranges cover
+                // the Devices/Alerts selector card, its former Divider strip, and the detail pane.
+                let selectorColors = stride(from: 215, to: 485, by: 12).flatMap { x in
+                    stride(from: 94, to: 530, by: 12).compactMap { y in
+                        bitmap.colorAt(
+                            x: pixelCoordinate(x, backingScale: scale),
+                            y: pixelCoordinate(y, backingScale: scale)
+                        )?.usingColorSpace(.deviceRGB)
+                    }
+                }
+                let selectorEdgeColors = stride(from: 468, to: 486, by: 3).flatMap { x in
+                    stride(from: 94, to: 530, by: 12).compactMap { y in
+                        bitmap.colorAt(
+                            x: pixelCoordinate(x, backingScale: scale),
+                            y: pixelCoordinate(y, backingScale: scale)
+                        )?.usingColorSpace(.deviceRGB)
+                    }
+                }
+                let detailColors = stride(from: 510, to: 870, by: 16).flatMap { x in
+                    stride(from: 94, to: 530, by: 16).compactMap { y in
+                        bitmap.colorAt(
+                            x: pixelCoordinate(x, backingScale: scale),
+                            y: pixelCoordinate(y, backingScale: scale)
+                        )?.usingColorSpace(.deviceRGB)
+                    }
+                }
+
+                let visibleSelectorColors = selectorColors.filter { $0.alphaComponent > 0.05 }
+                let uniqueSelectorEdgeColors = Set(selectorEdgeColors.map(roundedRGBAComponents))
+                let uniqueDetailColors = Set(detailColors.map(roundedRGBAComponents))
+
+                XCTAssertGreaterThan(visibleSelectorColors.count, 120)
+                XCTAssertGreaterThan(uniqueSelectorEdgeColors.count, 1)
+                XCTAssertGreaterThan(uniqueDetailColors.count, 12)
+            }
+        }
+    }
+
+    @MainActor
+    func testSettingsEmptyStatesRenderSurfacedDetailCards() throws {
+        try withAppearanceTheme(.light) {
+            for pane in [SettingsPane.devices, .alerts] {
+                let (hostingView, bitmap) = try renderedBitmap(
+                    for: BeaconSettingsView(
+                        snapshots: [],
+                        notificationAuthorizationState: .authorized,
+                        onRefresh: {},
+                        initialPane: pane
+                    ),
+                    width: 900,
+                    height: 620
+                )
+                let scale = backingScale(for: bitmap, in: hostingView)
+                let cardAreaColors = sampledColors(
+                    in: bitmap,
+                    xValues: stride(from: 500, to: 880, by: 12),
+                    yValues: stride(from: 80, to: 230, by: 12),
+                    backingScale: scale
+                )
+                let visibleColors = cardAreaColors.filter { $0.alphaComponent > 0.05 }
+                let uniqueVisibleColors = Set(visibleColors.map(roundedRGBAComponents))
+
+                XCTAssertGreaterThan(visibleColors.count, 360)
+                XCTAssertGreaterThan(
+                    uniqueVisibleColors.count,
+                    8,
+                    "Expected the \(pane.title) empty detail area to render as a surfaced card, not plain text."
+                )
+            }
+        }
+    }
+
+    @MainActor
     func testAddDeviceGuideRenderProducesNonBlankImage() throws {
         let view = AddDeviceGuideView(onOpenBluetoothSettings: {}, onDismiss: {})
         let hostingView = NSHostingView(rootView: view)
@@ -2664,6 +2905,57 @@ final class DeviceListPresentationTests: XCTestCase {
 
         try pngData?.write(to: outputURL, options: .atomic)
         XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBeaconQuickActionsSettingsRenderShowsRightSideAutomationPanel() throws {
+        withAppearanceTheme(.light) {
+            withQuickActionPreferences(
+                BeaconQuickActionPreferences(
+                    enabledActionIDs: [
+                        BeaconQuickAction.showDashboard.id,
+                        BeaconQuickAction.refreshBatteries.id,
+                        BeaconQuickAction.openSettings.id
+                    ]
+                )
+            ) {
+                let view = BeaconSettingsView(
+                    snapshots: [],
+                    onRefresh: {},
+                    initialPane: .quickActions
+                )
+                let hostingView = NSHostingView(rootView: view)
+                hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+                hostingView.layoutSubtreeIfNeeded()
+
+                let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+                XCTAssertNotNil(bitmap)
+
+                guard let bitmap else { return }
+                hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+                let scale = backingScale(for: bitmap, in: hostingView)
+
+                let panelColors = sampledColors(
+                    in: bitmap,
+                    xValues: stride(from: 590, to: 880, by: 12),
+                    yValues: stride(from: 110, to: 520, by: 12),
+                    backingScale: scale
+                )
+                let visibleColors = panelColors.filter { $0.alphaComponent > 0.05 }
+                let uniqueColors = Set(visibleColors.map(roundedRGBAComponents))
+                let rightEdgeColors = sampledColors(
+                    in: bitmap,
+                    xValues: stride(from: 852, to: 878, by: 4),
+                    yValues: stride(from: 150, to: 500, by: 12),
+                    backingScale: scale
+                )
+                let uniqueRightEdgeColors = Set(rightEdgeColors.map(roundedRGBAComponents))
+
+                XCTAssertGreaterThan(visibleColors.count, 60)
+                XCTAssertGreaterThan(uniqueColors.count, 12)
+                XCTAssertGreaterThan(uniqueRightEdgeColors.count, 2)
+            }
+        }
     }
 
     @MainActor

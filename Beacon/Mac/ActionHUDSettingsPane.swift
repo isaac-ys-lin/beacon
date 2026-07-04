@@ -90,7 +90,7 @@ struct ActionHUDSettingsPane: View {
         }
         .padding(16)
         .frame(width: 330, alignment: .topLeading)
-        .background(settingsCardBackground)
+        .beaconSettingsCardSurface()
         .padding(.top, 18)
     }
 
@@ -106,18 +106,4 @@ struct ActionHUDSettingsPane: View {
         }
     }
 
-    @ViewBuilder
-    private var settingsCardBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
-        if #available(macOS 26.0, *) {
-            shape
-                .fill(.regularMaterial)
-                .glassEffect(.regular, in: shape)
-                .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
-        } else {
-            shape
-                .fill(.regularMaterial)
-                .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
-        }
-    }
 }

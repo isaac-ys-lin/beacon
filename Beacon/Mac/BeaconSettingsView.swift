@@ -34,6 +34,12 @@ enum NotificationPermissionRequestPolicy {
     }
 }
 
+private enum SettingsDetailLayout {
+    static let paneSpacing: CGFloat = 18
+    static let selectorWidth: CGFloat = 278
+    static let selectorPadding: CGFloat = 12
+}
+
 struct BeaconSettingsView: View {
     let snapshots: [DecoratedBatterySnapshot]
     let isRefreshing: Bool
@@ -241,10 +247,8 @@ struct BeaconSettingsView: View {
     }
 
     private var devicesTab: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
             deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
-
-            Divider()
 
             Group {
                 if let selectedDevice {
@@ -257,15 +261,13 @@ struct BeaconSettingsView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(.leading, 22)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var alertsTab: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
             deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
-
-            Divider()
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 10) {
@@ -280,8 +282,8 @@ struct BeaconSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(.leading, 22)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func deviceSelectionPane(
@@ -334,8 +336,10 @@ struct BeaconSettingsView: View {
                 .padding(.vertical, 2)
             }
         }
-        .frame(width: 260)
-        .padding(.trailing, 18)
+        .padding(SettingsDetailLayout.selectorPadding)
+        .frame(width: SettingsDetailLayout.selectorWidth, alignment: .topLeading)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .beaconSettingsCardSurface()
     }
 
     private func alertDetail(for row: DeviceInspectorItem) -> some View {
@@ -439,7 +443,7 @@ struct BeaconSettingsView: View {
             .frame(height: 42)
             .opacity(row.isHidden || !chargedBatteryAlertsEnabled ? 0.5 : 1)
         }
-        .background(settingsCardBackground)
+        .beaconSettingsCardSurface()
     }
 
     private var compactGlobalAlertCard: some View {
@@ -502,7 +506,7 @@ struct BeaconSettingsView: View {
                 .padding(.horizontal, 12)
                 .frame(height: 40, alignment: .leading)
         }
-        .background(settingsCardBackground)
+        .beaconSettingsCardSurface()
     }
 
     private var compactAlertPreviewCard: some View {
@@ -527,7 +531,7 @@ struct BeaconSettingsView: View {
             }
         }
         .padding(10)
-        .background(settingsCardBackground)
+        .beaconSettingsCardSurface()
     }
 
     private func compactAlertTitleRow(title: String, subtitle: String, systemImage: String, color: Color) -> some View {
@@ -556,14 +560,11 @@ struct BeaconSettingsView: View {
     }
 
     private var emptyAlertDetail: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("No selectable devices")
-                .font(DesignTokens.Typography.sectionTitle)
-            Text("Show hidden devices or connect a reporting device to edit per-device alerts.")
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        SettingsEmptyStateCard(
+            title: "No selectable devices",
+            subtitle: "Show hidden devices or connect a reporting device to edit per-device alerts.",
+            systemImage: "bell.slash"
+        )
         .padding(.top, 12)
     }
 
@@ -636,7 +637,7 @@ struct BeaconSettingsView: View {
                 .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
                 .opacity(row.isHidden || !chargedBatteryAlertsEnabled ? 0.45 : 1)
             }
-            .background(settingsCardBackground)
+            .beaconSettingsCardSurface()
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -673,7 +674,7 @@ struct BeaconSettingsView: View {
                 }
             }
             .padding(12)
-            .background(settingsCardBackground)
+            .beaconSettingsCardSurface()
 
             if row.kind == .airPods {
                 AirPodsAudioControlsCard(
@@ -734,7 +735,7 @@ struct BeaconSettingsView: View {
                     }
                 }
                 .padding(12)
-                .background(settingsCardBackground)
+                .beaconSettingsCardSurface()
             }
 
             HStack {
@@ -764,13 +765,11 @@ struct BeaconSettingsView: View {
     }
 
     private var emptyDeviceDetail: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("No devices")
-                .font(DesignTokens.Typography.sectionTitle)
-            Text("Connected devices will appear here after the next refresh.")
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-        }
+        SettingsEmptyStateCard(
+            title: "No devices",
+            subtitle: "Connected devices will appear here after the next refresh.",
+            systemImage: "battery.0"
+        )
         .padding(.top, 12)
     }
 
@@ -891,21 +890,6 @@ struct BeaconSettingsView: View {
             onRequestNotificationPermission()
         case .openSystemSettings:
             onOpenNotificationSettings()
-        }
-    }
-
-    @ViewBuilder
-    private var settingsCardBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
-        if #available(macOS 26.0, *) {
-            shape
-                .fill(.regularMaterial)
-                .glassEffect(.regular, in: shape)
-                .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
-        } else {
-            shape
-                .fill(.regularMaterial)
-                .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
         }
     }
 
