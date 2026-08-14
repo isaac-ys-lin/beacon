@@ -21,7 +21,11 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSUIElement</key>
+#if BEACON_LSUIELEMENT
 	<true/>
+#else
+	<false/>
+#endif
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Beacon reads connected Bluetooth device battery reports when available.</string>
 </dict>

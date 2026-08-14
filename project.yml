@@ -16,12 +16,6 @@ targets:
     sources:
       - path: Beacon/Shared
       - path: Beacon/Mac
-    info:
-      path: Beacon/Mac/Info.plist
-      properties:
-        CFBundleDisplayName: Beacon
-        LSUIElement: true
-        NSBluetoothAlwaysUsageDescription: Beacon reads connected Bluetooth device battery reports when available.
     entitlements:
       path: Beacon/Mac/BeaconMac.entitlements
       properties:
@@ -33,8 +27,17 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_FILE: Beacon/Mac/Info.plist
+        INFOPLIST_PREPROCESS: YES
+        INFOPLIST_PREPROCESSOR_DEFINITIONS: BEACON_LSUIELEMENT=1
         PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.Beacon.mac
         PRODUCT_MODULE_NAME: Beacon
+      configs:
+        Debug:
+          # A Debug bundle must be a normal LaunchServices app so XCTest can
+          # vend panel accessibility. BeaconMacApp still selects .accessory
+          # for every non-UI-test launch.
+          INFOPLIST_PREPROCESSOR_DEFINITIONS: BEACON_LSUIELEMENT=0
   BeaconTests:
     type: bundle.unit-test
     platform: macOS
