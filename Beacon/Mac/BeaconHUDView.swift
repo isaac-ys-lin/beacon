@@ -130,6 +130,7 @@ struct BatteryActionHUDView: View {
                 .shadow(color: theme.shadow, radius: 32, x: 0, y: 16)
         )
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("hud.preview")
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
     }

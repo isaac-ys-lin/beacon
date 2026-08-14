@@ -28,7 +28,9 @@ final class BeaconHUDController {
     /// Deterministic preview path for focus/UI verification. It intentionally
     /// bypasses user HUD preferences without mutating them.
     func showForUITesting(event: BatteryAlertEvent) {
-        present(event: event, showsDismissButton: true, autoDismissDelay: 2)
+        // UI automation can spend several seconds establishing its accessibility
+        // session after launch, especially on hosted macOS runners.
+        present(event: event, showsDismissButton: true, autoDismissDelay: 6)
     }
     #endif
 

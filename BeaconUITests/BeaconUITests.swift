@@ -79,6 +79,6 @@ final class BeaconUITests: XCTestCase {
             predicate: NSPredicate(format: "exists == false"),
             object: hud
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 8), .completed)
     }
 }
