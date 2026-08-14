@@ -32,6 +32,12 @@ final class BeaconHUDController {
         // session after launch, especially on hosted macOS runners.
         present(event: event, showsDismissButton: true, autoDismissDelay: 6)
     }
+
+    func exposeWindowToAccessibilityForUITesting() {
+        guard let window else { return }
+        window.styleMask.remove(.nonactivatingPanel)
+        window.makeKeyAndOrderFront(nil)
+    }
     #endif
 
     private func present(
@@ -113,7 +119,7 @@ final class BeaconHUDController {
             return window
         }
 
-        let window = NSPanel(
+        let window = BeaconHUDPanel(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 92),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -152,6 +158,16 @@ final class BeaconHUDController {
             y: frame.maxY - size.height - 42
         )
         window.setFrame(NSRect(origin: origin, size: size), display: true)
+    }
+}
+
+private final class BeaconHUDPanel: NSPanel {
+    override var canBecomeKey: Bool {
+        #if DEBUG
+        !styleMask.contains(.nonactivatingPanel)
+        #else
+        false
+        #endif
     }
 }
 

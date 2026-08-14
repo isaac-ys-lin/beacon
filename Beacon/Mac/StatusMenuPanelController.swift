@@ -79,6 +79,14 @@ final class StatusMenuPanelController {
         stopEscapeKeyMonitor()
     }
 
+    #if DEBUG
+    func exposePanelToAccessibilityForUITesting() {
+        guard let panel else { return }
+        panel.styleMask.remove(.nonactivatingPanel)
+        panel.makeKeyAndOrderFront(nil)
+    }
+    #endif
+
     private func requestClose() {
         if let onRequestClose {
             onRequestClose()

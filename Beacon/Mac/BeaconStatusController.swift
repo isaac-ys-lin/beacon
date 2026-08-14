@@ -124,11 +124,13 @@ final class BeaconStatusController: NSObject {
                 percent: 12
             )
         )
+        hudController.exposeWindowToAccessibilityForUITesting()
     }
 
     func showStatusMenuForUITesting() {
         guard let button = statusItem.button else { return }
         showStatusMenu(relativeTo: button)
+        statusMenuPanelController.exposePanelToAccessibilityForUITesting()
     }
     #endif
 
