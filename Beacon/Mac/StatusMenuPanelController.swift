@@ -32,9 +32,17 @@ final class StatusMenuPanelController {
         hostingController.view.frame = NSRect(origin: .zero, size: contentSize)
         applyRoundedMask(to: hostingController.view)
 
+        #if DEBUG
+        let styleMask: NSWindow.StyleMask = ProcessInfo.processInfo.arguments.contains("--ui-test-open-status-menu")
+            ? [.titled, .closable, .fullSizeContentView]
+            : [.borderless, .nonactivatingPanel]
+        #else
+        let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
+        #endif
+
         let panel = BeaconStatusPanel(
             contentRect: NSRect(origin: .zero, size: contentSize),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: styleMask,
             backing: .buffered,
             defer: true
         )

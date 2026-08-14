@@ -124,9 +124,17 @@ final class BeaconHUDController {
             return window
         }
 
+        #if DEBUG
+        let styleMask: NSWindow.StyleMask = ProcessInfo.processInfo.arguments.contains("--ui-test-show-hud")
+            ? [.titled, .closable, .fullSizeContentView]
+            : [.borderless, .nonactivatingPanel]
+        #else
+        let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
+        #endif
+
         let window = BeaconHUDPanel(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 92),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: styleMask,
             backing: .buffered,
             defer: false
         )
