@@ -16,7 +16,24 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
         let delegate = BeaconMacApp()
         retainedDelegate = delegate
         app.delegate = delegate
-        app.setActivationPolicy(.accessory)
+
+        #if DEBUG
+        let arguments = Set(ProcessInfo.processInfo.arguments)
+        let panelUITestArguments: Set<String> = [
+            "--ui-test-show-hud",
+            "--ui-test-open-status-menu"
+        ]
+        let activationPolicy: NSApplication.ActivationPolicy = arguments.isDisjoint(with: panelUITestArguments)
+            ? .accessory
+            : .regular
+        #else
+        let activationPolicy: NSApplication.ActivationPolicy = .accessory
+        #endif
+
+        // XCTest determines whether the app can vend accessibility windows
+        // while launch is being completed, so UI-test-only regular activation
+        // must be selected before finishLaunching().
+        app.setActivationPolicy(activationPolicy)
         app.finishLaunching()
         app.run()
     }
@@ -32,9 +49,6 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
             "--ui-test-open-status-menu"
         ]
         if !arguments.isDisjoint(with: panelUITestArguments) {
-            // XCTest does not vend an accessibility window for an accessory app
-            // whose only visible surface is a nonactivating panel.
-            NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
         }
         #endif
