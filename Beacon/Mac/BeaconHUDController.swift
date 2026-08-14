@@ -5,12 +5,12 @@ import os
 @MainActor
 final class BeaconHUDController {
     private let logger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "hud")
-    private var window: NSPanel?
+    private var window: NSWindow?
     private var dismissTask: Task<Void, Never>?
     private var presentationID = 0
 
     #if DEBUG
-    var debugWindow: NSPanel? { window }
+    var debugWindow: NSPanel? { window as? NSPanel }
     #endif
 
     func show(event: BatteryAlertEvent) {
@@ -119,32 +119,38 @@ final class BeaconHUDController {
         }
     }
 
-    private func existingOrNewWindow() -> NSPanel {
+    private func existingOrNewWindow() -> NSWindow {
         if let window {
             return window
         }
 
         #if DEBUG
-        let styleMask: NSWindow.StyleMask = ProcessInfo.processInfo.arguments.contains("--ui-test-show-hud")
-            ? [.titled, .closable, .fullSizeContentView]
-            : [.borderless, .nonactivatingPanel]
+        let isUITestWindow = ProcessInfo.processInfo.arguments.contains("--ui-test-show-hud")
         #else
-        let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
+        let isUITestWindow = false
         #endif
 
-        let window = BeaconHUDPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 92),
-            styleMask: styleMask,
-            backing: .buffered,
-            defer: false
-        )
+        let contentRect = NSRect(x: 0, y: 0, width: 520, height: 92)
+        let window: NSWindow = isUITestWindow
+            ? NSWindow(
+                contentRect: contentRect,
+                styleMask: [.titled, .closable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            : BeaconHUDPanel(
+                contentRect: contentRect,
+                styleMask: [.borderless, .nonactivatingPanel],
+                backing: .buffered,
+                defer: false
+            )
         window.isReleasedWhenClosed = false
         window.backgroundColor = .clear
         window.isOpaque = false
         window.hasShadow = false
         window.level = .floating
         window.hidesOnDeactivate = false
-        window.becomesKeyOnlyIfNeeded = true
+        (window as? NSPanel)?.becomesKeyOnlyIfNeeded = true
         window.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle]
         self.window = window
         return window

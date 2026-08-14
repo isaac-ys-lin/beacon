@@ -5,6 +5,9 @@ import SwiftUI
 final class StatusMenuPanelController {
     private(set) var hostingController: NSHostingController<StatusMenuView>?
     private(set) var panel: BeaconStatusPanel?
+    #if DEBUG
+    private var uiTestWindow: NSWindow?
+    #endif
     var onRequestClose: (() -> Void)?
     private var escapeKeyMonitor: Any?
     private var contentSize: NSSize = StatusMenuSizing.preferredContentSize(
@@ -13,7 +16,10 @@ final class StatusMenuPanelController {
     )
 
     var isShown: Bool {
-        panel?.isVisible == true
+        #if DEBUG
+        if uiTestWindow?.isVisible == true { return true }
+        #endif
+        return panel?.isVisible == true
     }
 
     func install(rootView: StatusMenuView, contentSize: NSSize) {
@@ -32,17 +38,9 @@ final class StatusMenuPanelController {
         hostingController.view.frame = NSRect(origin: .zero, size: contentSize)
         applyRoundedMask(to: hostingController.view)
 
-        #if DEBUG
-        let styleMask: NSWindow.StyleMask = ProcessInfo.processInfo.arguments.contains("--ui-test-open-status-menu")
-            ? [.titled, .closable, .fullSizeContentView]
-            : [.borderless, .nonactivatingPanel]
-        #else
-        let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
-        #endif
-
         let panel = BeaconStatusPanel(
             contentRect: NSRect(origin: .zero, size: contentSize),
-            styleMask: styleMask,
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: true
         )
@@ -84,19 +82,35 @@ final class StatusMenuPanelController {
 
     func close() {
         panel?.orderOut(nil)
+        #if DEBUG
+        uiTestWindow?.orderOut(nil)
+        #endif
         stopEscapeKeyMonitor()
     }
 
     #if DEBUG
     func exposePanelToAccessibilityForUITesting() {
-        guard let panel else { return }
-        panel.styleMask.remove(.nonactivatingPanel)
-        panel.styleMask.formUnion([.titled, .fullSizeContentView])
-        panel.title = "Beacon Status Menu"
-        panel.titleVisibility = .hidden
-        panel.titlebarAppearsTransparent = true
-        panel.setContentSize(contentSize)
-        panel.makeKeyAndOrderFront(nil)
+        guard let panel, let hostingController else { return }
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: contentSize),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = hostingController
+        window.isReleasedWhenClosed = false
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.hasShadow = false
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        window.title = "Beacon Status Menu"
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.setFrame(panel.frame, display: true)
+        applyRoundedMask(to: window.contentView)
+        uiTestWindow = window
+        window.makeKeyAndOrderFront(nil)
     }
     #endif
 
