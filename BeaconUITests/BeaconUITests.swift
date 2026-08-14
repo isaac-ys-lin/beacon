@@ -46,7 +46,7 @@ final class BeaconUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
-        let statusMenu = app.otherElements["status.menu"]
+        let statusMenu = app.windows["Beacon Status Menu"]
         XCTAssertTrue(
             statusMenu.waitForExistence(timeout: 10),
             "The UI-test launch hook should open the real status panel."
@@ -69,7 +69,7 @@ final class BeaconUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
-        let hud = app.otherElements["hud.preview"]
+        let hud = app.windows["Beacon HUD Preview"]
         XCTAssertTrue(
             hud.waitForExistence(timeout: 10),
             "The deterministic UI-test hook should present the real HUD."

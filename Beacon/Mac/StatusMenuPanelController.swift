@@ -83,6 +83,11 @@ final class StatusMenuPanelController {
     func exposePanelToAccessibilityForUITesting() {
         guard let panel else { return }
         panel.styleMask.remove(.nonactivatingPanel)
+        panel.styleMask.formUnion([.titled, .fullSizeContentView])
+        panel.title = "Beacon Status Menu"
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.setContentSize(contentSize)
         panel.makeKeyAndOrderFront(nil)
     }
     #endif
