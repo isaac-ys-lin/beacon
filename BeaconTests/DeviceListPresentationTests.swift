@@ -1376,7 +1376,100 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(DeviceContextMenuAction.options.title(for: "AirPods Pro"), "Options")
         XCTAssertEqual(DeviceContextMenuAction.pin.title(for: "AirPods Pro"), "Pin AirPods Pro")
         XCTAssertEqual(DeviceContextMenuAction.unpin.title(for: "AirPods Pro"), "Unpin AirPods Pro")
-        XCTAssertEqual(DeviceContextMenuAction.remove.title(for: "AirPods Pro"), "Remove from Beacon")
+        XCTAssertEqual(DeviceContextMenuAction.remove.title(for: "AirPods Pro"), "Hide from Beacon")
+    }
+
+    func testRefreshDiagnosticsPresentationMapsProviderStatusesToSafeNextSteps() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let statuses: [(BatteryProvider, BatteryReadStatus)] = [
+            (.ioRegistry, .reported),
+            (.systemProfiler, .noReport),
+            (.coreBluetoothBatteryService, .unavailable),
+            (.ideviceInfo, .timedOut),
+            (.coreBluetoothBatteryService, .unauthorized),
+            (.ideviceInfo, .commandMissing),
+        ]
+        let diagnostics = BatteryRefreshDiagnostics(
+            attempts: statuses.map { provider, status in
+                BatteryProviderAttempt(
+                    provider: provider,
+                    status: status,
+                    candidateCount: status == .reported ? 1 : 0,
+                    message: "raw command output should never render",
+                    attemptedAt: now
+                )
+            },
+            refreshedAt: now,
+            snapshotCount: 1
+        )
+
+        let presentation = batteryRefreshDiagnosticsPresentation(diagnostics)
+
+        XCTAssertEqual(presentation.attempts.count, statuses.count)
+        XCTAssertEqual(presentation.attempts.map(\.status), statuses.map(\.1))
+        XCTAssertEqual(presentation.attempts[0].statusTitle, "Reported")
+        XCTAssertEqual(presentation.attempts[1].statusTitle, "No report")
+        XCTAssertEqual(presentation.attempts[2].statusTitle, "Unavailable")
+        XCTAssertEqual(presentation.attempts[3].statusTitle, "Timed out")
+        XCTAssertEqual(presentation.attempts[4].statusTitle, "Permission needed")
+        XCTAssertEqual(presentation.attempts[5].statusTitle, "Helper missing")
+        XCTAssertEqual(presentation.attempts[3].nextStep, "Try again; a slow source did not answer in time.")
+        XCTAssertEqual(presentation.attempts[5].nextStep, "Install the optional iPhone helper, then refresh.")
+        XCTAssertFalse(presentation.attempts.contains { $0.explanation.contains("raw command") })
+        XCTAssertEqual(presentation.tone, .error)
+        XCTAssertEqual(presentation.title, "Partial refresh")
+    }
+
+    func testRefreshDiagnosticsPresentationDistinguishesWaitingAndHealthyStates() {
+        let waiting = batteryRefreshDiagnosticsPresentation(BatteryRefreshDiagnostics())
+        XCTAssertEqual(waiting.tone, .neutral)
+        XCTAssertEqual(waiting.title, "Waiting for first refresh")
+        XCTAssertTrue(waiting.attempts.isEmpty)
+
+        let noReport = batteryRefreshDiagnosticsPresentation(
+            BatteryRefreshDiagnostics(
+                attempts: [
+                    BatteryProviderAttempt(
+                        provider: .ioRegistry,
+                        status: .noReport,
+                        candidateCount: 0,
+                        message: "ignored",
+                        attemptedAt: Date(timeIntervalSince1970: 2_500)
+                    )
+                ],
+                refreshedAt: Date(timeIntervalSince1970: 2_500),
+                snapshotCount: 0
+            )
+        )
+        XCTAssertEqual(noReport.tone, .neutral)
+        XCTAssertEqual(noReport.title, "No battery reports")
+
+        let now = Date(timeIntervalSince1970: 3_000)
+        let healthy = batteryRefreshDiagnosticsPresentation(
+            BatteryRefreshDiagnostics(
+                attempts: [
+                    BatteryProviderAttempt(
+                        provider: .ioRegistry,
+                        status: .reported,
+                        candidateCount: 2,
+                        message: "ignored",
+                        attemptedAt: now
+                    ),
+                    BatteryProviderAttempt(
+                        provider: .ideviceInfo,
+                        status: .reported,
+                        candidateCount: 1,
+                        message: "ignored",
+                        attemptedAt: now
+                    ),
+                ],
+                refreshedAt: now,
+                snapshotCount: 3
+            )
+        )
+        XCTAssertEqual(healthy.tone, .success)
+        XCTAssertEqual(healthy.title, "Refresh healthy")
+        XCTAssertEqual(healthy.summary, "All 2 provider checks returned battery data.")
     }
 
     // MARK: - Per-device alert thresholds

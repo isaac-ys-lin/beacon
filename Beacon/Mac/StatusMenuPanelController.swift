@@ -5,6 +5,8 @@ import SwiftUI
 final class StatusMenuPanelController {
     private(set) var hostingController: NSHostingController<StatusMenuView>?
     private(set) var panel: BeaconStatusPanel?
+    var onRequestClose: (() -> Void)?
+    private var escapeKeyMonitor: Any?
     private var contentSize: NSSize = StatusMenuSizing.preferredContentSize(
         dashboardItemCount: 0,
         visibleScreenHeight: 900
@@ -43,6 +45,9 @@ final class StatusMenuPanelController {
         panel.isReleasedWhenClosed = false
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.onRequestClose = { [weak self] in
+            self?.requestClose()
+        }
         applyRoundedMask(to: panel.contentView)
         self.panel = panel
     }
@@ -52,6 +57,7 @@ final class StatusMenuPanelController {
         guard let window = sender.window else {
             panel.center()
             panel.orderFrontRegardless()
+            startEscapeKeyMonitor()
             return
         }
 
@@ -65,10 +71,35 @@ final class StatusMenuPanelController {
         )
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()
+        startEscapeKeyMonitor()
     }
 
     func close() {
         panel?.orderOut(nil)
+        stopEscapeKeyMonitor()
+    }
+
+    private func requestClose() {
+        if let onRequestClose {
+            onRequestClose()
+        } else {
+            close()
+        }
+    }
+
+    private func startEscapeKeyMonitor() {
+        stopEscapeKeyMonitor()
+        escapeKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, self?.panel?.isVisible == true else { return event }
+            self?.requestClose()
+            return nil
+        }
+    }
+
+    private func stopEscapeKeyMonitor() {
+        guard let escapeKeyMonitor else { return }
+        NSEvent.removeMonitor(escapeKeyMonitor)
+        self.escapeKeyMonitor = nil
     }
 
     private func applyRoundedMask(to view: NSView?) {
@@ -84,8 +115,22 @@ final class StatusMenuPanelController {
 }
 
 final class BeaconStatusPanel: NSPanel {
+    var onRequestClose: (() -> Void)?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func cancelOperation(_ sender: Any?) {
+        onRequestClose?()
+    }
+
+    override func keyDown(with event: NSEvent) {
+        guard event.keyCode != 53 else {
+            onRequestClose?()
+            return
+        }
+        super.keyDown(with: event)
+    }
 }
 
 enum StatusMenuPanelPositioning {

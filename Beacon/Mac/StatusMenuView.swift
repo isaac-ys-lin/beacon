@@ -117,6 +117,7 @@ struct StatusMenuView: View {
         .padding(.top, 12)
         .padding(.bottom, 12)
         .frame(width: statusWindowWidth)
+        .accessibilityIdentifier("status.menu")
         .beaconPopoverSurface(cornerRadius: NativeMacStyle.popoverCornerRadius, theme: theme)
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
     }

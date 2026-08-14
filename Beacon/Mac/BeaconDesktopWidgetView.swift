@@ -5,6 +5,16 @@ import os
 enum DesktopWidgetPreferences {
     static let showDesktopWidgetKey = "Beacon.desktopWidget.show"
     static let widgetStyleKey = "Beacon.desktopWidget.style"
+    static let productionFrameAutosaveName = "BeaconDesktopWidgetWindow"
+
+    static var frameAutosaveName: String {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return "\(productionFrameAutosaveName).Tests"
+        }
+        #endif
+        return productionFrameAutosaveName
+    }
 }
 
 enum DesktopWidgetStyle: String, CaseIterable, Identifiable {
@@ -99,8 +109,26 @@ enum DesktopWidgetWindowPlacement {
         )
     }
 
+    static func bestVisibleFrame(
+        for frame: NSRect,
+        among visibleFrames: [NSRect],
+        fallback: NSRect
+    ) -> NSRect {
+        visibleFrames.max { lhs, rhs in
+            intersectionArea(frame, lhs) < intersectionArea(frame, rhs)
+        }.flatMap { bestFrame in
+            intersectionArea(frame, bestFrame) > 0 ? bestFrame : nil
+        } ?? fallback
+    }
+
     private static func isSameSize(_ lhs: NSSize, _ rhs: NSSize) -> Bool {
         abs(lhs.width - rhs.width) < 0.5 && abs(lhs.height - rhs.height) < 0.5
+    }
+
+    private static func intersectionArea(_ lhs: NSRect, _ rhs: NSRect) -> CGFloat {
+        let intersection = lhs.intersection(rhs)
+        guard !intersection.isNull else { return 0 }
+        return intersection.width * intersection.height
     }
 }
 
@@ -231,7 +259,28 @@ struct BatteryDesktopWidgetView: View {
 final class BeaconDesktopWidgetController {
     private let logger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "widget")
     private var window: NSPanel?
-    private var lastKnownFrame: NSRect?
+    private var hostingController: NSHostingController<BatteryDesktopWidgetView>?
+    // NotificationCenter's opaque token is not Sendable, while deinit is
+    // nonisolated. Access is confined to init/deinit and removal is thread-safe.
+    private nonisolated(unsafe) var screenParametersObserver: NSObjectProtocol?
+
+    init() {
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.clampWindowToVisibleScreens()
+            }
+        }
+    }
+
+    deinit {
+        if let screenParametersObserver {
+            NotificationCenter.default.removeObserver(screenParametersObserver)
+        }
+    }
 
     #if DEBUG
     var debugWindowFrame: NSRect? {
@@ -243,8 +292,15 @@ final class BeaconDesktopWidgetController {
     }
 
     var debugHostingViewMasksToBounds: Bool {
-        (window?.contentViewController as? NSHostingController<BatteryDesktopWidgetView>)?
-            .view.layer?.masksToBounds == true
+        hostingController?.view.layer?.masksToBounds == true
+    }
+
+    var debugHostingControllerIdentifier: ObjectIdentifier? {
+        hostingController.map(ObjectIdentifier.init)
+    }
+
+    func debugSetWindowFrame(_ frame: NSRect) {
+        window?.setFrame(frame, display: false)
     }
     #endif
 
@@ -263,22 +319,29 @@ final class BeaconDesktopWidgetController {
         let wasVisible = window?.isVisible == true
         let window = existingOrNewWindow(for: style)
         let targetFrame = targetFrame(for: window, style: style)
-        let hostingController = NSHostingController(
-            rootView: BatteryDesktopWidgetView(
-                snapshots: snapshots,
-                style: style,
-                onOpenSettings: onOpenSettings
-            )
+        let rootView = BatteryDesktopWidgetView(
+            snapshots: snapshots,
+            style: style,
+            onOpenSettings: onOpenSettings
         )
+        let hostingController: NSHostingController<BatteryDesktopWidgetView>
+        if let existingHostingController = self.hostingController {
+            existingHostingController.rootView = rootView
+            hostingController = existingHostingController
+        } else {
+            let newHostingController = NSHostingController(rootView: rootView)
+            self.hostingController = newHostingController
+            window.contentViewController = newHostingController
+            hostingController = newHostingController
+        }
         hostingController.sizingOptions = []
         hostingController.view.frame = NSRect(origin: .zero, size: style.size)
         applyRoundedTransparentMask(to: hostingController.view)
         applyFixedContentSize(style.size, to: window)
-        window.contentViewController = hostingController
         applyRoundedTransparentMask(to: window.contentView)
         window.setContentSize(style.size)
         window.setFrame(targetFrame, display: true)
-        lastKnownFrame = window.frame
+        window.saveFrame(usingName: DesktopWidgetPreferences.frameAutosaveName)
         window.orderFrontRegardless()
         if !wasVisible {
             logger.info("Desktop widget shown style=\(style.rawValue, privacy: .public)")
@@ -287,9 +350,7 @@ final class BeaconDesktopWidgetController {
 
     func close() {
         let wasVisible = window?.isVisible == true
-        if let frame = window?.frame {
-            lastKnownFrame = frame
-        }
+        window?.saveFrame(usingName: DesktopWidgetPreferences.frameAutosaveName)
         window?.orderOut(nil)
         if wasVisible {
             logger.info("Desktop widget hidden")
@@ -315,20 +376,42 @@ final class BeaconDesktopWidgetController {
         window.hidesOnDeactivate = false
         window.isMovableByWindowBackground = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        _ = window.setFrameUsingName(DesktopWidgetPreferences.frameAutosaveName, force: true)
+        window.setFrameAutosaveName(DesktopWidgetPreferences.frameAutosaveName)
         self.window = window
         applyRoundedTransparentMask(to: window.contentView)
         return window
     }
 
     private func targetFrame(for window: NSPanel, style: DesktopWidgetStyle) -> NSRect {
-        let visibleFrame = window.screen?.visibleFrame
-            ?? NSScreen.main?.visibleFrame
+        let fallbackVisibleFrame = NSScreen.main?.visibleFrame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let currentFrame = lastKnownFrame ?? window.frame
+        let currentFrame = window.frame
+        let visibleFrame = currentFrame.origin == .zero
+            ? fallbackVisibleFrame
+            : DesktopWidgetWindowPlacement.bestVisibleFrame(
+                for: currentFrame,
+                among: NSScreen.screens.map(\.visibleFrame),
+                fallback: fallbackVisibleFrame
+            )
         let targetFrame = currentFrame.origin == .zero
             ? DesktopWidgetWindowPlacement.initialFrame(for: style, in: visibleFrame)
             : DesktopWidgetWindowPlacement.reusedFrame(currentFrame: currentFrame, style: style)
         return DesktopWidgetWindowPlacement.clampedFrame(targetFrame, in: visibleFrame)
+    }
+
+    private func clampWindowToVisibleScreens() {
+        guard let window else { return }
+        let fallbackVisibleFrame = NSScreen.main?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let visibleFrame = DesktopWidgetWindowPlacement.bestVisibleFrame(
+            for: window.frame,
+            among: NSScreen.screens.map(\.visibleFrame),
+            fallback: fallbackVisibleFrame
+        )
+        let clampedFrame = DesktopWidgetWindowPlacement.clampedFrame(window.frame, in: visibleFrame)
+        window.setFrame(clampedFrame, display: window.isVisible)
+        window.saveFrame(usingName: DesktopWidgetPreferences.frameAutosaveName)
     }
 
     private func applyFixedContentSize(_ size: NSSize, to window: NSPanel) {

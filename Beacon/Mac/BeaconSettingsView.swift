@@ -44,6 +44,7 @@ struct BeaconSettingsView: View {
     let snapshots: [DecoratedBatterySnapshot]
     let isRefreshing: Bool
     let isPreviewingData: Bool
+    let refreshDiagnostics: BatteryRefreshDiagnostics
     let notificationAuthorizationState: NotificationCenterAuthorizationState
     let onRefresh: () -> Void
     let onOpenBluetoothSettings: () -> Void
@@ -75,6 +76,7 @@ struct BeaconSettingsView: View {
         snapshots: [DecoratedBatterySnapshot],
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
+        refreshDiagnostics: BatteryRefreshDiagnostics = BatteryRefreshDiagnostics(),
         notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown,
         onRefresh: @escaping () -> Void,
         onOpenBluetoothSettings: @escaping () -> Void = {},
@@ -90,6 +92,7 @@ struct BeaconSettingsView: View {
         self.snapshots = snapshots
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
+        self.refreshDiagnostics = refreshDiagnostics
         self.notificationAuthorizationState = notificationAuthorizationState
         self.onRefresh = onRefresh
         self.onOpenBluetoothSettings = onOpenBluetoothSettings
@@ -118,7 +121,13 @@ struct BeaconSettingsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(width: 900, height: 620)
+        .frame(
+            minWidth: 900,
+            idealWidth: 900,
+            minHeight: 620,
+            idealHeight: 620,
+            alignment: .topLeading
+        )
         .background(.regularMaterial)
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
         .onAppear {
@@ -128,6 +137,7 @@ struct BeaconSettingsView: View {
         .sheet(isPresented: $isShowingAddDeviceGuide) {
             AddDeviceGuideView(
                 onOpenBluetoothSettings: onOpenBluetoothSettings,
+                onRefresh: onRefresh,
                 onDismiss: { isShowingAddDeviceGuide = false }
             )
         }
@@ -217,6 +227,7 @@ struct BeaconSettingsView: View {
             }
             .disabled(isRefreshing)
             .help(isRefreshing ? "Refreshing" : "Refresh")
+            .accessibilityIdentifier("settings.refresh")
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 18)
@@ -247,20 +258,24 @@ struct BeaconSettingsView: View {
     }
 
     private var devicesTab: some View {
-        HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
-            deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
+        VStack(alignment: .leading, spacing: 10) {
+            RefreshHealthDisclosureView(diagnostics: refreshDiagnostics)
 
-            Group {
-                if let selectedDevice {
-                    ScrollView(showsIndicators: false) {
-                        deviceDetail(for: selectedDevice)
-                            .padding(1)
+            HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
+                deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
+
+                Group {
+                    if let selectedDevice {
+                        ScrollView(showsIndicators: false) {
+                            deviceDetail(for: selectedDevice)
+                                .padding(1)
+                        }
+                    } else {
+                        emptyDeviceDetail
                     }
-                } else {
-                    emptyDeviceDetail
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

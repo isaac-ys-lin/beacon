@@ -60,6 +60,216 @@ public struct DeviceSection: Equatable, Sendable {
     public let items: [DeviceListItem]
 }
 
+// MARK: - Refresh diagnostics presentation
+
+/// A deliberately small, user-facing view model for refresh diagnostics.
+///
+/// The scanner's `message` is an implementation detail (and may contain
+/// command output or status codes), so Settings must not render it directly.
+/// These values translate each provider outcome into a safe explanation and a
+/// next step without exposing identifiers or raw subprocess output.
+public enum BatteryRefreshHealthTone: String, Equatable, Sendable {
+    case success
+    case neutral
+    case warning
+    case error
+}
+
+public struct BatteryRefreshAttemptPresentation: Equatable, Identifiable, Sendable {
+    public let id: String
+    public let provider: BatteryProvider
+    public let providerTitle: String
+    public let status: BatteryReadStatus
+    public let statusTitle: String
+    public let explanation: String
+    public let nextStep: String
+    public let candidateCount: Int
+    public let attemptedAt: Date
+
+    public init(
+        provider: BatteryProvider,
+        status: BatteryReadStatus,
+        candidateCount: Int,
+        attemptedAt: Date
+    ) {
+        self.id = provider.rawValue
+        self.provider = provider
+        self.providerTitle = Self.providerTitle(for: provider)
+        self.status = status
+        self.statusTitle = Self.statusTitle(for: status)
+        self.explanation = Self.explanation(for: provider, status: status)
+        self.nextStep = Self.nextStep(for: provider, status: status)
+        self.candidateCount = candidateCount
+        self.attemptedAt = attemptedAt
+    }
+
+    private static func providerTitle(for provider: BatteryProvider) -> String {
+        switch provider {
+        case .macPowerSource:
+            return "Mac power source"
+        case .ioRegistry:
+            return "Local device battery services"
+        case .coreBluetoothBatteryService:
+            return "Bluetooth battery service"
+        case .ioBluetooth:
+            return "Classic Bluetooth"
+        case .systemProfiler:
+            return "Bluetooth profiler"
+        case .bluetoothUnsupported:
+            return "Bluetooth fallback"
+        case .ideviceInfo:
+            return "iPhone USB helper"
+        }
+    }
+
+    private static func statusTitle(for status: BatteryReadStatus) -> String {
+        switch status {
+        case .reported:
+            return "Reported"
+        case .noReport:
+            return "No report"
+        case .unavailable:
+            return "Unavailable"
+        case .timedOut:
+            return "Timed out"
+        case .unauthorized:
+            return "Permission needed"
+        case .commandMissing:
+            return "Helper missing"
+        }
+    }
+
+    private static func explanation(for provider: BatteryProvider, status: BatteryReadStatus) -> String {
+        switch status {
+        case .reported:
+            return "This source returned a battery reading."
+        case .noReport:
+            return "The source responded, but no battery level was available."
+        case .unavailable:
+            return "Beacon could not read this source right now."
+        case .timedOut:
+            return "This source did not respond before the refresh deadline."
+        case .unauthorized:
+            return provider == .coreBluetoothBatteryService
+                ? "macOS has not granted Bluetooth access to Beacon."
+                : "macOS has not granted access to this source."
+        case .commandMissing:
+            return "The optional helper needed for this source is not installed."
+        }
+    }
+
+    private static func nextStep(for provider: BatteryProvider, status: BatteryReadStatus) -> String {
+        switch status {
+        case .reported:
+            return "No action needed."
+        case .noReport:
+            return provider == .ideviceInfo
+                ? "Connect the iPhone, tap Trust, then refresh."
+                : "Reconnect the device and refresh."
+        case .unavailable:
+            return "Keep the device awake and refresh."
+        case .timedOut:
+            return "Try again; a slow source did not answer in time."
+        case .unauthorized:
+            return "Allow access in macOS Settings, then refresh."
+        case .commandMissing:
+            return "Install the optional iPhone helper, then refresh."
+        }
+    }
+}
+
+public struct BatteryRefreshDiagnosticsPresentation: Equatable, Sendable {
+    public let tone: BatteryRefreshHealthTone
+    public let title: String
+    public let summary: String
+    public let attempts: [BatteryRefreshAttemptPresentation]
+    public let refreshedAt: Date
+    public let snapshotCount: Int
+
+    public var hasAttention: Bool {
+        tone == .warning || tone == .error
+    }
+}
+
+/// Maps diagnostics to safe Settings copy. Raw provider messages are omitted
+/// intentionally; callers should render only this presentation model.
+public func batteryRefreshDiagnosticsPresentation(
+    _ diagnostics: BatteryRefreshDiagnostics
+) -> BatteryRefreshDiagnosticsPresentation {
+    let attempts = diagnostics.attempts.map {
+        BatteryRefreshAttemptPresentation(
+            provider: $0.provider,
+            status: $0.status,
+            candidateCount: $0.candidateCount,
+            attemptedAt: $0.attemptedAt
+        )
+    }
+
+    guard !attempts.isEmpty else {
+        return BatteryRefreshDiagnosticsPresentation(
+            tone: .neutral,
+            title: "Waiting for first refresh",
+            summary: "Beacon has not completed a battery refresh yet.",
+            attempts: [],
+            refreshedAt: diagnostics.refreshedAt,
+            snapshotCount: diagnostics.snapshotCount
+        )
+    }
+
+    let statuses = attempts.map(\.status)
+    let reportedCount = statuses.filter { $0 == .reported }.count
+    let hasHardFailure = statuses.contains {
+        switch $0 {
+        case .timedOut, .unauthorized, .commandMissing:
+            return true
+        default:
+            return false
+        }
+    }
+    let hasSoftFailure = statuses.contains { $0 == .noReport || $0 == .unavailable }
+
+    let tone: BatteryRefreshHealthTone
+    let title: String
+    let summary: String
+    if reportedCount == attempts.count {
+        tone = .success
+        title = "Refresh healthy"
+        summary = "All \(reportedCount) provider checks returned battery data."
+    } else if reportedCount > 0 {
+        tone = hasHardFailure ? .error : .warning
+        title = "Partial refresh"
+        summary = "\(reportedCount) of \(attempts.count) provider checks returned battery data."
+    } else if hasHardFailure {
+        tone = .error
+        title = "Refresh needs attention"
+        summary = "No provider returned battery data this time."
+    } else if statuses.allSatisfy({ $0 == .noReport }) {
+        // A provider can legitimately have no battery service (for example a
+        // Bluetooth device that only exposes connection state). Keep this
+        // informational instead of presenting it as a fault.
+        tone = .neutral
+        title = "No battery reports"
+        summary = "The providers responded, but none returned a battery level."
+    } else if hasSoftFailure {
+        tone = .warning
+        title = "Refresh incomplete"
+        summary = "Some providers did not return a battery level."
+    } else {
+        tone = .neutral
+        title = "Refresh completed"
+        summary = "The refresh completed without a battery reading."
+    }
+
+    return BatteryRefreshDiagnosticsPresentation(
+        tone: tone,
+        title: title,
+        summary: summary,
+        attempts: attempts,
+        refreshedAt: diagnostics.refreshedAt,
+        snapshotCount: diagnostics.snapshotCount
+    )
+}
+
 public struct BatteryOverviewSummary: Equatable, Sendable {
     public let reportedItemCount: Int
     public let lowestPercent: Int?
@@ -364,7 +574,7 @@ public enum DeviceContextMenuAction: String, CaseIterable, Identifiable, Equatab
         case .pin: return "Pin \(displayName)"
         case .unpin: return "Unpin \(displayName)"
         case .disconnect: return "Disconnect"
-        case .remove: return "Remove from Beacon"
+        case .remove: return "Hide from Beacon"
         }
     }
 }

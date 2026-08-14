@@ -14,6 +14,8 @@
 		1EE94522FFC39C4D79D3F76F /* BatterySnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF12E505932A7869669DBDB9 /* BatterySnapshotStore.swift */; };
 		2238DCC0CD90A32F21014B6C /* BatteryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F16D3C33EE768C2BB31D7C /* BatteryHistoryStore.swift */; };
 		230198441D082928C94CAE47 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6765EC1A3AC0B4385ECA7805 /* Assets.xcassets */; };
+		243543D8D019ED698C45C488 /* LowBatteryNotifierFreshnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1272E76938E13DEC819BAD84 /* LowBatteryNotifierFreshnessTests.swift */; };
+		376F8A2AA3589AA8668FA2C4 /* WindowAccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D65C05E03CC6517BB8EA7C4 /* WindowAccessibilityTests.swift */; };
 		39D59897D914543FDE7B70F3 /* BeaconHUDController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AEC0B7B0A3C5597B299A2B5 /* BeaconHUDController.swift */; };
 		4670576BE3981977733DA905 /* BeaconStatusController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D70580BC57793CE0FADEF0 /* BeaconStatusController.swift */; };
 		4A65059572403B13720EB6EC /* DeviceBatteryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AFAF2B21F32B40BCE0DDA23 /* DeviceBatteryRow.swift */; };
@@ -21,7 +23,9 @@
 		53073ECBB082D056B27B050F /* BeaconAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F3CF1AFAD597E2693F9D08 /* BeaconAppShortcuts.swift */; };
 		58FB82C93A5920099D0A9E04 /* LowBatteryNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3024F441E85EF1AF639F9032 /* LowBatteryNotifier.swift */; };
 		5B7D1A21024B8E1E55A43919 /* StatusMenuPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4D64755B98EE7C45D25BC8 /* StatusMenuPanelController.swift */; };
+		5D620D0C764B067E54110992 /* BatteryProviderRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE8F6FDFC7313A2021A7F2FE /* BatteryProviderRunner.swift */; };
 		6ABE8E950AB7F96716D0B1C1 /* QuickActionsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51CC15AD0413CC94BA3FA1CF /* QuickActionsSettingsPane.swift */; };
+		6B53C9E156C0653C62E4F724 /* BatteryProviderRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C70DCAC3E1A47342D30FB7 /* BatteryProviderRunnerTests.swift */; };
 		70F23A8F0D2355F94C0B5121 /* BeaconMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0572BDAF185BEAAA9EE6DDEB /* BeaconMacApp.swift */; };
 		757D87D1560E861C813D43C5 /* BatterySnapshotStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2247AA89FCDB5CCFE789F0 /* BatterySnapshotStoreTests.swift */; };
 		8E288E3C8B3231E85EB0FB63 /* ActionHUDSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 712158D8A1D5055A40B71EED /* ActionHUDSettingsPane.swift */; };
@@ -35,6 +39,7 @@
 		DE4F73DCD277B829888A4845 /* BeaconDesktopWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */; };
 		DFC559BACEFC876F5A35E41A /* DashboardSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69BDB8AD2B4CC24408772E50 /* DashboardSettingsPane.swift */; };
 		E8AA626A2247A7F79EFCE42E /* BluetoothBatteryResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F7F5FC1C8BDDCD77A766720 /* BluetoothBatteryResolverTests.swift */; };
+		EBDBD7AD39672AD7DAC6A950 /* BeaconUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19A161032A69B238FD0C0E3 /* BeaconUITests.swift */; };
 		F81474E0D1FF064777791D2F /* StatusMenuSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9924F50E7814A7E4CF7477B /* StatusMenuSnapshotTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -62,6 +67,7 @@
 		0A4D64755B98EE7C45D25BC8 /* StatusMenuPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuPanelController.swift; sourceTree = "<group>"; };
 		0AFAF2B21F32B40BCE0DDA23 /* DeviceBatteryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceBatteryRow.swift; sourceTree = "<group>"; };
 		0E213AC3FB1B698F6CEEC722 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		1272E76938E13DEC819BAD84 /* LowBatteryNotifierFreshnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowBatteryNotifierFreshnessTests.swift; sourceTree = "<group>"; };
 		27D70580BC57793CE0FADEF0 /* BeaconStatusController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconStatusController.swift; sourceTree = "<group>"; };
 		2854B69F96AEFF5C6596BAFB /* DeviceListPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceListPresentationTests.swift; sourceTree = "<group>"; };
 		3024F441E85EF1AF639F9032 /* LowBatteryNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowBatteryNotifier.swift; sourceTree = "<group>"; };
@@ -74,20 +80,24 @@
 		5DBB0F2D5F8FF9FFCB1AD693 /* DeviceListPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceListPresentation.swift; sourceTree = "<group>"; };
 		6765EC1A3AC0B4385ECA7805 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		69BDB8AD2B4CC24408772E50 /* DashboardSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSettingsPane.swift; sourceTree = "<group>"; };
+		6D65C05E03CC6517BB8EA7C4 /* WindowAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAccessibilityTests.swift; sourceTree = "<group>"; };
 		712158D8A1D5055A40B71EED /* ActionHUDSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionHUDSettingsPane.swift; sourceTree = "<group>"; };
 		757E016D3707EE4CB64CFAEC /* BeaconTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BeaconTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7F7F5FC1C8BDDCD77A766720 /* BluetoothBatteryResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolverTests.swift; sourceTree = "<group>"; };
 		83003948902C5FE7458516EE /* BeaconQuickActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconQuickActions.swift; sourceTree = "<group>"; };
 		880527582A8993BB88F33C39 /* BeaconMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeaconMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8AEC0B7B0A3C5597B299A2B5 /* BeaconHUDController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconHUDController.swift; sourceTree = "<group>"; };
+		96C70DCAC3E1A47342D30FB7 /* BatteryProviderRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryProviderRunnerTests.swift; sourceTree = "<group>"; };
 		A11F3FCBE3CCB0BFC94851DE /* BeaconMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeaconMac.entitlements; sourceTree = "<group>"; };
 		A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconDesktopWidgetView.swift; sourceTree = "<group>"; };
 		AE98B7B5C78C9741FAEA0A75 /* BeaconSettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsWindowController.swift; sourceTree = "<group>"; };
+		B19A161032A69B238FD0C0E3 /* BeaconUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconUITests.swift; sourceTree = "<group>"; };
 		B8F5CFA3EE741ED116550AFB /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
 		C076A50AB2933A2E15E880E4 /* BeaconSettingsSupportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsSupportViews.swift; sourceTree = "<group>"; };
 		CF12E505932A7869669DBDB9 /* BatterySnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStore.swift; sourceTree = "<group>"; };
 		D6628EF4A0FE3A1028C2E7DE /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		DA14437C753C2C72E7DCF4AA /* BeaconHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconHUDView.swift; sourceTree = "<group>"; };
+		EE8F6FDFC7313A2021A7F2FE /* BatteryProviderRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryProviderRunner.swift; sourceTree = "<group>"; };
 		F9924F50E7814A7E4CF7477B /* StatusMenuSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuSnapshotTests.swift; sourceTree = "<group>"; };
 		FC2247AA89FCDB5CCFE789F0 /* BatterySnapshotStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -108,6 +118,7 @@
 		310A6E5613670DF7E7DF9A13 /* BeaconUITests */ = {
 			isa = PBXGroup;
 			children = (
+				B19A161032A69B238FD0C0E3 /* BeaconUITests.swift */,
 				F9924F50E7814A7E4CF7477B /* StatusMenuSnapshotTests.swift */,
 			);
 			path = BeaconUITests;
@@ -128,6 +139,7 @@
 			children = (
 				712158D8A1D5055A40B71EED /* ActionHUDSettingsPane.swift */,
 				6765EC1A3AC0B4385ECA7805 /* Assets.xcassets */,
+				EE8F6FDFC7313A2021A7F2FE /* BatteryProviderRunner.swift */,
 				37F3CF1AFAD597E2693F9D08 /* BeaconAppShortcuts.swift */,
 				A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */,
 				8AEC0B7B0A3C5597B299A2B5 /* BeaconHUDController.swift */,
@@ -168,9 +180,12 @@
 		D014B8C60FB1A12368B2921D /* BeaconTests */ = {
 			isa = PBXGroup;
 			children = (
+				96C70DCAC3E1A47342D30FB7 /* BatteryProviderRunnerTests.swift */,
 				FC2247AA89FCDB5CCFE789F0 /* BatterySnapshotStoreTests.swift */,
 				7F7F5FC1C8BDDCD77A766720 /* BluetoothBatteryResolverTests.swift */,
 				2854B69F96AEFF5C6596BAFB /* DeviceListPresentationTests.swift */,
+				1272E76938E13DEC819BAD84 /* LowBatteryNotifierFreshnessTests.swift */,
+				6D65C05E03CC6517BB8EA7C4 /* WindowAccessibilityTests.swift */,
 			);
 			path = BeaconTests;
 			sourceTree = "<group>";
@@ -290,9 +305,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B53C9E156C0653C62E4F724 /* BatteryProviderRunnerTests.swift in Sources */,
 				757D87D1560E861C813D43C5 /* BatterySnapshotStoreTests.swift in Sources */,
 				E8AA626A2247A7F79EFCE42E /* BluetoothBatteryResolverTests.swift in Sources */,
 				C8E65576C4B592832F6EBC90 /* DeviceListPresentationTests.swift in Sources */,
+				243543D8D019ED698C45C488 /* LowBatteryNotifierFreshnessTests.swift in Sources */,
+				376F8A2AA3589AA8668FA2C4 /* WindowAccessibilityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -302,6 +320,7 @@
 			files = (
 				8E288E3C8B3231E85EB0FB63 /* ActionHUDSettingsPane.swift in Sources */,
 				2238DCC0CD90A32F21014B6C /* BatteryHistoryStore.swift in Sources */,
+				5D620D0C764B067E54110992 /* BatteryProviderRunner.swift in Sources */,
 				04BC3F76E0EDFDC270D9CF0C /* BatterySnapshot.swift in Sources */,
 				1EE94522FFC39C4D79D3F76F /* BatterySnapshotStore.swift in Sources */,
 				53073ECBB082D056B27B050F /* BeaconAppShortcuts.swift in Sources */,
@@ -331,6 +350,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EBDBD7AD39672AD7DAC6A950 /* BeaconUITests.swift in Sources */,
 				F81474E0D1FF064777791D2F /* StatusMenuSnapshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -356,6 +376,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -388,6 +409,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

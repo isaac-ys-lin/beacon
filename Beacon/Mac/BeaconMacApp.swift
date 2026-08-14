@@ -30,6 +30,19 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
         statusController = BeaconStatusController(model: model)
         model.refreshNotificationAuthorizationStatus()
         model.start()
+
+        #if DEBUG
+        let arguments = Set(ProcessInfo.processInfo.arguments)
+        if arguments.contains("--ui-test-open-settings") {
+            statusController?.showSettingsForUITesting()
+        }
+        if arguments.contains("--ui-test-show-hud") {
+            statusController?.showHUDForUITesting()
+        }
+        if arguments.contains("--ui-test-open-status-menu") {
+            statusController?.showStatusMenuForUITesting()
+        }
+        #endif
     }
 
     nonisolated func userNotificationCenter(
@@ -249,24 +262,6 @@ enum BeaconMenuBarMetrics {
     static let imageOnlyLength: CGFloat = 24
 }
 
-private enum BatteryRefreshLimits {
-    static let timeout: Duration = .seconds(8)
-}
-
-private actor RefreshRaceGate<Value: Sendable> {
-    private var continuation: CheckedContinuation<Value, Never>?
-
-    init(_ continuation: CheckedContinuation<Value, Never>) {
-        self.continuation = continuation
-    }
-
-    func resume(returning value: Value) {
-        guard let continuation else { return }
-        self.continuation = nil
-        continuation.resume(returning: value)
-    }
-}
-
 @MainActor
 final class BeaconModel: ObservableObject {
     @Published private(set) var store = BatterySnapshotStore()
@@ -337,27 +332,14 @@ final class BeaconModel: ObservableObject {
         }
 
         var nextStore = store
-        guard let readReport = await readBluetoothSnapshotsWithTimeout() else {
-            logger.error("Bluetooth refresh timed out after 8 seconds")
-            latestRefreshDiagnostics = BatteryRefreshDiagnostics(
-                attempts: [
-                    BatteryProviderAttempt(
-                        provider: .coreBluetoothBatteryService,
-                        status: .timedOut,
-                        candidateCount: 0,
-                        message: "Battery refresh timed out after 8 seconds",
-                        attemptedAt: Date()
-                    )
-                ],
-                refreshedAt: Date(),
-                snapshotCount: 0
-            )
-            return
-        }
+        let readReport = await BluetoothBatteryResolver().readReport()
         let bluetoothSnapshots = readReport.snapshots
         latestRefreshDiagnostics = readReport.diagnostics
         logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
-        nextStore.reconcile(with: bluetoothSnapshots)
+        nextStore.reconcile(
+            with: bluetoothSnapshots,
+            authoritativeProviders: readReport.authoritativeProviders
+        )
         BatteryHistoryStore.record(nextStore.snapshots)
         let inferenceNow = Date()
         nextStore.applyInferredChargeStates { snapshot in
@@ -373,7 +355,7 @@ final class BeaconModel: ObservableObject {
         store = nextStore
         logger.info("Visible external snapshots: \(nextStore.externalBatterySnapshots.count)")
         latestAlertEvents = LowBatteryNotifier.notifyIfNeeded(
-            for: nextStore.externalBatterySnapshots,
+            for: nextStore.decoratedExternalBatterySnapshots,
             deliveryHandler: { [weak self] result in
                 Task { @MainActor [weak self] in
                     self?.setLatestNotificationDeliveryResult(result)
@@ -381,31 +363,6 @@ final class BeaconModel: ObservableObject {
                 }
             }
         )
-    }
-
-    private func readBluetoothSnapshotsWithTimeout() async -> BluetoothBatteryReadReport? {
-        let resolverTask = Task.detached(priority: .utility) {
-            await BluetoothBatteryResolver().readReport()
-        }
-
-        return await withTaskCancellationHandler {
-            await withCheckedContinuation { continuation in
-                let gate = RefreshRaceGate<BluetoothBatteryReadReport?>(continuation)
-
-                Task {
-                    let snapshots = await resolverTask.value
-                    await gate.resume(returning: snapshots)
-                }
-
-                Task {
-                    try? await Task.sleep(for: BatteryRefreshLimits.timeout)
-                    resolverTask.cancel()
-                    await gate.resume(returning: nil)
-                }
-            }
-        } onCancel: {
-            resolverTask.cancel()
-        }
     }
 
     func refreshNotificationAuthorizationStatus() {

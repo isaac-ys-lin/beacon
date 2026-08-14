@@ -28,7 +28,7 @@ public enum BatterySource: String, Codable, Sendable {
     case ideviceInfo
 }
 
-public enum BatteryProvider: String, Codable, Sendable {
+public enum BatteryProvider: String, Codable, Hashable, Sendable {
     case macPowerSource
     case ioRegistry
     case coreBluetoothBatteryService
@@ -65,6 +65,12 @@ public enum ConnectionState: String, Codable, Sendable {
     case disconnected
 }
 
+public enum BatteryIdentityStrength: String, Codable, Sendable {
+    case synthetic
+    case medium
+    case strong
+}
+
 public struct BatterySnapshot: Codable, Equatable, Identifiable, Sendable {
     public var id: String { deviceID }
     public let deviceID: String
@@ -77,6 +83,7 @@ public struct BatterySnapshot: Codable, Equatable, Identifiable, Sendable {
     public let provider: BatteryProvider
     public let readStatus: BatteryReadStatus
     public let confidence: BatteryReadConfidence
+    public let identityStrength: BatteryIdentityStrength
     public let updatedAt: Date
 
     public init(
@@ -90,6 +97,7 @@ public struct BatterySnapshot: Codable, Equatable, Identifiable, Sendable {
         provider: BatteryProvider? = nil,
         readStatus: BatteryReadStatus? = nil,
         confidence: BatteryReadConfidence? = nil,
+        identityStrength: BatteryIdentityStrength = .synthetic,
         updatedAt: Date
     ) {
         self.deviceID = deviceID
@@ -102,6 +110,7 @@ public struct BatterySnapshot: Codable, Equatable, Identifiable, Sendable {
         self.provider = provider ?? BatteryProvider.defaultProvider(for: source)
         self.readStatus = readStatus ?? BatteryReadStatus.defaultStatus(percent: percent, source: source)
         self.confidence = confidence ?? BatteryReadConfidence.defaultConfidence(percent: percent, source: source)
+        self.identityStrength = identityStrength
         self.updatedAt = updatedAt
     }
 
@@ -116,6 +125,7 @@ public struct BatterySnapshot: Codable, Equatable, Identifiable, Sendable {
         case provider
         case readStatus
         case confidence
+        case identityStrength
         case updatedAt
     }
 
@@ -131,6 +141,7 @@ public struct BatterySnapshot: Codable, Equatable, Identifiable, Sendable {
         provider = try container.decodeIfPresent(BatteryProvider.self, forKey: .provider) ?? BatteryProvider.defaultProvider(for: source)
         readStatus = try container.decodeIfPresent(BatteryReadStatus.self, forKey: .readStatus) ?? BatteryReadStatus.defaultStatus(percent: percent, source: source)
         confidence = try container.decodeIfPresent(BatteryReadConfidence.self, forKey: .confidence) ?? BatteryReadConfidence.defaultConfidence(percent: percent, source: source)
+        identityStrength = try container.decodeIfPresent(BatteryIdentityStrength.self, forKey: .identityStrength) ?? .synthetic
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 }
@@ -150,6 +161,7 @@ public extension BatterySnapshot {
             provider: provider,
             readStatus: readStatus,
             confidence: confidence,
+            identityStrength: identityStrength,
             updatedAt: updatedAt
         )
     }

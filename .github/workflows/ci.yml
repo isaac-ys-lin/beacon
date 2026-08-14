@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    name: BeaconMac Tests
+    name: BeaconMac Verification
     runs-on: macos-latest
 
     steps:
@@ -21,12 +21,64 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        run: xcodegen generate
-
-      - name: Run tests
         run: |
+          set -euo pipefail
+          xcodegen generate
+          project_drift="$(git status --porcelain --untracked-files=all -- Beacon.xcodeproj)"
+          if [[ -n "$project_drift" ]]; then
+            printf '%s\n' "$project_drift"
+            exit 1
+          fi
+          xcodegen generate
+          project_drift="$(git status --porcelain --untracked-files=all -- Beacon.xcodeproj)"
+          if [[ -n "$project_drift" ]]; then
+            printf '%s\n' "$project_drift"
+            exit 1
+          fi
+          git diff --check
+
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/beacon-results"
           xcodebuild test \
             -project Beacon.xcodeproj \
             -scheme BeaconMac \
             -destination 'platform=macOS' \
-            -derivedDataPath build/DerivedData
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath "$RUNNER_TEMP/beacon-results/BeaconMac.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run UI smoke tests
+        timeout-minutes: 10
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Beacon.xcodeproj \
+            -scheme BeaconMacUI \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedDataUI \
+            -resultBundlePath "$RUNNER_TEMP/beacon-results/BeaconMacUI.xcresult" \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM=
+
+      - name: Verify test result summaries
+        run: |
+          set -euo pipefail
+          for result in \
+            "$RUNNER_TEMP/beacon-results/BeaconMac.xcresult" \
+            "$RUNNER_TEMP/beacon-results/BeaconMacUI.xcresult"; do
+            summary="${result%.xcresult}.json"
+            xcrun xcresulttool get test-results summary --path "$result" > "$summary"
+            jq -e '(.totalTestCount // 0) > 0 and (.failedTests // 0) == 0' "$summary" >/dev/null
+            echo "Verified non-empty passing test result: $result"
+          done
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: beacon-xcresults
+          path: ${{ runner.temp }}/beacon-results
+          if-no-files-found: warn

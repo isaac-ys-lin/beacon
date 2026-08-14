@@ -58,6 +58,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.isaacyslin.Beacon.uitests
         TEST_TARGET_NAME: BeaconMac
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   BeaconMac:
     build:
@@ -66,4 +67,13 @@ schemes:
     test:
       targets:
         - BeaconTests
+      gatherCoverageData: false
+  BeaconMacUI:
+    build:
+      targets:
+        BeaconMac: all
+        BeaconUITests: [test]
+    test:
+      targets:
+        - BeaconUITests
       gatherCoverageData: false

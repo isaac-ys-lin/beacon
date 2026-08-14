@@ -542,6 +542,7 @@ private struct BeaconStatusDot: View {
     let color: Color
     var isCharging: Bool = false
     @State private var pulsing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Circle()
@@ -549,11 +550,18 @@ private struct BeaconStatusDot: View {
             .frame(width: 7, height: 7)
             .shadow(color: color.opacity(pulsing ? 0.72 : 0.36), radius: pulsing ? 9 : 5, x: 0, y: 0)
             .animation(
-                isCharging ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true) : .default,
+                reduceMotion
+                    ? nil
+                    : (isCharging ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true) : .default),
                 value: pulsing
             )
-            .onAppear { pulsing = isCharging }
-            .onChange(of: isCharging) { _, v in pulsing = v }
+            .onAppear { pulsing = isCharging && !reduceMotion }
+            .onChange(of: isCharging) { _, value in
+                pulsing = value && !reduceMotion
+            }
+            .onChange(of: reduceMotion) { _, value in
+                pulsing = isCharging && !value
+            }
             .accessibilityHidden(true)
     }
 }
@@ -639,6 +647,9 @@ struct DashboardBatteryDeviceRow: View {
                         .stroke(theme.hairlineSubtle, lineWidth: 0.7)
                 )
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(device.displayName)
+        .accessibilityValue(accessibilityValue)
     }
 
     private var isLow: Bool {
@@ -704,10 +715,75 @@ struct DashboardBatteryDeviceRow: View {
         )
     }
 
+    private var accessibilityValue: String {
+        dashboardBatteryAccessibilityValue(
+            for: device,
+            statusText: statusText
+        )
+    }
+
     private var theme: BeaconThemePalette {
         BeaconAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
             .palette(resolvedSystemScheme: colorScheme)
     }
+}
+
+func dashboardBatteryAccessibilityValue(
+    for device: DashboardBatteryDevice,
+    statusText: String
+) -> String {
+    var parts: [String]
+    if device.kind == .airPods, !device.airPodsComponents.isEmpty {
+        parts = device.airPodsComponents.map(airPodsComponentAccessibilityDescription)
+    } else if let percent = device.percent {
+        parts = ["\(percent) percent"]
+    } else {
+        parts = ["No battery report"]
+    }
+
+    if statusText != "Battery", statusText != "No report", statusText != "Parts" {
+        parts.append(statusText)
+    }
+    if device.isPinned {
+        parts.append("Pinned")
+    }
+    return parts.joined(separator: ", ")
+}
+
+private func airPodsComponentAccessibilityDescription(_ component: AirPodsComponent) -> String {
+    let name: String
+    switch component.slot {
+    case .case:
+        name = "Charging case"
+    case .left:
+        name = "Left AirPod"
+    case .right:
+        name = "Right AirPod"
+    }
+
+    var parts = [name]
+    if let percent = component.percent {
+        parts.append("\(percent) percent")
+    } else {
+        parts.append("no battery report")
+    }
+    switch component.chargeState {
+    case .charging:
+        parts.append("charging")
+    case .full:
+        parts.append("full")
+    case .unknown, .unplugged:
+        break
+    }
+    switch component.freshness {
+    case .fresh:
+        break
+    case .stale:
+        parts.append("stale")
+    case .expired:
+        parts.append("expired")
+    }
+    return parts.joined(separator: " ")
 }
 
 private struct AirPodsDashboardComponentChip: View {

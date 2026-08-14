@@ -219,6 +219,35 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots.map(\.percent), [82])
     }
 
+    func testMergeKeepsSameNamedDevicesWithDifferentStrongIdentities() {
+        let now = Date(timeIntervalSince1970: 120)
+        let first = BatterySnapshot(
+            deviceID: "bluetooth-AA-BB-CC-01",
+            displayName: "Magic Mouse",
+            kind: .mouse,
+            percent: 82,
+            chargeState: .unknown,
+            source: .ioRegistry,
+            identityStrength: .strong,
+            updatedAt: now
+        )
+        let second = BatterySnapshot(
+            deviceID: "bluetooth-AA-BB-CC-02",
+            displayName: "Magic Mouse",
+            kind: .mouse,
+            percent: 63,
+            chargeState: .unknown,
+            source: .systemProfiler,
+            identityStrength: .strong,
+            updatedAt: now
+        )
+        var store = BatterySnapshotStore(now: { now })
+
+        store.merge([first, second])
+
+        XCTAssertEqual(Set(store.snapshots.map(\.deviceID)), [first.deviceID, second.deviceID])
+    }
+
     func testMobileRowsRemainOrdinaryExternalSnapshots() {
         let now = Date(timeIntervalSince1970: 100)
         let keyboard = BatterySnapshot(
@@ -402,6 +431,131 @@ final class BatterySnapshotStoreTests: XCTestCase {
         store.reconcile(with: [keyboard])
 
         XCTAssertEqual(Set(store.snapshots.map(\.deviceID)), ["mac", "keyboard"])
+    }
+
+    func testProviderAwareReconcilePreservesBLEAndProfilerRowsWhenOnlyHIDCompletes() {
+        let now = Date(timeIntervalSince1970: 100)
+        let bleMouse = BatterySnapshot(
+            deviceID: "ble-mouse",
+            displayName: "Travel Mouse",
+            kind: .mouse,
+            percent: 48,
+            chargeState: .unknown,
+            source: .coreBluetooth,
+            provider: .coreBluetoothBatteryService,
+            updatedAt: now
+        )
+        let profilerAirPods = BatterySnapshot(
+            deviceID: "airpods-left",
+            displayName: "AirPods Left",
+            kind: .airPods,
+            percent: 72,
+            chargeState: .unknown,
+            source: .systemProfiler,
+            provider: .systemProfiler,
+            updatedAt: now
+        )
+        let hidKeyboard = BatterySnapshot(
+            deviceID: "keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 89,
+            chargeState: .unknown,
+            source: .ioRegistry,
+            provider: .ioRegistry,
+            updatedAt: now.addingTimeInterval(45)
+        )
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(45) })
+        store.merge([bleMouse, profilerAirPods])
+
+        store.reconcile(with: [hidKeyboard], authoritativeProviders: [.ioRegistry])
+
+        XCTAssertEqual(Set(store.snapshots.map(\.deviceID)), ["ble-mouse", "airpods-left", "keyboard"])
+        XCTAssertEqual(store.snapshots.first(where: { $0.deviceID == "ble-mouse" })?.updatedAt, now)
+        XCTAssertEqual(store.snapshots.first(where: { $0.deviceID == "airpods-left" })?.updatedAt, now)
+    }
+
+    func testProviderAwareNoReportPrunesOnlyThatProvider() {
+        let now = Date(timeIntervalSince1970: 100)
+        let bleMouse = BatterySnapshot(
+            deviceID: "ble-mouse",
+            displayName: "Travel Mouse",
+            kind: .mouse,
+            percent: 48,
+            chargeState: .unknown,
+            source: .coreBluetooth,
+            provider: .coreBluetoothBatteryService,
+            updatedAt: now
+        )
+        let profilerAirPods = BatterySnapshot(
+            deviceID: "airpods-left",
+            displayName: "AirPods Left",
+            kind: .airPods,
+            percent: 72,
+            chargeState: .unknown,
+            source: .systemProfiler,
+            provider: .systemProfiler,
+            updatedAt: now
+        )
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(45) })
+        store.merge([bleMouse, profilerAirPods])
+
+        store.reconcile(with: [], authoritativeProviders: [.coreBluetoothBatteryService])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["airpods-left"])
+    }
+
+    func testProviderAwareMergePreservesNonAuthoritativeStrongRowsFromWeakNameMatch() {
+        let now = Date(timeIntervalSince1970: 100)
+        let first = BatterySnapshot(
+            deviceID: "bluetooth-AA-BB-CC-01",
+            displayName: "Magic Mouse",
+            kind: .mouse,
+            percent: 71,
+            chargeState: .unknown,
+            source: .ioRegistry,
+            provider: .ioRegistry,
+            identityStrength: .strong,
+            updatedAt: now
+        )
+        let second = BatterySnapshot(
+            deviceID: "bluetooth-AA-BB-CC-02",
+            displayName: "Magic Mouse",
+            kind: .mouse,
+            percent: 62,
+            chargeState: .unknown,
+            source: .ioRegistry,
+            provider: .ioRegistry,
+            identityStrength: .strong,
+            updatedAt: now
+        )
+        let weakProfilerReading = BatterySnapshot(
+            deviceID: "bluetooth-Magic Mouse",
+            displayName: "Magic Mouse",
+            kind: .mouse,
+            percent: 90,
+            chargeState: .unknown,
+            source: .systemProfiler,
+            provider: .systemProfiler,
+            identityStrength: .synthetic,
+            updatedAt: now.addingTimeInterval(45)
+        )
+        var store = BatterySnapshotStore(now: { now.addingTimeInterval(45) })
+        store.merge([first, second])
+
+        store.reconcile(
+            with: [weakProfilerReading],
+            authoritativeProviders: [.systemProfiler]
+        )
+
+        XCTAssertEqual(
+            Set(store.snapshots.filter { $0.identityStrength == .strong }.map(\.deviceID)),
+            [first.deviceID, second.deviceID]
+        )
+        XCTAssertEqual(
+            store.snapshots.first(where: { $0.deviceID == weakProfilerReading.deviceID })?.percent,
+            90
+        )
     }
 
     func testIsChargingByTrendDetectsRecentRise() {

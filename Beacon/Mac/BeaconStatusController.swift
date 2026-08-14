@@ -17,6 +17,7 @@ final class BeaconStatusController: NSObject {
     private let quickActionLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "quick-actions")
     private var storeObserver: AnyCancellable?
     private var refreshStateObserver: AnyCancellable?
+    private var refreshDiagnosticsObserver: AnyCancellable?
     private var alertEventsObserver: AnyCancellable?
     private var notificationAuthorizationObserver: AnyCancellable?
     private var notificationDeliveryObserver: AnyCancellable?
@@ -28,6 +29,10 @@ final class BeaconStatusController: NSObject {
         self.model = model
         settingsWindowController = BeaconSettingsWindowController(model: model)
         super.init()
+
+        statusMenuPanelController.onRequestClose = { [weak self] in
+            self?.closeStatusMenu()
+        }
 
         updateStatusMenuContent()
 
@@ -51,6 +56,9 @@ final class BeaconStatusController: NSObject {
             self?.updateStatusMenuContent(isRefreshing: isRefreshing)
             self?.settingsWindowController.updateContent(isRefreshing: isRefreshing)
             self?.updateDesktopWidget()
+        }
+        refreshDiagnosticsObserver = model.$latestRefreshDiagnostics.sink { [weak self] diagnostics in
+            self?.settingsWindowController.updateContent(refreshDiagnostics: diagnostics)
         }
         notificationAuthorizationObserver = model.$notificationAuthorizationState.sink { [weak self] authorizationState in
             self?.updateStatusMenuContent()
@@ -101,6 +109,28 @@ final class BeaconStatusController: NSObject {
         updateStatusButton()
         updateDesktopWidget()
     }
+
+    #if DEBUG
+    func showSettingsForUITesting() {
+        showSettingsWindow(initialPane: .devices)
+    }
+
+    func showHUDForUITesting() {
+        hudController.showForUITesting(
+            event: BatteryAlertEvent(
+                kind: .lowBattery,
+                deviceID: "ui-test-device",
+                displayName: "UI Test Keyboard",
+                percent: 12
+            )
+        )
+    }
+
+    func showStatusMenuForUITesting() {
+        guard let button = statusItem.button else { return }
+        showStatusMenu(relativeTo: button)
+    }
+    #endif
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
         // Don't overlap the popover with an open Settings window — surface the

@@ -381,6 +381,29 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(BLEBatteryReadStatePolicy.action(for: .unauthorized), .finish)
     }
 
+    func testBLECompletionReasonControlsProviderStatus() {
+        XCTAssertEqual(
+            BluetoothDeviceScanner.bleReadStatus(completion: .completed, candidates: []),
+            .noReport
+        )
+        XCTAssertEqual(
+            BluetoothDeviceScanner.bleReadStatus(completion: .timedOut, candidates: []),
+            .timedOut
+        )
+        XCTAssertEqual(
+            BluetoothDeviceScanner.bleReadStatus(completion: .cancelled, candidates: []),
+            .timedOut
+        )
+        XCTAssertEqual(
+            BluetoothDeviceScanner.bleReadStatus(completion: .unauthorized, candidates: []),
+            .unauthorized
+        )
+        XCTAssertEqual(
+            BluetoothDeviceScanner.bleReadStatus(completion: .unavailable, candidates: []),
+            .unavailable
+        )
+    }
+
     func testBLEBatteryScanWindowShrinksWhenNoConnectedPeripheralsAreInspected() {
         XCTAssertEqual(
             BLEBatteryDiscoveryWindow.timeout(
@@ -419,6 +442,114 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(merged.kindHint, .keyboard)
         XCTAssertEqual(merged.batteryPercent, 95)
         XCTAssertEqual(merged.transport, .ble)
+    }
+
+    func testConnectedHIDDoesNotInheritDisconnectedProfilerPercent() {
+        let hid = BluetoothBatteryCandidate(
+            deviceID: "AA:BB:CC:DD:EE:FF",
+            displayName: "Magic Mouse",
+            transport: .hid,
+            batteryPercent: nil,
+            kindHint: .mouse,
+            connectionState: .connected,
+            identityEvidence: .deviceAddress
+        )
+        let profiler = BluetoothBatteryCandidate(
+            deviceID: "AA:BB:CC:DD:EE:FF",
+            displayName: "Magic Mouse",
+            transport: .systemProfiler,
+            batteryPercent: 71,
+            kindHint: .mouse,
+            connectionState: .disconnected,
+            identityEvidence: .deviceAddress
+        )
+
+        let merged = BluetoothDeviceScanner.mergedCandidate(existing: profiler, with: hid)
+
+        XCTAssertEqual(merged.connectionState, .connected)
+        XCTAssertNil(merged.batteryPercent)
+        XCTAssertEqual(merged.transport, .hid)
+    }
+
+    func testSameNameWithDifferentStrongIDsDoesNotMerge() {
+        let first = BluetoothBatteryCandidate(
+            deviceID: "AA:BB:CC:DD:EE:01",
+            displayName: "Magic Mouse",
+            transport: .hid,
+            batteryPercent: 70,
+            kindHint: .mouse,
+            identityEvidence: .deviceAddress
+        )
+        let second = BluetoothBatteryCandidate(
+            deviceID: "AA:BB:CC:DD:EE:02",
+            displayName: "Magic Mouse",
+            transport: .systemProfiler,
+            batteryPercent: 60,
+            kindHint: .mouse,
+            identityEvidence: .deviceAddress
+        )
+
+        XCTAssertEqual(BluetoothDeviceScanner.mergingCandidates([first, second]).count, 2)
+    }
+
+    func testWeakSameNameCandidateDoesNotAttachToAmbiguousStrongIdentity() {
+        let first = BluetoothBatteryCandidate(
+            deviceID: "AA:BB:CC:DD:EE:01",
+            displayName: "Magic Mouse",
+            transport: .hid,
+            batteryPercent: nil,
+            kindHint: .mouse,
+            identityEvidence: .deviceAddress
+        )
+        let second = BluetoothBatteryCandidate(
+            deviceID: "AA:BB:CC:DD:EE:02",
+            displayName: "Magic Mouse",
+            transport: .hid,
+            batteryPercent: nil,
+            kindHint: .mouse,
+            identityEvidence: .deviceAddress
+        )
+        let ambiguous = BluetoothBatteryCandidate(
+            deviceID: "Magic Mouse",
+            displayName: "Magic Mouse",
+            transport: .systemProfiler,
+            batteryPercent: 90,
+            kindHint: .mouse,
+            identityEvidence: .normalizedName
+        )
+
+        for candidates in [[first, second, ambiguous], [ambiguous, second, first]] {
+            let merged = BluetoothDeviceScanner.mergingCandidates(candidates)
+            XCTAssertEqual(merged.count, 3)
+            XCTAssertNil(merged.first(where: { $0.deviceID == first.deviceID })?.batteryPercent)
+            XCTAssertNil(merged.first(where: { $0.deviceID == second.deviceID })?.batteryPercent)
+            XCTAssertEqual(merged.first(where: { $0.deviceID == ambiguous.deviceID })?.batteryPercent, 90)
+        }
+    }
+
+    func testLegacySingleIPhoneCollapseDeterministicallyPrefersUSB() {
+        let ble = BluetoothBatteryCandidate(
+            deviceID: "ble-uuid",
+            displayName: "Phone",
+            transport: .ble,
+            batteryPercent: 81,
+            kindHint: .iPhone,
+            identityEvidence: .coreBluetoothUUID
+        )
+        let usb = BluetoothBatteryCandidate(
+            deviceID: "usb-phone",
+            displayName: "My iPhone",
+            transport: .usb,
+            batteryPercent: 79,
+            kindHint: .iPhone,
+            identityEvidence: .normalizedName
+        )
+
+        let collapsed = BluetoothDeviceScanner.collapsingDuplicateIPhones([ble, usb])
+
+        XCTAssertEqual(collapsed.count, 1)
+        XCTAssertEqual(collapsed.first?.transport, .usb)
+        XCTAssertEqual(collapsed.first?.batteryPercent, 79)
     }
 
     func testSystemProfilerParserIncludesDisconnectedBatteryDevicesWithReadings() throws {

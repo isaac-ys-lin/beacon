@@ -9,6 +9,25 @@ public enum BluetoothTransport: Sendable {
     case unknown
 }
 
+public enum BluetoothIdentityEvidence: Sendable {
+    case physicalDeviceUniqueID
+    case deviceAddress
+    case serialNumber
+    case coreBluetoothUUID
+    case normalizedName
+
+    var strength: Int {
+        switch self {
+        case .physicalDeviceUniqueID, .deviceAddress, .serialNumber:
+            return 2
+        case .coreBluetoothUUID:
+            return 1
+        case .normalizedName:
+            return 0
+        }
+    }
+}
+
 public struct BluetoothBatteryCandidate: Sendable {
     public let deviceID: String
     public let displayName: String
@@ -17,6 +36,7 @@ public struct BluetoothBatteryCandidate: Sendable {
     public let kindHint: DeviceKind?
     public let connectionState: ConnectionState
     public let chargeState: ChargeState
+    public let identityEvidence: BluetoothIdentityEvidence
 
     public init(
         deviceID: String,
@@ -25,7 +45,8 @@ public struct BluetoothBatteryCandidate: Sendable {
         batteryPercent: Int?,
         kindHint: DeviceKind? = nil,
         connectionState: ConnectionState = .connected,
-        chargeState: ChargeState = .unknown
+        chargeState: ChargeState = .unknown,
+        identityEvidence: BluetoothIdentityEvidence = .normalizedName
     ) {
         self.deviceID = deviceID
         self.displayName = displayName
@@ -34,22 +55,32 @@ public struct BluetoothBatteryCandidate: Sendable {
         self.kindHint = kindHint
         self.connectionState = connectionState
         self.chargeState = chargeState
+        self.identityEvidence = identityEvidence
     }
 }
 
 public struct BluetoothCandidateScanReport: Sendable {
     public let candidates: [BluetoothBatteryCandidate]
     public let attempts: [BatteryProviderAttempt]
+    public let authoritativeProviders: Set<BatteryProvider>
 
-    public init(candidates: [BluetoothBatteryCandidate], attempts: [BatteryProviderAttempt]) {
+    public init(
+        candidates: [BluetoothBatteryCandidate],
+        attempts: [BatteryProviderAttempt],
+        authoritativeProviders: Set<BatteryProvider>? = nil
+    ) {
         self.candidates = candidates
         self.attempts = attempts
+        self.authoritativeProviders = authoritativeProviders ?? Set(
+            attempts.filter { $0.status == .reported || $0.status == .noReport }.map(\.provider)
+        )
     }
 }
 
 public struct BluetoothBatteryReadReport: Sendable {
     public let snapshots: [BatterySnapshot]
     public let diagnostics: BatteryRefreshDiagnostics
+    public let authoritativeProviders: Set<BatteryProvider>
 }
 
 public struct BluetoothBatteryResolver {
@@ -76,7 +107,8 @@ public struct BluetoothBatteryResolver {
                 attempts: scanReport.attempts,
                 refreshedAt: now,
                 snapshotCount: snapshots.count
-            )
+            ),
+            authoritativeProviders: scanReport.authoritativeProviders
         )
     }
 
@@ -93,6 +125,8 @@ public struct BluetoothBatteryResolver {
             chargeState: candidate.chargeState,
             connectionState: candidate.connectionState,
             source: source,
+            provider: provider(for: candidate),
+            identityStrength: identityStrength(for: candidate.identityEvidence),
             updatedAt: now
         )
     }
@@ -116,6 +150,25 @@ public struct BluetoothBatteryResolver {
         case .systemProfiler: return .systemProfiler
         case .usb: return .ideviceInfo
         case .unknown: return .bluetoothUnsupported
+        }
+    }
+
+    private static func provider(for candidate: BluetoothBatteryCandidate) -> BatteryProvider {
+        switch candidate.transport {
+        case .hid: return .ioRegistry
+        case .ble: return .coreBluetoothBatteryService
+        case .classic: return .ioBluetooth
+        case .systemProfiler: return .systemProfiler
+        case .usb: return .ideviceInfo
+        case .unknown: return .bluetoothUnsupported
+        }
+    }
+
+    private static func identityStrength(for evidence: BluetoothIdentityEvidence) -> BatteryIdentityStrength {
+        switch evidence.strength {
+        case 2: return .strong
+        case 1: return .medium
+        default: return .synthetic
         }
     }
 
@@ -152,7 +205,7 @@ enum IPhoneUSBBatteryProvider {
         "/usr/local/bin/ideviceinfo",
         "/usr/bin/ideviceinfo"
     ]
-    private static let timeout: TimeInterval = 3
+    private static let commandTimeout: Duration = .seconds(3)
 
     static func candidate(from reading: IPhoneUSBBatteryReading) -> BluetoothBatteryCandidate? {
         BluetoothBatteryCandidate(
@@ -162,7 +215,8 @@ enum IPhoneUSBBatteryProvider {
             batteryPercent: reading.percent,
             kindHint: .iPhone,
             connectionState: .connected,
-            chargeState: reading.chargeState
+            chargeState: reading.chargeState,
+            identityEvidence: .normalizedName
         )
     }
 
@@ -221,74 +275,91 @@ enum IPhoneUSBBatteryProvider {
         }
     }
 
-    static func readCandidate(now: Date = Date()) async -> (candidate: BluetoothBatteryCandidate?, attempt: BatteryProviderAttempt) {
-        await Task.detached(priority: .utility) {
-            guard let commandURL = availableCommandURL() else {
-                return (
-                    nil,
-                    BatteryProviderAttempt(
-                        provider: .ideviceInfo,
-                        status: .commandMissing,
-                        candidateCount: 0,
-                        message: "ideviceinfo command not found",
-                        attemptedAt: now
-                    )
-                )
-            }
-
-            // Try USB first, fall back to Wi-Fi lockdown (established after one USB trust pairing)
-            var batteryResult = run(commandURL: commandURL, arguments: ["-q", "com.apple.mobile.battery"])
-            var networkMode = false
-            if batteryResult.status != 0 {
-                batteryResult = run(commandURL: commandURL, arguments: ["-n", "-q", "com.apple.mobile.battery"])
-                networkMode = true
-            }
-            guard batteryResult.status == 0 else {
-                return (
-                    nil,
-                    BatteryProviderAttempt(
-                        provider: .ideviceInfo,
-                        status: batteryResult.timedOut ? .timedOut : .unavailable,
-                        candidateCount: 0,
-                        message: batteryResult.timedOut
-                            ? "ideviceinfo timed out while reading iPhone battery"
-                            : "ideviceinfo returned status \(batteryResult.status)",
-                        attemptedAt: now
-                    )
-                )
-            }
-
-            let nameArgs = networkMode ? ["-n", "-k", "DeviceName"] : ["-k", "DeviceName"]
-            let deviceName = run(commandURL: commandURL, arguments: nameArgs)
-                .output
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let fallbackName = deviceName.isEmpty ? "iPhone" : deviceName
-            guard let reading = parse(batteryResult.output, fallbackDisplayName: fallbackName),
-                  let candidate = candidate(from: reading)
-            else {
-                return (
-                    nil,
-                    BatteryProviderAttempt(
-                        provider: .ideviceInfo,
-                        status: .noReport,
-                        candidateCount: 0,
-                        message: "ideviceinfo did not return an iPhone battery percentage",
-                        attemptedAt: now
-                    )
-                )
-            }
-
+    static func readCandidate(
+        now: Date = Date(),
+        deadline: ContinuousClock.Instant,
+        runner: BatteryProviderRunner = BatteryProviderRunner()
+    ) async -> (candidate: BluetoothBatteryCandidate?, attempt: BatteryProviderAttempt) {
+        guard let commandURL = availableCommandURL() else {
             return (
-                candidate,
+                nil,
                 BatteryProviderAttempt(
                     provider: .ideviceInfo,
-                    status: .reported,
-                    candidateCount: 1,
-                    message: "ideviceinfo returned 1 iPhone battery candidate (\(networkMode ? "Wi-Fi" : "USB"))",
+                    status: .commandMissing,
+                    candidateCount: 0,
+                    message: "ideviceinfo command not found",
                     attemptedAt: now
                 )
             )
-        }.value
+        }
+
+        // Try USB first, then the Wi-Fi lockdown pairing. Every subprocess is
+        // capped by the remaining shared refresh deadline.
+        var batteryResult = await run(
+            commandURL: commandURL,
+            arguments: ["-q", "com.apple.mobile.battery"],
+            deadline: deadline,
+            runner: runner
+        )
+        var networkMode = false
+        if batteryResult.status != 0, !batteryResult.timedOut, !batteryResult.cancelled {
+            batteryResult = await run(
+                commandURL: commandURL,
+                arguments: ["-n", "-q", "com.apple.mobile.battery"],
+                deadline: deadline,
+                runner: runner
+            )
+            networkMode = true
+        }
+        guard batteryResult.status == 0 else {
+            return (
+                nil,
+                BatteryProviderAttempt(
+                    provider: .ideviceInfo,
+                    status: batteryResult.timedOut || batteryResult.cancelled ? .timedOut : .unavailable,
+                    candidateCount: 0,
+                    message: batteryResult.timedOut || batteryResult.cancelled
+                        ? "ideviceinfo timed out while reading iPhone battery"
+                        : "ideviceinfo returned status \(batteryResult.status)",
+                    attemptedAt: now
+                )
+            )
+        }
+
+        let nameArgs = networkMode ? ["-n", "-k", "DeviceName"] : ["-k", "DeviceName"]
+        let nameResult = await run(
+            commandURL: commandURL,
+            arguments: nameArgs,
+            deadline: deadline,
+            runner: runner
+        )
+        let deviceName = nameResult.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackName = deviceName.isEmpty ? "iPhone" : deviceName
+        guard let reading = parse(batteryResult.output, fallbackDisplayName: fallbackName),
+              let candidate = candidate(from: reading)
+        else {
+            return (
+                nil,
+                BatteryProviderAttempt(
+                    provider: .ideviceInfo,
+                    status: .noReport,
+                    candidateCount: 0,
+                    message: "ideviceinfo did not return an iPhone battery percentage",
+                    attemptedAt: now
+                )
+            )
+        }
+
+        return (
+            candidate,
+            BatteryProviderAttempt(
+                provider: .ideviceInfo,
+                status: .reported,
+                candidateCount: 1,
+                message: "ideviceinfo returned 1 iPhone battery candidate (\(networkMode ? "Wi-Fi" : "USB"))",
+                attemptedAt: now
+            )
+        )
     }
 
     private static func availableCommandURL(fileManager: FileManager = .default) -> URL? {
@@ -318,53 +389,29 @@ enum IPhoneUSBBatteryProvider {
         return Int(trimmed)
     }
 
-    private static func run(commandURL: URL, arguments: [String]) -> (status: Int32, output: String, timedOut: Bool) {
-        let process = Process()
-        let outputPipe = Pipe()
-        process.executableURL = commandURL
-        process.arguments = arguments
-        process.standardOutput = outputPipe
-        process.standardError = FileHandle.nullDevice
-
-        let timeoutState = ProcessTimeoutState()
-        let timeoutWorkItem = DispatchWorkItem {
-            guard process.isRunning else { return }
-            timeoutState.markTimedOut()
-            process.terminate()
-        }
-
+    private static func run(
+        commandURL: URL,
+        arguments: [String],
+        deadline: ContinuousClock.Instant,
+        runner: BatteryProviderRunner
+    ) async -> (status: Int32, output: String, timedOut: Bool, cancelled: Bool) {
+        let remaining = ContinuousClock().now.duration(to: deadline)
+        guard remaining > .zero else { return (-1, "", true, false) }
         do {
-            try process.run()
-            DispatchQueue.global(qos: .utility).asyncAfter(
-                deadline: .now() + timeout,
-                execute: timeoutWorkItem
+            let result = try await runner.run(
+                executableURL: commandURL,
+                arguments: arguments,
+                timeout: min(commandTimeout, remaining)
             )
-            let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            timeoutWorkItem.cancel()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            return (process.terminationStatus, output, timeoutState.didTimeOut)
+            return (
+                result.terminationStatus,
+                String(data: result.output, encoding: .utf8) ?? "",
+                result.timedOut,
+                result.wasCancelled
+            )
         } catch {
-            timeoutWorkItem.cancel()
-            return (-1, "", false)
+            return (-1, "", false, false)
         }
-    }
-}
-
-private final class ProcessTimeoutState: @unchecked Sendable {
-    private let lock = NSLock()
-    private var timedOut = false
-
-    var didTimeOut: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return timedOut
-    }
-
-    func markTimedOut() {
-        lock.lock()
-        timedOut = true
-        lock.unlock()
     }
 }
 

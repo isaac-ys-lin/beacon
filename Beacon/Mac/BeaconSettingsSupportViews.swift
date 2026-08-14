@@ -27,7 +27,18 @@ extension View {
 
 struct AddDeviceGuideView: View {
     let onOpenBluetoothSettings: () -> Void
+    let onRefresh: () -> Void
     let onDismiss: () -> Void
+
+    init(
+        onOpenBluetoothSettings: @escaping () -> Void,
+        onRefresh: @escaping () -> Void = {},
+        onDismiss: @escaping () -> Void
+    ) {
+        self.onOpenBluetoothSettings = onOpenBluetoothSettings
+        self.onRefresh = onRefresh
+        self.onDismiss = onDismiss
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -53,7 +64,7 @@ struct AddDeviceGuideView: View {
 
             VStack(spacing: 8) {
                 AddDeviceGuideRow(
-                    title: "AirPods or Beats Device",
+                    title: "AirPods or Beats",
                     subtitle: "Pair in Bluetooth Settings, then refresh.",
                     systemImage: resolveSymbol("airpodspro", fallback: "headphones"),
                     actionTitle: "Bluetooth",
@@ -61,11 +72,19 @@ struct AddDeviceGuideView: View {
                 )
 
                 AddDeviceGuideRow(
-                    title: "Another Mac",
-                    subtitle: "Cross-Mac transfer stays disabled.",
-                    systemImage: resolveSymbol("macbook.and.iphone", fallback: "desktopcomputer"),
-                    actionTitle: "Unavailable",
-                    isEnabled: false
+                    title: "Keyboard, mouse, or trackpad",
+                    subtitle: "Pair the Bluetooth accessory in System Settings, then refresh.",
+                    systemImage: resolveSymbol("keyboard", fallback: "rectangle.and.hand.point.up.left"),
+                    actionTitle: "Bluetooth",
+                    action: onOpenBluetoothSettings
+                )
+
+                AddDeviceGuideRow(
+                    title: "iPhone via USB",
+                    subtitle: "Connect a cable, tap Trust This Mac, then refresh the battery reading.",
+                    systemImage: resolveSymbol("iphone", fallback: "mobilephone"),
+                    actionTitle: "Refresh",
+                    action: onRefresh
                 )
             }
 
@@ -136,6 +155,148 @@ struct AddDeviceGuideRow: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
+    }
+}
+
+struct RefreshHealthDisclosureView: View {
+    let diagnostics: BatteryRefreshDiagnostics
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        let presentation = batteryRefreshDiagnosticsPresentation(diagnostics)
+
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(presentation.attempts) { attempt in
+                    RefreshHealthAttemptRow(attempt: attempt)
+                }
+
+                if presentation.attempts.isEmpty {
+                    Text("Run Refresh to check Bluetooth accessories and iPhone USB access.")
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(DesignTokens.Palette.secondaryText)
+                }
+            }
+            .padding(.top, 6)
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: refreshHealthSymbol(for: presentation.tone))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(refreshHealthColor(for: presentation.tone))
+                    .frame(width: 22)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(presentation.title)
+                        .font(DesignTokens.Typography.captionEmphasis)
+                    Text(refreshHealthSummary(presentation))
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(DesignTokens.Palette.secondaryText)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        .font(DesignTokens.Typography.caption)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .beaconSettingsCardSurface(cornerRadius: DesignTokens.Radius.row)
+    }
+
+    private func refreshHealthSummary(_ presentation: BatteryRefreshDiagnosticsPresentation) -> String {
+        guard !presentation.attempts.isEmpty else { return "No completed refresh yet" }
+        let relative = RelativeDateTimeFormatter()
+        relative.unitsStyle = .abbreviated
+        return "\(presentation.summary) · \(relative.localizedString(for: presentation.refreshedAt, relativeTo: Date()))"
+    }
+
+    private func refreshHealthSymbol(for tone: BatteryRefreshHealthTone) -> String {
+        switch tone {
+        case .success: return "checkmark.circle.fill"
+        case .neutral: return "info.circle"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .error: return "xmark.octagon.fill"
+        }
+    }
+
+    private func refreshHealthColor(for tone: BatteryRefreshHealthTone) -> Color {
+        switch tone {
+        case .success: return DesignTokens.Palette.charging
+        case .neutral: return DesignTokens.Palette.secondaryText
+        case .warning: return DesignTokens.Palette.warning
+        case .error: return DesignTokens.Palette.critical
+        }
+    }
+}
+
+private struct RefreshHealthAttemptRow: View {
+    let attempt: BatteryRefreshAttemptPresentation
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: statusSymbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(statusColor)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(attempt.providerTitle)
+                        .font(DesignTokens.Typography.caption2Emphasis)
+                    Text(attempt.statusTitle)
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(statusColor)
+                    if attempt.candidateCount > 0 {
+                        Text("· \(attempt.candidateCount) result\(attempt.candidateCount == 1 ? "" : "s")")
+                            .font(DesignTokens.Typography.caption2)
+                            .foregroundStyle(DesignTokens.Palette.tertiaryText)
+                    }
+                    Text("· tried \(attemptAgeText)")
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(DesignTokens.Palette.tertiaryText)
+                }
+
+                Text(attempt.explanation)
+                    .font(DesignTokens.Typography.caption2)
+                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(attempt.nextStep)
+                    .font(DesignTokens.Typography.caption2)
+                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var statusSymbol: String {
+        switch attempt.status {
+        case .reported: return "checkmark.circle.fill"
+        case .noReport: return "minus.circle"
+        case .unavailable: return "questionmark.circle"
+        case .timedOut: return "clock.badge.exclamationmark"
+        case .unauthorized: return "lock.trianglebadge.exclamationmark"
+        case .commandMissing: return "wrench.and.screwdriver"
+        }
+    }
+
+    private var attemptAgeText: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: attempt.attemptedAt, relativeTo: Date())
+    }
+
+    private var statusColor: Color {
+        switch attempt.status {
+        case .reported: return DesignTokens.Palette.charging
+        case .noReport, .unavailable: return DesignTokens.Palette.secondaryText
+        case .timedOut: return DesignTokens.Palette.warning
+        case .unauthorized, .commandMissing: return DesignTokens.Palette.critical
+        }
     }
 }
 
@@ -951,6 +1112,14 @@ struct SettingsDeviceSidebarRow: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(item.displayName)
+        .accessibilityValue(rowSubtitle)
+        .accessibilityHint("Selects this device")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        // Keep the row's position in the VoiceOver traversal stable while the
+        // selected trait changes after a click.
+        .accessibilitySortPriority(0)
     }
 
     private var theme: BeaconThemePalette {

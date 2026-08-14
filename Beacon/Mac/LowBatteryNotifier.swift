@@ -290,7 +290,7 @@ enum LowBatteryNotifier {
 
     @discardableResult
     static func notifyIfNeeded(
-        for snapshots: [BatterySnapshot],
+        for snapshots: [DecoratedBatterySnapshot],
         deliveryHandler: @escaping @Sendable (NotificationCenterDeliveryResult) -> Void = { _ in }
     ) -> [BatteryAlertEvent] {
         let defaults = UserDefaults.standard
@@ -298,7 +298,7 @@ enum LowBatteryNotifier {
         logger.info("Notification check snapshots=\(snapshots.count) events=\(events.count)")
 
         for event in events {
-            logger.info("Queueing \(String(describing: event.kind)) notification for \(event.displayName, privacy: .public) id=\(event.deviceID, privacy: .public) percent=\(event.percent ?? -1)")
+            logger.info("Queueing notification kind=\(String(describing: event.kind), privacy: .public)")
             let content = UNMutableNotificationContent()
             switch event.kind {
             case .lowBattery:
@@ -316,14 +316,13 @@ enum LowBatteryNotifier {
                 content: content,
                 trigger: nil
             )
-            let requestIdentifier = request.identifier
             UNUserNotificationCenter.current().add(request) { error in
                 if let error {
-                    logger.error("Notification add failed id=\(requestIdentifier, privacy: .public): \(error.localizedDescription)")
+                    logger.error("Notification add failed: \(error.localizedDescription, privacy: .private)")
                     deliveryHandler(.failed(error.localizedDescription))
                 } else {
                     markAlerted(event, defaults: .standard)
-                    logger.info("Notification add succeeded id=\(requestIdentifier, privacy: .public)")
+                    logger.info("Notification add succeeded")
                     deliveryHandler(.queued(notificationTitle))
                 }
             }
@@ -361,6 +360,17 @@ enum LowBatteryNotifier {
         for snapshots: [BatterySnapshot],
         defaults: UserDefaults = .standard
     ) -> [BatteryAlertEvent] {
+        pendingAlertEvents(
+            for: snapshots.map { DecoratedBatterySnapshot(snapshot: $0, freshness: .fresh) },
+            defaults: defaults,
+            markAsQueued: true
+        )
+    }
+
+    static func pendingAlertEvents(
+        for snapshots: [DecoratedBatterySnapshot],
+        defaults: UserDefaults = .standard
+    ) -> [BatteryAlertEvent] {
         pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: true)
     }
 
@@ -368,18 +378,40 @@ enum LowBatteryNotifier {
         for snapshots: [BatterySnapshot],
         defaults: UserDefaults = .standard
     ) -> [BatteryAlertEvent] {
+        pendingAlertEvents(
+            for: snapshots.map { DecoratedBatterySnapshot(snapshot: $0, freshness: .fresh) },
+            defaults: defaults,
+            markAsQueued: false
+        )
+    }
+
+
+    static func pendingAlertEventsWithoutMarking(
+        for snapshots: [DecoratedBatterySnapshot],
+        defaults: UserDefaults = .standard
+    ) -> [BatteryAlertEvent] {
         pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: false)
     }
 
     private static func pendingAlertEvents(
-        for snapshots: [BatterySnapshot],
+        for snapshots: [DecoratedBatterySnapshot],
         defaults: UserDefaults,
         markAsQueued: Bool
     ) -> [BatteryAlertEvent] {
+        let eligibleSnapshots = snapshots.compactMap { decorated -> BatterySnapshot? in
+            guard decorated.freshness == .fresh,
+                  decorated.snapshot.connectionState == .connected
+            else {
+                return nil
+            }
+            return decorated.snapshot
+        }
+        guard !eligibleSnapshots.isEmpty else { return [] }
+
         migrateChargedAlertedStateIfNeeded(defaults: defaults)
         var events: [BatteryAlertEvent] = []
 
-        for snapshot in snapshots {
+        for snapshot in eligibleSnapshots {
             rememberChargedAlertAliases(for: snapshot, defaults: defaults)
             if let event = lowBatteryEvent(for: snapshot, defaults: defaults, markAsQueued: markAsQueued) {
                 events.append(event)

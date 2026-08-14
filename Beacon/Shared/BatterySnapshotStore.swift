@@ -64,7 +64,22 @@ public struct BatterySnapshotStore: Sendable {
     ///
     /// Skips pruning when the live read produced no Bluetooth snapshots at all
     /// (a failed/empty scan) to avoid wiping the whole list on a transient miss.
-    public mutating func reconcile(with liveSnapshots: [BatterySnapshot]) {
+    public mutating func reconcile(
+        with liveSnapshots: [BatterySnapshot],
+        authoritativeProviders: Set<BatteryProvider>? = nil
+    ) {
+        if let authoritativeProviders {
+            merge(
+                liveSnapshots,
+                preservingStrongSnapshotsOutside: authoritativeProviders
+            )
+            reconcileByProvider(
+                liveSnapshots: liveSnapshots,
+                authoritativeProviders: authoritativeProviders
+            )
+            return
+        }
+
         merge(liveSnapshots)
 
         let liveBluetooth = liveSnapshots.filter { $0.source.isBluetoothRelated }
@@ -83,8 +98,30 @@ public struct BatterySnapshotStore: Sendable {
         }
     }
 
+    private mutating func reconcileByProvider(
+        liveSnapshots: [BatterySnapshot],
+        authoritativeProviders: Set<BatteryProvider>
+    ) {
+        guard !authoritativeProviders.isEmpty else { return }
+        let liveKeysByProvider = Dictionary(grouping: liveSnapshots, by: \.provider)
+            .mapValues { Set($0.map(Self.reconciliationKey)) }
+
+        snapshotsByID = snapshotsByID.filter { _, existing in
+            guard existing.source.isBluetoothRelated,
+                  authoritativeProviders.contains(existing.provider)
+            else {
+                return true
+            }
+            return liveKeysByProvider[existing.provider, default: []]
+                .contains(Self.reconciliationKey(existing))
+        }
+    }
+
     private static func reconciliationKey(_ snapshot: BatterySnapshot) -> String {
-        "\(snapshot.kind)|\(snapshot.displayName.normalizedDeviceName)"
+        if snapshot.identityStrength == .strong {
+            return "\(snapshot.kind)|id|\(snapshot.deviceID)"
+        }
+        return "\(snapshot.kind)|\(snapshot.displayName.normalizedDeviceName)"
     }
 
     private static func shouldPreserveTrustedIPhone(
@@ -128,6 +165,7 @@ public struct BatterySnapshotStore: Sendable {
                 && existing.source.isBluetoothRelated
                 && existing.kind == snapshot.kind
                 && existing.displayName.normalizedDeviceName == normalizedName
+                && Self.canDeduplicateByName(existing, snapshot)
                 && existing.updatedAt > snapshot.updatedAt
         }
     }
@@ -149,6 +187,7 @@ public struct BatterySnapshotStore: Sendable {
                 && existing.source.isBluetoothRelated
                 && existing.kind == snapshot.kind
                 && existing.displayName.normalizedDeviceName == normalizedName
+                && Self.canDeduplicateByName(existing, snapshot)
                 && existing.percent != nil
                 && existing.updatedAt >= snapshot.updatedAt
         }
@@ -173,6 +212,38 @@ public struct BatterySnapshotStore: Sendable {
     }
 
     private mutating func removeDuplicateBluetoothSnapshots(matching snapshot: BatterySnapshot) {
+        removeDuplicateBluetoothSnapshots(
+            matching: snapshot,
+            preservingStrongSnapshotsOutside: nil
+        )
+    }
+
+    private mutating func merge(
+        _ incoming: [BatterySnapshot],
+        preservingStrongSnapshotsOutside authoritativeProviders: Set<BatteryProvider>
+    ) {
+        for snapshot in incoming {
+            if hasNewerDuplicateBluetoothSnapshot(matching: snapshot) {
+                continue
+            }
+            if hasBetterDuplicateBluetoothSnapshot(matching: snapshot) {
+                continue
+            }
+            if let existing = snapshotsByID[snapshot.deviceID], existing.updatedAt > snapshot.updatedAt {
+                continue
+            }
+            removeDuplicateBluetoothSnapshots(
+                matching: snapshot,
+                preservingStrongSnapshotsOutside: authoritativeProviders
+            )
+            snapshotsByID[snapshot.deviceID] = snapshot
+        }
+    }
+
+    private mutating func removeDuplicateBluetoothSnapshots(
+        matching snapshot: BatterySnapshot,
+        preservingStrongSnapshotsOutside authoritativeProviders: Set<BatteryProvider>?
+    ) {
         guard snapshot.source.isBluetoothRelated else { return }
 
         let normalizedName = snapshot.displayName.normalizedDeviceName
@@ -181,7 +252,34 @@ public struct BatterySnapshotStore: Sendable {
                 || !existing.source.isBluetoothRelated
                 || existing.kind != snapshot.kind
                 || existing.displayName.normalizedDeviceName != normalizedName
+                || !Self.canDeduplicateByName(existing, snapshot)
+                || Self.shouldPreserveStrongSnapshot(
+                    existing,
+                    from: snapshot,
+                    authoritativeProviders: authoritativeProviders
+                )
         }
+    }
+
+    private static func shouldPreserveStrongSnapshot(
+        _ existing: BatterySnapshot,
+        from incoming: BatterySnapshot,
+        authoritativeProviders: Set<BatteryProvider>?
+    ) -> Bool {
+        guard let authoritativeProviders else { return false }
+        return existing.identityStrength == .strong
+            && incoming.identityStrength != .strong
+            && existing.deviceID != incoming.deviceID
+            && !authoritativeProviders.contains(existing.provider)
+    }
+
+    private static func canDeduplicateByName(
+        _ left: BatterySnapshot,
+        _ right: BatterySnapshot
+    ) -> Bool {
+        !(left.identityStrength == .strong
+            && right.identityStrength == .strong
+            && left.deviceID != right.deviceID)
     }
 }
 

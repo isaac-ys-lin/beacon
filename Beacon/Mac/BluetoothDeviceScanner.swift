@@ -6,7 +6,9 @@ import os
 
 public struct BluetoothDeviceScanner {
     private static let logger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "bluetooth")
-    private static let systemProfilerTimeout: TimeInterval = 5
+    private static let signposter = OSSignposter(logger: logger)
+    private static let refreshTimeout: Duration = .seconds(8)
+    private static let systemProfilerTimeout: Duration = .seconds(5)
     private static let bleBatteryScanTimeout: Duration = .seconds(6)
 
     public init() {}
@@ -16,57 +18,168 @@ public struct BluetoothDeviceScanner {
     }
 
     public func connectedCandidateReport(now: Date = Date()) async -> BluetoothCandidateScanReport {
-        async let localRead = Self.readLocalBatteryCandidates()
-        async let profilerRead = Self.readSystemProfilerBatteryCandidates()
-        async let bleRead = Self.readBLEBatteryCandidates(now: now)
-        async let usbRead = IPhoneUSBBatteryProvider.readCandidate(now: now)
-
-        let (local, profiler, ble, usb) = await (localRead, profilerRead, bleRead, usbRead)
-
-        var candidates = local
-        var attempts: [BatteryProviderAttempt] = [
-            BatteryProviderAttempt(
-                provider: .ioRegistry,
-                status: Self.status(for: local),
-                candidateCount: local.count,
-                message: "IORegistry returned \(local.count) Bluetooth battery candidates",
-                attemptedAt: now
-            )
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: Self.refreshTimeout)
+        let expectedProviders: Set<BatteryProvider> = [
+            .ioRegistry,
+            .systemProfiler,
+            .coreBluetoothBatteryService,
+            .ideviceInfo,
         ]
+        var outcomes: [BatteryProvider: BluetoothProviderOutcome] = [:]
 
-        Self.logger.info("system_profiler returned \(profiler.count) battery candidates")
-        attempts.append(
-            BatteryProviderAttempt(
-                provider: .systemProfiler,
-                status: Self.status(for: profiler),
-                candidateCount: profiler.count,
-                message: "system_profiler returned \(profiler.count) battery candidates",
-                attemptedAt: Date()
+        await withTaskGroup(of: BluetoothProviderCollectionEvent.self) { group in
+            group.addTask {
+                .outcome(await Self.instrumented(provider: .ioRegistry) {
+                    let candidates = await Self.readLocalBatteryCandidates()
+                    return Self.outcome(
+                        provider: .ioRegistry,
+                        candidates: candidates,
+                        now: now,
+                        message: "IORegistry returned \(candidates.count) Bluetooth battery candidates"
+                    )
+                })
+            }
+            group.addTask {
+                .outcome(await Self.instrumented(provider: .systemProfiler) {
+                    await Self.readSystemProfilerBatteryCandidates(now: now, deadline: deadline)
+                })
+            }
+            group.addTask {
+                .outcome(await Self.instrumented(provider: .coreBluetoothBatteryService) {
+                    let result = await Self.readBLEBatteryCandidates(now: now)
+                    return BluetoothProviderOutcome(candidates: result.candidates, attempt: result.attempt)
+                })
+            }
+            group.addTask {
+                .outcome(await Self.instrumented(provider: .ideviceInfo) {
+                    let result = await IPhoneUSBBatteryProvider.readCandidate(now: now, deadline: deadline)
+                    return BluetoothProviderOutcome(
+                        candidates: result.candidate.map { [$0] } ?? [],
+                        attempt: result.attempt
+                    )
+                })
+            }
+            group.addTask {
+                do {
+                    try await Task.sleep(for: Self.refreshTimeout)
+                } catch {
+                    return .deadline
+                }
+                return .deadline
+            }
+
+            while let event = await group.next() {
+                switch event {
+                case .outcome(let outcome):
+                    outcomes[outcome.attempt.provider] = outcome
+                    if outcomes.keys.count == expectedProviders.count {
+                        group.cancelAll()
+                        return
+                    }
+                case .deadline:
+                    group.cancelAll()
+                    return
+                }
+            }
+        }
+
+        for provider in expectedProviders where outcomes[provider] == nil {
+            outcomes[provider] = BluetoothProviderOutcome(
+                candidates: [],
+                attempt: BatteryProviderAttempt(
+                    provider: provider,
+                    status: .timedOut,
+                    candidateCount: 0,
+                    message: "Provider did not finish before the refresh deadline",
+                    attemptedAt: now
+                )
             )
+        }
+
+        let orderedOutcomes = outcomes.values.sorted {
+            Self.providerRank($0.attempt.provider) > Self.providerRank($1.attempt.provider)
+        }
+        let merged = Self.mergingCandidates(orderedOutcomes.flatMap(\.candidates))
+        let collapsed = Self.collapsingDuplicateIPhones(merged)
+        let attempts = orderedOutcomes.map(\.attempt)
+        let authoritativeProviders = Set(
+            attempts.filter { $0.status == .reported || $0.status == .noReport }.map(\.provider)
         )
-        for candidate in profiler {
-            candidates.upsert(candidate)
-        }
+        Self.logger.info("Battery provider refresh completed outcomes=\(attempts.count) candidates=\(collapsed.count)")
+        return BluetoothCandidateScanReport(
+            candidates: collapsed,
+            attempts: attempts,
+            authoritativeProviders: authoritativeProviders
+        )
+    }
 
-        Self.logger.info("Known BLE scan returned \(ble.candidates.count) battery candidates")
-        attempts.append(ble.attempt)
-        for candidate in ble.candidates {
-            candidates.upsert(candidate)
-        }
+    private struct BluetoothProviderOutcome: Sendable {
+        let candidates: [BluetoothBatteryCandidate]
+        let attempt: BatteryProviderAttempt
+    }
 
-        Self.logger.info("USB iPhone read returned \(usb.attempt.candidateCount) battery candidates")
-        attempts.append(usb.attempt)
-        if let candidate = usb.candidate {
-            candidates.upsert(candidate)
-        }
-
-        let collapsed = Self.collapsingDuplicateIPhones(candidates)
-        return BluetoothCandidateScanReport(candidates: collapsed, attempts: attempts)
+    private enum BluetoothProviderCollectionEvent: Sendable {
+        case outcome(BluetoothProviderOutcome)
+        case deadline
     }
 
     private struct BLEBatteryProviderResult: Sendable {
         let candidates: [BluetoothBatteryCandidate]
         let attempt: BatteryProviderAttempt
+    }
+
+    static func bleReadStatus(
+        completion: BLEBatteryReadCompletion,
+        candidates: [BluetoothBatteryCandidate]
+    ) -> BatteryReadStatus {
+        switch completion {
+        case .completed:
+            return status(for: candidates)
+        case .timedOut, .cancelled:
+            return .timedOut
+        case .unauthorized:
+            return .unauthorized
+        case .unavailable:
+            return .unavailable
+        }
+    }
+
+    private static func outcome(
+        provider: BatteryProvider,
+        candidates: [BluetoothBatteryCandidate],
+        now: Date,
+        message: String
+    ) -> BluetoothProviderOutcome {
+        BluetoothProviderOutcome(
+            candidates: candidates,
+            attempt: BatteryProviderAttempt(
+                provider: provider,
+                status: status(for: candidates),
+                candidateCount: candidates.count,
+                message: message,
+                attemptedAt: now
+            )
+        )
+    }
+
+    private static func instrumented(
+        provider: BatteryProvider,
+        operation: () async -> BluetoothProviderOutcome
+    ) async -> BluetoothProviderOutcome {
+        let id = signposter.makeSignpostID()
+        let state = signposter.beginInterval(
+            "BatteryProvider",
+            id: id,
+            "provider=\(provider.rawValue, privacy: .public)"
+        )
+        let outcome = await operation()
+        signposter.endInterval(
+            "BatteryProvider",
+            state,
+            "status=\(outcome.attempt.status.rawValue, privacy: .public) count=\(outcome.candidates.count)"
+        )
+        return outcome
     }
 
     /// The same iPhone can surface through multiple providers (USB `ideviceinfo`,
@@ -80,10 +193,9 @@ public struct BluetoothDeviceScanner {
         let iPhones = candidates.filter(Self.isIPhoneCandidate)
         guard iPhones.count > 1 else { return candidates }
 
-        let preferred = iPhones.first { $0.batteryPercent != nil && $0.connectionState == .connected }
-            ?? iPhones.first { $0.batteryPercent != nil }
-            ?? iPhones.first { $0.connectionState == .connected }
-            ?? iPhones[0]
+        let preferred = iPhones.max { left, right in
+            candidatePreference(left) < candidatePreference(right)
+        } ?? iPhones[0]
 
         var result: [BluetoothBatteryCandidate] = []
         var insertedIPhone = false
@@ -106,19 +218,25 @@ public struct BluetoothDeviceScanner {
         return name.contains("iphone") || name.contains("ios")
     }
 
+    private static func candidatePreference(_ candidate: BluetoothBatteryCandidate) -> (Int, Int, Int, String) {
+        (
+            candidate.connectionState == .connected ? 1 : 0,
+            candidate.batteryPercent == nil ? 0 : 1,
+            transportRank(candidate.transport),
+            candidate.deviceID
+        )
+    }
+
     private static func status(for candidates: [BluetoothBatteryCandidate]) -> BatteryReadStatus {
         candidates.contains { $0.batteryPercent != nil } ? .reported : .noReport
     }
 
     private static func readLocalBatteryCandidates() async -> [BluetoothBatteryCandidate] {
-        await Task.detached(priority: .utility) {
-            let scanner = BluetoothDeviceScanner()
-            var candidates = scanner.readAppleDeviceManagementBatteryCandidates()
-            for candidate in scanner.readHIDBatteryCandidates() {
-                candidates.upsert(candidate)
-            }
-            return candidates
-        }.value
+        guard !Task.isCancelled else { return [] }
+        let scanner = BluetoothDeviceScanner()
+        let candidates = scanner.readAppleDeviceManagementBatteryCandidates()
+            + scanner.readHIDBatteryCandidates()
+        return mergingCandidates(candidates)
     }
 
     private func readAppleDeviceManagementBatteryCandidates() -> [BluetoothBatteryCandidate] {
@@ -132,6 +250,7 @@ public struct BluetoothDeviceScanner {
         var seenIDs = Set<String>()
 
         for className in classNames {
+            guard !Task.isCancelled else { break }
             var iterator: io_iterator_t = 0
             let matching = IOServiceMatching(className)
             guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
@@ -140,6 +259,7 @@ public struct BluetoothDeviceScanner {
             defer { IOObjectRelease(iterator) }
 
             while true {
+                guard !Task.isCancelled else { break }
                 let service = IOIteratorNext(iterator)
                 if service == 0 { break }
                 defer { IOObjectRelease(service) }
@@ -168,15 +288,25 @@ public struct BluetoothDeviceScanner {
 
         var results: [BluetoothBatteryCandidate] = []
         while true {
+            guard !Task.isCancelled else { break }
             let service = IOIteratorNext(iterator)
             if service == 0 { break }
             defer { IOObjectRelease(service) }
 
             let name = property("Product", service: service) ?? property("ProductID", service: service) ?? "Bluetooth Device"
-            let id = property("PhysicalDeviceUniqueID", service: service)
-                ?? property("DeviceAddress", service: service)
-                ?? property("SerialNumber", service: service)
-                ?? name
+            let physicalID = property("PhysicalDeviceUniqueID", service: service)
+            let address = property("DeviceAddress", service: service)
+            let serial = property("SerialNumber", service: service)
+            let id = physicalID ?? address ?? serial ?? name
+            let identityEvidence: BluetoothIdentityEvidence = if physicalID != nil {
+                .physicalDeviceUniqueID
+            } else if address != nil {
+                .deviceAddress
+            } else if serial != nil {
+                .serialNumber
+            } else {
+                .normalizedName
+            }
             let percent = intProperty("BatteryPercent", service: service)
             let transport = property("Transport", service: service) ?? ""
             let usagePage = intProperty("PrimaryUsagePage", service: service)
@@ -199,7 +329,8 @@ public struct BluetoothDeviceScanner {
                         displayName: name,
                         transport: .hid,
                         batteryPercent: percent,
-                        kindHint: kindHint
+                        kindHint: kindHint,
+                        identityEvidence: identityEvidence
                     )
                 )
             }
@@ -207,25 +338,83 @@ public struct BluetoothDeviceScanner {
         return results
     }
 
-    private static func readSystemProfilerBatteryCandidates() async -> [BluetoothBatteryCandidate] {
-        await Task.detached(priority: .utility) {
-            Self.systemProfilerBatteryCandidates()
-        }.value
+    private static func readSystemProfilerBatteryCandidates(
+        now: Date,
+        deadline: ContinuousClock.Instant,
+        runner: BatteryProviderRunner = BatteryProviderRunner()
+    ) async -> BluetoothProviderOutcome {
+        let remaining = ContinuousClock().now.duration(to: deadline)
+        guard remaining > .zero else {
+            return BluetoothProviderOutcome(
+                candidates: [],
+                attempt: BatteryProviderAttempt(
+                    provider: .systemProfiler,
+                    status: .timedOut,
+                    candidateCount: 0,
+                    message: "system_profiler did not start before the refresh deadline",
+                    attemptedAt: now
+                )
+            )
+        }
+
+        do {
+            let result = try await runner.run(
+                executableURL: URL(fileURLWithPath: "/usr/sbin/system_profiler"),
+                arguments: ["SPBluetoothDataType", "-json"],
+                timeout: min(systemProfilerTimeout, remaining)
+            )
+            let candidates = result.succeeded ? parseSystemProfilerBluetoothData(result.output) : []
+            let status: BatteryReadStatus
+            if result.timedOut || result.wasCancelled {
+                status = .timedOut
+            } else if result.terminationStatus != 0 {
+                status = .unavailable
+            } else {
+                status = Self.status(for: candidates)
+            }
+            return BluetoothProviderOutcome(
+                candidates: candidates,
+                attempt: BatteryProviderAttempt(
+                    provider: .systemProfiler,
+                    status: status,
+                    candidateCount: candidates.count,
+                    message: status == .timedOut
+                        ? "system_profiler timed out"
+                        : "system_profiler returned \(candidates.count) battery candidates",
+                    attemptedAt: now
+                )
+            )
+        } catch {
+            return BluetoothProviderOutcome(
+                candidates: [],
+                attempt: BatteryProviderAttempt(
+                    provider: .systemProfiler,
+                    status: .unavailable,
+                    candidateCount: 0,
+                    message: "system_profiler could not be launched",
+                    attemptedAt: now
+                )
+            )
+        }
     }
 
     @MainActor
     private static func readBLEBatteryCandidates(now: Date) async -> BLEBatteryProviderResult {
         switch CBCentralManager.authorization {
         case .allowedAlways, .notDetermined:
-            let candidates = await BLEBatteryServiceReader().read(timeout: bleBatteryScanTimeout)
+            let readResult = await BLEBatteryServiceReader().read(timeout: bleBatteryScanTimeout)
+            let status = bleReadStatus(
+                completion: readResult.completion,
+                candidates: readResult.candidates
+            )
             return BLEBatteryProviderResult(
-                candidates: candidates,
+                candidates: readResult.candidates,
                 attempt: BatteryProviderAttempt(
                     provider: .coreBluetoothBatteryService,
-                    status: Self.status(for: candidates),
-                    candidateCount: candidates.count,
-                    message: "Known BLE scan returned \(candidates.count) battery candidates",
-                    attemptedAt: Date()
+                    status: status,
+                    candidateCount: readResult.candidates.count,
+                    message: "Known BLE scan finished with \(status.rawValue) and \(readResult.candidates.count) battery candidates",
+                    attemptedAt: now
                 )
             )
         case .denied, .restricted:
@@ -254,36 +443,6 @@ public struct BluetoothDeviceScanner {
                     attemptedAt: now
                 )
             )
-        }
-    }
-
-    private static func systemProfilerBatteryCandidates() -> [BluetoothBatteryCandidate] {
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
-        process.arguments = ["SPBluetoothDataType", "-json"]
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        let timeoutWorkItem = DispatchWorkItem {
-            guard process.isRunning else { return }
-            process.terminate()
-        }
-
-        do {
-            try process.run()
-            DispatchQueue.global(qos: .utility).asyncAfter(
-                deadline: .now() + systemProfilerTimeout,
-                execute: timeoutWorkItem
-            )
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            timeoutWorkItem.cancel()
-            guard process.terminationStatus == 0 else { return [] }
-            return parseSystemProfilerBluetoothData(data)
-        } catch {
-            timeoutWorkItem.cancel()
-            return []
         }
     }
 
@@ -316,7 +475,9 @@ public struct BluetoothDeviceScanner {
     }
 
     private static func candidates(fromSystemProfilerDeviceNamed name: String, device: [String: Any], connectionState: ConnectionState = .connected) -> [BluetoothBatteryCandidate] {
-        let address = stringValue(device["device_address"]) ?? name
+        let reportedAddress = stringValue(device["device_address"])
+        let address = reportedAddress ?? name
+        let identityEvidence: BluetoothIdentityEvidence = reportedAddress == nil ? .normalizedName : .deviceAddress
         let minorType = stringValue(device["device_minorType"]) ?? ""
         let kindHint = kindHint(name: name, minorType: minorType)
         let levels = batteryLevels(from: device)
@@ -331,7 +492,8 @@ public struct BluetoothDeviceScanner {
                     transport: .systemProfiler,
                     batteryPercent: level.percent,
                     kindHint: .airPods,
-                    connectionState: connectionState
+                    connectionState: connectionState,
+                    identityEvidence: identityEvidence
                 )
             }
         }
@@ -347,7 +509,8 @@ public struct BluetoothDeviceScanner {
                 transport: .systemProfiler,
                 batteryPercent: percent,
                 kindHint: kindHint,
-                connectionState: connectionState
+                connectionState: connectionState,
+                identityEvidence: identityEvidence
             )
         ]
     }
@@ -465,12 +628,19 @@ public struct BluetoothDeviceScanner {
             return nil
         }
 
-        let id = stringValue(properties["DeviceAddress"])
+        let address = stringValue(properties["DeviceAddress"])
             ?? stringValue(properties["BluetoothDeviceAddress"])
-            ?? stringValue(properties["SerialNumber"])
-            ?? stringValue(properties["HIDDeviceID"])
+        let serial = stringValue(properties["SerialNumber"])
+        let fallbackID = stringValue(properties["HIDDeviceID"])
             ?? stringValue(properties["LocationID"])
-            ?? name
+        let id = address ?? serial ?? fallbackID ?? name
+        let identityEvidence: BluetoothIdentityEvidence = if address != nil {
+            .deviceAddress
+        } else if serial != nil {
+            .serialNumber
+        } else {
+            .normalizedName
+        }
 
         return BluetoothBatteryCandidate(
             deviceID: id,
@@ -478,7 +648,8 @@ public struct BluetoothDeviceScanner {
             transport: .hid,
             batteryPercent: percent,
             kindHint: kindHint,
-            connectionState: .connected
+            connectionState: .connected,
+            identityEvidence: identityEvidence
         )
     }
 
@@ -501,19 +672,129 @@ public struct BluetoothDeviceScanner {
         existing: BluetoothBatteryCandidate,
         with candidate: BluetoothBatteryCandidate
     ) -> BluetoothBatteryCandidate {
-        let displayName = candidate.displayName.isGenericBluetoothDisplayName
-            ? existing.displayName
-            : candidate.displayName
-
+        let values = [existing, candidate]
+        let connected = values.filter { $0.connectionState == .connected }
+        let eligible = connected.isEmpty ? values : connected
+        let identityWinner = values.max { left, right in
+            if left.identityEvidence.strength != right.identityEvidence.strength {
+                return left.identityEvidence.strength < right.identityEvidence.strength
+            }
+            return transportRank(left.transport) < transportRank(right.transport)
+        } ?? candidate
+        let displayWinner = eligible
+            .filter { !$0.displayName.isGenericBluetoothDisplayName }
+            .max { transportRank($0.transport) < transportRank($1.transport) }
+            ?? identityWinner
+        let percentWinner = eligible
+            .filter { $0.batteryPercent != nil }
+            .max { transportRank($0.transport) < transportRank($1.transport) }
+        let connectionWinner = values.max {
+            connectionRank($0.connectionState) < connectionRank($1.connectionState)
+        } ?? candidate
+        let provenanceWinner = percentWinner ?? connectionWinner
+        let chargeState = eligible
+            .filter { $0.chargeState != .unknown }
+            .max { transportRank($0.transport) < transportRank($1.transport) }?
+            .chargeState ?? .unknown
         return BluetoothBatteryCandidate(
-            deviceID: candidate.deviceID,
-            displayName: displayName,
-            transport: candidate.transport,
-            batteryPercent: candidate.batteryPercent,
-            kindHint: candidate.kindHint ?? existing.kindHint,
-            connectionState: candidate.connectionState,
-            chargeState: candidate.chargeState
+            deviceID: identityWinner.deviceID,
+            displayName: displayWinner.displayName,
+            transport: provenanceWinner.transport,
+            batteryPercent: percentWinner?.batteryPercent,
+            kindHint: displayWinner.kindHint ?? identityWinner.kindHint ?? provenanceWinner.kindHint,
+            connectionState: connectionWinner.connectionState,
+            chargeState: chargeState,
+            identityEvidence: identityWinner.identityEvidence
         )
+    }
+
+    static func mergingCandidates(_ candidates: [BluetoothBatteryCandidate]) -> [BluetoothBatteryCandidate] {
+        let ambiguousStrongClusters = Set(
+            Dictionary(grouping: candidates.filter { $0.identityEvidence.strength == 2 }) {
+                candidateClusterKey($0)
+            }
+            .compactMap { key, values in
+                Set(values.map(\.deviceID)).count > 1 ? key : nil
+            }
+        )
+        var merged: [BluetoothBatteryCandidate] = []
+        for candidate in candidates {
+            let clusterIsAmbiguous = ambiguousStrongClusters.contains(candidateClusterKey(candidate))
+            let matchingIndex = merged.firstIndex { existing in
+                if clusterIsAmbiguous, existing.deviceID != candidate.deviceID {
+                    return false
+                }
+                return canMerge(existing, candidate)
+            }
+            if let index = matchingIndex {
+                merged[index] = mergedCandidate(existing: merged[index], with: candidate)
+            } else {
+                merged.append(candidate)
+            }
+        }
+        return merged
+    }
+
+    private static func canMerge(
+        _ left: BluetoothBatteryCandidate,
+        _ right: BluetoothBatteryCandidate
+    ) -> Bool {
+        if left.deviceID == right.deviceID { return true }
+        guard candidateKind(left) == candidateKind(right),
+              left.displayName.normalizedDeviceName == right.displayName.normalizedDeviceName
+        else {
+            return false
+        }
+        let hasConflictingStrongIDs = left.identityEvidence.strength == 2
+            && right.identityEvidence.strength == 2
+            && left.deviceID != right.deviceID
+        return !hasConflictingStrongIDs
+    }
+
+    private static func candidateClusterKey(_ candidate: BluetoothBatteryCandidate) -> String {
+        "\(candidateKind(candidate))|\(candidate.displayName.normalizedDeviceName)"
+    }
+
+    private static func candidateKind(_ candidate: BluetoothBatteryCandidate) -> DeviceKind {
+        if let kindHint = candidate.kindHint { return kindHint }
+        let name = candidate.displayName.lowercased()
+        if name.contains("iphone") || name.contains("ios") { return .iPhone }
+        if name.contains("airpods") || name.contains("air pods") { return .airPods }
+        if name.contains("keyboard") { return .keyboard }
+        if name.contains("mouse") { return .mouse }
+        if name.contains("trackpad") { return .trackpad }
+        return .bluetoothPeripheral
+    }
+
+    private static func connectionRank(_ state: ConnectionState) -> Int {
+        switch state {
+        case .connected: return 2
+        case .disconnected: return 1
+        case .unknown: return 0
+        }
+    }
+
+    private static func transportRank(_ transport: BluetoothTransport) -> Int {
+        switch transport {
+        case .usb: return 6
+        case .hid: return 5
+        case .systemProfiler: return 4
+        case .classic: return 3
+        case .ble: return 2
+        case .unknown: return 1
+        }
+    }
+
+    private static func providerRank(_ provider: BatteryProvider) -> Int {
+        switch provider {
+        case .ideviceInfo: return 6
+        case .ioRegistry: return 5
+        case .systemProfiler: return 4
+        case .ioBluetooth: return 3
+        case .coreBluetoothBatteryService: return 2
+        case .bluetoothUnsupported: return 1
+        case .macPowerSource: return 0
+        }
     }
 
     private static func isAirPods(name: String, minorType: String) -> Bool {
@@ -689,20 +970,6 @@ enum BluetoothDeviceController {
     }
 }
 
-private extension Array where Element == BluetoothBatteryCandidate {
-    mutating func upsert(_ candidate: BluetoothBatteryCandidate) {
-        if let index = firstIndex(where: { $0.deviceID == candidate.deviceID || $0.displayName.normalizedDeviceName == candidate.displayName.normalizedDeviceName }) {
-            let existing = self[index]
-            let resolved = BluetoothDeviceScanner.mergedCandidate(existing: existing, with: candidate)
-            if candidate.batteryPercent != nil || self[index].batteryPercent == nil {
-                self[index] = resolved
-            }
-        } else {
-            append(candidate)
-        }
-    }
-}
-
 private extension String {
     var normalizedDeviceName: String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -721,6 +988,19 @@ enum BLEBatteryReadStateAction: Equatable {
     case wait
     case scanKnownPeripherals
     case finish
+}
+
+enum BLEBatteryReadCompletion: Equatable, Sendable {
+    case completed
+    case timedOut
+    case cancelled
+    case unauthorized
+    case unavailable
+}
+
+private struct BLEBatteryServiceReadResult: Sendable {
+    let candidates: [BluetoothBatteryCandidate]
+    let completion: BLEBatteryReadCompletion
 }
 
 enum BLEBatteryReadStatePolicy {
@@ -757,7 +1037,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     private static let hidService = CBUUID(string: "1812")
 
     private var central: CBCentralManager?
-    private var continuation: CheckedContinuation<[BluetoothBatteryCandidate], Never>?
+    private var continuation: CheckedContinuation<BLEBatteryServiceReadResult, Never>?
     private var candidates: [UUID: BluetoothBatteryCandidate] = [:]
     private var peripherals: [UUID: CBPeripheral] = [:]
     private var connectionAttemptIDs = Set<UUID>()
@@ -771,14 +1051,24 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
     private var inspectedAnyPeripheral = false
     private var didStartInitialInspection = false
 
-    func read(timeout: Duration = .seconds(4)) async -> [BluetoothBatteryCandidate] {
-        await withCheckedContinuation { continuation in
-            self.continuation = continuation
-            self.configuredTimeout = timeout
-            self.central = CBCentralManager(delegate: self, queue: nil)
-            self.timeoutTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: timeout)
-                self?.finish()
+    func read(timeout: Duration = .seconds(4)) async -> BLEBatteryServiceReadResult {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                self.continuation = continuation
+                self.configuredTimeout = timeout
+                self.central = CBCentralManager(delegate: self, queue: nil)
+                self.timeoutTask = Task { @MainActor [weak self] in
+                    do {
+                        try await Task.sleep(for: timeout)
+                        self?.finish(completion: .timedOut)
+                    } catch {
+                        // Another terminal reason completed the read.
+                    }
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.finish(completion: .cancelled)
             }
         }
     }
@@ -788,7 +1078,14 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         case .wait:
             return
         case .finish:
-            finish()
+            switch central.state {
+            case .unauthorized:
+                finish(completion: .unauthorized)
+            case .unsupported, .poweredOff:
+                finish(completion: .unavailable)
+            default:
+                finish(completion: .unavailable)
+            }
             return
         case .scanKnownPeripherals:
             break
@@ -863,7 +1160,8 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
             deviceID: peripheral.identifier.uuidString,
             displayName: name,
             transport: .ble,
-            batteryPercent: Int(value)
+            batteryPercent: Int(value),
+            identityEvidence: .coreBluetoothUUID
         )
         resolve(peripheral.identifier)
     }
@@ -894,7 +1192,7 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
               inspectedAnyPeripheral,
               pendingResolutionIDs.isEmpty
         else { return }
-        finish()
+        finish(completion: .completed)
     }
 
     private func scheduleDiscoveryWindowFinishIfNeeded(inspectedKnownPeripheral: Bool) {
@@ -905,12 +1203,17 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
         guard timeout != configuredTimeout else { return }
         discoveryWindowTask?.cancel()
         discoveryWindowTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: timeout)
-            self?.finish()
+            do {
+                try await Task.sleep(for: timeout)
+                self?.finish(completion: .completed)
+            } catch {
+                // Another terminal reason completed the read.
+            }
         }
     }
 
-    private func finish() {
+    private func finish(completion: BLEBatteryReadCompletion) {
+        guard let continuation else { return }
         timeoutTask?.cancel()
         timeoutTask = nil
         discoveryWindowTask?.cancel()
@@ -921,9 +1224,12 @@ private final class BLEBatteryServiceReader: NSObject, @preconcurrency CBCentral
                 central?.cancelPeripheralConnection(peripheral)
             }
         }
-        let result = Array(candidates.values)
-        continuation?.resume(returning: result)
-        continuation = nil
+        let result = BLEBatteryServiceReadResult(
+            candidates: Array(candidates.values),
+            completion: completion
+        )
+        self.continuation = nil
+        continuation.resume(returning: result)
         connectionAttemptIDs.removeAll()
         central = nil
     }
