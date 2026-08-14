@@ -25,6 +25,20 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
 
+        #if DEBUG
+        let arguments = Set(ProcessInfo.processInfo.arguments)
+        let panelUITestArguments: Set<String> = [
+            "--ui-test-show-hud",
+            "--ui-test-open-status-menu"
+        ]
+        if !arguments.isDisjoint(with: panelUITestArguments) {
+            // XCTest does not vend an accessibility window for an accessory app
+            // whose only visible surface is a nonactivating panel.
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        #endif
+
         let model = BeaconModel()
         self.model = model
         statusController = BeaconStatusController(model: model)
@@ -32,7 +46,6 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
         model.start()
 
         #if DEBUG
-        let arguments = Set(ProcessInfo.processInfo.arguments)
         if arguments.contains("--ui-test-open-settings") {
             statusController?.showSettingsForUITesting()
         }
