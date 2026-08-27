@@ -104,7 +104,7 @@ final class StatusMenuPanelController {
         window.hasShadow = false
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        window.title = "Beacon Status Menu"
+        window.title = BeaconL10n.string("Beacon Status Menu")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.setFrame(panel.frame, display: true)

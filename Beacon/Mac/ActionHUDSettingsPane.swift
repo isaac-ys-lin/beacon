@@ -4,6 +4,9 @@ struct ActionHUDSettingsPane: View {
     @Binding var showActionHUD: Bool
     @Binding var showLowBatteryHUD: Bool
     @Binding var showChargedHUD: Bool
+    @Binding var autoDismissEnabled: Bool
+    @Binding var dismissDelaySeconds: Double
+    @Binding var showDismissButton: Bool
     let lowBatteryThreshold: Int
 
     var body: some View {
@@ -11,8 +14,6 @@ struct ActionHUDSettingsPane: View {
             Form {
                 Section {
                     Toggle("Show Action HUD", isOn: $showActionHUD)
-                } header: {
-                    Text("Action HUD")
                 } footer: {
                     Text("Show polished in-app alerts for important battery events.")
                 }
@@ -40,6 +41,41 @@ struct ActionHUDSettingsPane: View {
                 } header: {
                     Text("Events")
                 }
+
+                Section {
+                    Toggle("Dismiss automatically", isOn: $autoDismissEnabled)
+                        .disabled(!showActionHUD || !showDismissButton)
+                        .help(BeaconL10n.string(
+                            showDismissButton
+                                ? "Keep the HUD visible until dismissed."
+                                : "Enable the dismiss button before turning off automatic dismissal."
+                        ))
+                        .accessibilityIdentifier("hud.settings.auto-dismiss")
+
+                    HStack(spacing: 10) {
+                        Text("Dismiss after")
+                        Slider(value: dismissDelayBinding, in: 2...10, step: 1)
+                        Text(BeaconL10n.format("%@ sec", String(Int(clampedDismissDelay))))
+                            .monospacedDigit()
+                            .frame(width: 46, alignment: .trailing)
+                    }
+                    .disabled(!showActionHUD || !autoDismissEnabled)
+                    .opacity(showActionHUD && autoDismissEnabled ? 1 : 0.45)
+                    .accessibilityIdentifier("hud.settings.dismiss-delay")
+
+                    Toggle("Show dismiss button", isOn: $showDismissButton)
+                        .disabled(!showActionHUD || !autoDismissEnabled)
+                        .help(BeaconL10n.string(
+                            autoDismissEnabled
+                                ? "Show a close button on the HUD."
+                                : "Automatic dismissal must stay on if the dismiss button is hidden."
+                        ))
+                        .accessibilityIdentifier("hud.settings.dismiss-button")
+                } header: {
+                    Text("Behavior")
+                } footer: {
+                    Text("The HUD always keeps at least one way to close it.")
+                }
             }
             .formStyle(.grouped)
             .frame(minWidth: 350, maxWidth: 350, maxHeight: .infinity, alignment: .topLeading)
@@ -47,6 +83,11 @@ struct ActionHUDSettingsPane: View {
             previewPanel
         }
         .frame(maxWidth: 650, maxHeight: .infinity, alignment: .top)
+        .onAppear {
+            if !autoDismissEnabled && !showDismissButton {
+                autoDismissEnabled = true
+            }
+        }
     }
 
     private var previewPanel: some View {
@@ -62,7 +103,7 @@ struct ActionHUDSettingsPane: View {
                         displayName: "Magic Mouse",
                         percent: lowBatteryThreshold
                     ),
-                    showsDismissButton: false
+                    showsDismissButton: showDismissButton
                 )
                 .scaleEffect(0.58)
                 .frame(width: 302, height: 54)
@@ -74,7 +115,7 @@ struct ActionHUDSettingsPane: View {
                         displayName: "Magic Keyboard",
                         percent: 100
                     ),
-                    showsDismissButton: false
+                    showsDismissButton: showDismissButton
                 )
                 .scaleEffect(0.58)
                 .frame(width: 302, height: 54)
@@ -84,8 +125,13 @@ struct ActionHUDSettingsPane: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 7) {
-                hudStateRow("Low battery", isOn: showLowBatteryHUD)
-                hudStateRow("Finished charging", isOn: showChargedHUD)
+                hudStateRow(BeaconL10n.string("Low battery"), isOn: showLowBatteryHUD)
+                hudStateRow(BeaconL10n.string("Finished charging"), isOn: showChargedHUD)
+                hudStateRow(
+                    BeaconL10n.format("Auto dismiss (%d sec)", Int(clampedDismissDelay)),
+                    isOn: autoDismissEnabled
+                )
+                hudStateRow(BeaconL10n.string("Dismiss button"), isOn: showDismissButton)
             }
         }
         .padding(16)
@@ -104,6 +150,17 @@ struct ActionHUDSettingsPane: View {
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
             Spacer(minLength: 0)
         }
+    }
+
+    private var clampedDismissDelay: Double {
+        Swift.max(2, Swift.min(10, dismissDelaySeconds))
+    }
+
+    private var dismissDelayBinding: Binding<Double> {
+        Binding(
+            get: { clampedDismissDelay },
+            set: { dismissDelaySeconds = Swift.max(2, Swift.min(10, $0)) }
+        )
     }
 
 }

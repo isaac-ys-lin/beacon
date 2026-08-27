@@ -1,6 +1,6 @@
 # Beacon AirBuddy Alignment Checklist
 
-Generated: 2026-06-18
+Last verified: 2026-08-27
 
 ## Reference Scope
 
@@ -18,9 +18,12 @@ for this pass are:
 - Settings for device visibility and alert behavior.
 - Widget/dashboard style glanceability.
 
-Out of scope by user request:
+Current product boundary:
 
-- Device transfer and Magic Handoff style behavior.
+- Direct-download macOS 14+ app only.
+- No Mac App Store target, iOS/watch companion, iCloud sync, private APIs,
+  paid licensing, third-party network service, or in-app network updater.
+- Device transfer and Magic Handoff style behavior remain excluded.
 
 Official reference links reviewed:
 
@@ -42,9 +45,12 @@ Official reference links reviewed:
 | Pairing and connect flows | `Beacon/Mac/BeaconSettingsView.swift`, `Beacon/Mac/BeaconMacApp.swift`, `Beacon/Mac/BluetoothDeviceScanner.swift`, `Beacon/Mac/DeviceListPresentation.swift` | `testAddDeviceGuideRenderProducesNonBlankImage`, context action and control target tests | Complete with platform-safe limits |
 | Device context actions | `Beacon/Mac/StatusMenuView.swift`, `Beacon/Mac/DeviceListPresentation.swift`, `Beacon/Mac/BeaconQuickActions.swift` | `testContextMenuActionsExposeSafeImplementedCommandsFirst`, `testContextMenuActionTitlesMatchAirBuddyStyleCommands`, `testAirPodsContextMenuIncludesAudioControls` | Complete |
 | Preferences and settings window | `Beacon/Mac/BeaconSettingsView.swift`, `Beacon/Mac/DeviceListPresentation.swift`, `Beacon/Mac/BeaconHUDView.swift`, `Beacon/Mac/BeaconQuickActions.swift` | `testBeaconSettingsWindowRenderProducesNonBlankImage`, `testBeaconSettingsWindowRefreshingRenderProducesNonBlankImage`, settings tab render tests | Complete |
+| General settings and app lifecycle | `Beacon/Mac/GeneralSettingsPane.swift`, `Beacon/Mac/GeneralSettingsSupport.swift` | launch-at-login state/action tests, version fallback test, General pane render test | Complete for signed direct-download builds |
+| Local data controls | `Beacon/Mac/GeneralSettingsPane.swift`, `Beacon/Mac/GeneralSettingsSupport.swift`, `Beacon/Shared/BatteryHistoryStore.swift` | CSV escaping/order/clear tests and preference-reset preservation test | Complete |
 | Battery alerts | `Beacon/Mac/LowBatteryNotifier.swift`, `Beacon/Mac/BeaconHUDView.swift`, settings alert panes | `testLowBatteryNotifierFallsBackToAirPodsPrefixThreshold`, `testChargedAlertRequiresDeviceOptInAndCreatesEventOnceUntilDrained`, `testBeaconAlertsCanRenderInitialSelectedDeviceOverrides`, HUD render tests | Complete |
 | Shortcuts and automation | `Beacon/Mac/BeaconAppShortcuts.swift`, `Beacon/Mac/BeaconQuickActions.swift`, `Beacon/Mac/BeaconMacApp.swift` | `testBeaconAppShortcutsExposeSupportedAutomationActions`, intent bridge tests, app intents metadata extraction in packaged app | Complete |
 | Quick actions and keyboard shortcuts | `Beacon/Mac/BeaconQuickActions.swift`, `Beacon/Mac/BeaconMacApp.swift`, quick actions settings pane | `testQuickActionPreferencesDefaultToSafeEnabledActions`, `testQuickActionPreferencesRoundTripAndFilterUnsupportedActions`, `testBeaconQuickActionsSettingsRenderProducesNonBlankImage` | Complete |
+| English and Taiwan Traditional Chinese | `Beacon/Shared/BeaconL10n.swift`, `Beacon/Mac/zh-Hant-TW.lproj` | bundle localization test, Xcode localization export audit, App Shortcuts strings validation | Complete for current user-facing strings |
 | AirPods audio controls | `Beacon/Mac/DeviceListPresentation.swift`, `Beacon/Mac/StatusMenuView.swift`, `Beacon/Mac/BeaconSettingsView.swift` | `testAirPodsAudioPreferencesRoundTripPerDevice`, `testBeaconSettingsWindowCanRenderAirPodsAudioControls` | Safe alternative implemented |
 | Widget/dashboard glanceability | `Beacon/Mac/BeaconDesktopWidgetView.swift`, `Beacon/Mac/BeaconSettingsView.swift`, `Beacon/Shared/BatteryHistoryStore.swift` | `testBatteryDesktopWidgetRenderProducesNonBlankImage`, `testBeaconDashboardSettingsRenderProducesDesktopWidgetPreview`, history trend tests | Complete |
 | Empty/loading/stale/unsupported states | `Beacon/Mac/StatusMenuView.swift`, `Beacon/Mac/BeaconSettingsView.swift`, `Beacon/Mac/DeviceBatteryRow.swift`, `Beacon/Shared/BatterySnapshotStore.swift` | refreshing render tests, `testUnsupportedBluetoothDeviceStaysVisibleWithoutPercent`, freshness/status render coverage | Complete |
@@ -73,23 +79,43 @@ alternatives:
   preferring USB and falling back to Wi-Fi lockdown when available; there are no
   active iOS/watch companion targets or iCloud battery sync path in the current
   project.
+- Apple Watch remains a model/test-preview compatibility type only. The
+  production app has no Apple Watch data provider and makes no support claim.
+- Launch at Login uses Apple's `SMAppService.mainApp`. An unsigned test build can
+  correctly report the service as unavailable; the signed direct-download build
+  exposes registration, required-approval, and error states without fake success.
+- Updates are manual. Beacon does not call an update server or download code in
+  the background.
 - The local DMG is ad-hoc signed when `DEVELOPER_ID_IDENTITY` is not provided.
   Developer ID signing and notarization require those external signing
   credentials.
 
 ## Verification Evidence
 
-Evidence from the original alignment completion pass:
+Current evidence from 2026-08-27:
 
 - `git diff --check` passed.
-- `xcodebuild test -project Beacon.xcodeproj -scheme BeaconMac -destination 'platform=macOS,arch=arm64'` passed with 87 tests and 0 failures.
-- `script/package_dmg.sh` built the Release app and produced `dist/Beacon.dmg`.
-- `codesign --verify --deep --strict --verbose=2 build/dmg-staging/BeaconMac.app` passed.
-- `hdiutil verify dist/Beacon.dmg` reported the DMG checksum as valid.
-- App Intents metadata was present in the staged app and included dashboard,
-  refresh, low battery, summary, and battery trend actions.
-- Render artifacts used for screen inspection:
+- The complete `BeaconMac` test suite passed with 216 tests and 0 failures,
+  including minimum-window render coverage for General, Action HUD, and AirPods
+  detail panes so taller content cannot push the settings chrome off-screen.
+- `script/build_and_run.sh --verify` produced an Apple Development-signed Debug
+  app and verified the active process was running that exact executable.
+- `codesign --verify --deep --strict --verbose=2` passed for the signed Debug app;
+  its entitlements contain Bluetooth and development debugging access, but no App
+  Sandbox entitlement.
+- Xcode localization export found zero untranslated units for `zh-Hant-TW`,
+  including App Shortcut phrases.
+- App Intents metadata extraction succeeded and the test suite confirms the
+  platform-limit maximum of 10 App Shortcuts.
+- `script/package_dmg.sh` built the Release app and produced a locally ad-hoc
+  signed `dist/Beacon.dmg`; no install, notarization, publication, commit, or push
+  was performed.
+- Render artifacts used for screen inspection include:
   - `/tmp/batteryhub-status-menu-render.png`
   - `/tmp/batteryhub-status-menu-refreshing-render.png`
   - `/tmp/batteryhub-settings-refreshing-render.png`
   - `/tmp/batteryhub-airpods-settings-render.png`
+  - `/tmp/batteryhub-alerts-empty-render.png`
+  - `/tmp/batteryhub-action-hud-settings-render.png`
+  - `/tmp/batteryhub-quick-actions-settings-render.png`
+  - `/tmp/batteryhub-general-settings-render.png`

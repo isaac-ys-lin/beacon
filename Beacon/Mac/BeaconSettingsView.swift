@@ -46,12 +46,14 @@ struct BeaconSettingsView: View {
     let isPreviewingData: Bool
     let refreshDiagnostics: BatteryRefreshDiagnostics
     let notificationAuthorizationState: NotificationCenterAuthorizationState
+    let latestNotificationDeliveryResult: NotificationCenterDeliveryResult?
     let onRefresh: () -> Void
     let onOpenBluetoothSettings: () -> Void
     let onOpenSoundSettings: () -> Void
     let onRefreshNotificationAuthorization: () -> Void
     let onRequestNotificationPermission: () -> Void
     let onOpenNotificationSettings: () -> Void
+    let onSendTestNotification: () -> Void
     let onQuit: () -> Void
 
     @AppStorage(LowBatteryNotifier.thresholdDefaultsKey) private var lowBatteryThreshold = LowBatteryNotifier.defaultThreshold
@@ -60,6 +62,9 @@ struct BeaconSettingsView: View {
     @AppStorage(BatteryHUDPreferences.showActionHUDKey) private var showActionHUD = true
     @AppStorage(BatteryHUDPreferences.lowBatteryHUDEnabledKey) private var showLowBatteryHUD = true
     @AppStorage(BatteryHUDPreferences.chargedHUDEnabledKey) private var showChargedHUD = true
+    @AppStorage(BatteryHUDPreferences.autoDismissEnabledKey) private var autoDismissHUD = true
+    @AppStorage(BatteryHUDPreferences.dismissDelaySecondsKey) private var hudDismissDelaySeconds = BatteryHUDPreferences.defaultDismissDelaySeconds
+    @AppStorage(BatteryHUDPreferences.showDismissButtonKey) private var showHUDDismissButton = false
     @AppStorage(StatusWindowPreferences.showMenuBarBatteryKey) private var showMenuBarBattery = false
     @AppStorage(DesktopWidgetPreferences.showDesktopWidgetKey) private var showDesktopWidget = false
     @AppStorage(DesktopWidgetPreferences.widgetStyleKey) private var desktopWidgetStyleRawValue = DesktopWidgetStyle.compact.rawValue
@@ -78,12 +83,14 @@ struct BeaconSettingsView: View {
         isPreviewingData: Bool = false,
         refreshDiagnostics: BatteryRefreshDiagnostics = BatteryRefreshDiagnostics(),
         notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown,
+        latestNotificationDeliveryResult: NotificationCenterDeliveryResult? = nil,
         onRefresh: @escaping () -> Void,
         onOpenBluetoothSettings: @escaping () -> Void = {},
         onOpenSoundSettings: @escaping () -> Void = {},
         onRefreshNotificationAuthorization: @escaping () -> Void = {},
         onRequestNotificationPermission: @escaping () -> Void = {},
         onOpenNotificationSettings: @escaping () -> Void = {},
+        onSendTestNotification: @escaping () -> Void = {},
         onQuit: @escaping () -> Void = {},
         initialPane: SettingsPane = .devices,
         initialSelectedDeviceID: String? = nil,
@@ -94,12 +101,14 @@ struct BeaconSettingsView: View {
         self.isPreviewingData = isPreviewingData
         self.refreshDiagnostics = refreshDiagnostics
         self.notificationAuthorizationState = notificationAuthorizationState
+        self.latestNotificationDeliveryResult = latestNotificationDeliveryResult
         self.onRefresh = onRefresh
         self.onOpenBluetoothSettings = onOpenBluetoothSettings
         self.onOpenSoundSettings = onOpenSoundSettings
         self.onRefreshNotificationAuthorization = onRefreshNotificationAuthorization
         self.onRequestNotificationPermission = onRequestNotificationPermission
         self.onOpenNotificationSettings = onOpenNotificationSettings
+        self.onSendTestNotification = onSendTestNotification
         self.onQuit = onQuit
         _selectedPane = State(initialValue: initialPane)
         _selectedDeviceID = State(initialValue: initialSelectedDeviceID)
@@ -107,19 +116,26 @@ struct BeaconSettingsView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            settingsSidebar
-
-            Divider()
-
-            VStack(spacing: 0) {
-                settingsHeader
+        GeometryReader { proxy in
+            HStack(alignment: .top, spacing: 0) {
+                settingsSidebar
 
                 Divider()
 
-                settingsDetail
+                VStack(spacing: 0) {
+                    settingsHeader
+
+                    Divider()
+
+                    settingsDetail
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height,
+                alignment: .topLeading
+            )
         }
         .frame(
             minWidth: 900,
@@ -196,6 +212,7 @@ struct BeaconSettingsView: View {
         }
         .padding(12)
         .frame(width: 190)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.regularMaterial)
     }
 
@@ -213,21 +230,23 @@ struct BeaconSettingsView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
-                .help("Add Device")
+                .help("Set Up Device")
             }
 
-            Button(action: onRefresh) {
-                if isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 18, height: 18)
-                } else {
-                    Image(systemName: "arrow.clockwise")
+            if selectedPane != .general {
+                Button(action: onRefresh) {
+                    if isRefreshing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: 18, height: 18)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
                 }
+                .disabled(isRefreshing)
+                .help(isRefreshing ? "Refreshing" : "Refresh")
+                .accessibilityIdentifier("settings.refresh")
             }
-            .disabled(isRefreshing)
-            .help(isRefreshing ? "Refreshing" : "Refresh")
-            .accessibilityIdentifier("settings.refresh")
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 18)
@@ -245,6 +264,7 @@ struct BeaconSettingsView: View {
 
             Group {
                 switch selectedPane {
+                case .general: generalTab
                 case .devices: devicesTab
                 case .alerts: alertsTab
                 case .actionHUD: actionHUDTab
@@ -280,12 +300,18 @@ struct BeaconSettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    private var generalTab: some View {
+        GeneralSettingsPane(onPreferencesReset: applyResetPreferenceState)
+    }
+
     private var alertsTab: some View {
         HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
             deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 10) {
+                    notificationCenterSettingsCard
+
                     if let selectedDevice {
                         alertDetail(for: selectedDevice)
                     } else {
@@ -301,8 +327,97 @@ struct BeaconSettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    private var notificationCenterSettingsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            compactAlertTitleRow(
+                title: "Notification Center",
+                subtitle: notificationAuthorizationState.subtitle,
+                systemImage: notificationAuthorizationState == .denied ? "bell.slash.fill" : "bell.badge.fill",
+                color: notificationAuthorizationColor
+            )
+            .padding(.horizontal, 12)
+            .frame(height: 48)
+
+            Divider()
+                .padding(.leading, 50)
+
+            HStack(spacing: 8) {
+                Text(notificationAuthorizationState.title)
+                    .font(DesignTokens.Typography.captionEmphasis)
+                    .foregroundStyle(notificationAuthorizationColor)
+
+                if notificationAuthorizationState == .unknown {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
+                Spacer(minLength: 8)
+
+                if notificationAuthorizationState.canRequestPermission {
+                    Button("Allow Notifications", action: onRequestNotificationPermission)
+                        .accessibilityIdentifier("alerts.notification.allow")
+                }
+
+                if notificationAuthorizationState.canSendTestNotification {
+                    Button("Send Test", action: onSendTestNotification)
+                        .accessibilityIdentifier("alerts.notification.test")
+                }
+
+                if notificationAuthorizationState.canOpenSystemSettings {
+                    Button("Open Settings", action: onOpenNotificationSettings)
+                        .accessibilityIdentifier("alerts.notification.settings")
+                }
+
+                Button(action: onRefreshNotificationAuthorization) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help("Refresh notification status")
+                .accessibilityLabel("Refresh notification status")
+                .accessibilityIdentifier("alerts.notification.refresh")
+            }
+            .controlSize(.small)
+            .buttonStyle(.bordered)
+            .padding(.horizontal, 12)
+            .frame(height: 42)
+
+            if let latestNotificationDeliveryResult {
+                Divider()
+                    .padding(.leading, 50)
+
+                HStack(spacing: 8) {
+                    Image(systemName: latestNotificationDeliveryResult.state == .queued ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(latestNotificationDeliveryResult.state == .queued ? DesignTokens.Palette.charging : DesignTokens.Palette.critical)
+                    Text(latestNotificationDeliveryResult.title)
+                        .font(DesignTokens.Typography.captionEmphasis)
+                    Text(latestNotificationDeliveryResult.subtitle)
+                        .font(DesignTokens.Typography.caption)
+                        .foregroundStyle(DesignTokens.Palette.secondaryText)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 38)
+                .accessibilityIdentifier("alerts.notification.result")
+            }
+        }
+        .frame(maxWidth: 560, alignment: .topLeading)
+        .beaconSettingsCardSurface()
+        .accessibilityIdentifier("alerts.notification-center")
+    }
+
+    private var notificationAuthorizationColor: Color {
+        switch notificationAuthorizationState {
+        case .authorized:
+            return DesignTokens.Palette.charging
+        case .provisional, .notDetermined, .unknown:
+            return DesignTokens.Palette.warning
+        case .denied:
+            return DesignTokens.Palette.critical
+        }
+    }
+
     private func deviceSelectionPane(
-        title: String,
+        title: LocalizedStringKey,
         subtitle: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -394,7 +509,7 @@ struct BeaconSettingsView: View {
     }
 
     private func compactAlertSummaryBadge(for row: DeviceInspectorItem) -> some View {
-        Text(row.isHidden ? "Hidden" : alertSummary(for: row.item))
+        Text(row.isHidden ? BeaconL10n.string("Hidden") : alertSummary(for: row.item))
             .font(DesignTokens.Typography.captionEmphasis)
             .monospacedDigit()
             .foregroundStyle(row.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.accent)
@@ -407,7 +522,11 @@ struct BeaconSettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             compactAlertTitleRow(
                 title: "Selected Device",
-                subtitle: row.isHidden ? "Hidden until it reconnects and reports battery." : "Overrides only this device.",
+                subtitle: BeaconL10n.string(
+                    row.isHidden
+                        ? "Hidden until it reconnects and reports battery."
+                        : "Overrides only this device."
+                ),
                 systemImage: "bell.badge",
                 color: row.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.accent
             )
@@ -465,7 +584,7 @@ struct BeaconSettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             compactAlertTitleRow(
                 title: "Global Defaults",
-                subtitle: "Used when a device has no override.",
+                subtitle: BeaconL10n.string("Used when a device has no override."),
                 systemImage: "slider.horizontal.3",
                 color: DesignTokens.Palette.secondaryText
             )
@@ -533,13 +652,13 @@ struct BeaconSettingsView: View {
             HStack(spacing: 10) {
                 SettingsAlertPreview(
                     title: "Low Battery",
-                    subtitle: "At \(clampedLowBatteryThreshold)%",
+                    subtitle: BeaconL10n.format("At %d%%", clampedLowBatteryThreshold),
                     systemImage: "battery.25",
                     color: DesignTokens.Palette.critical
                 )
                 SettingsAlertPreview(
                     title: "Fully Charged",
-                    subtitle: "At 100%",
+                    subtitle: BeaconL10n.format("At %d%%", 100),
                     systemImage: "battery.100",
                     color: DesignTokens.Palette.charging
                 )
@@ -549,7 +668,12 @@ struct BeaconSettingsView: View {
         .beaconSettingsCardSurface()
     }
 
-    private func compactAlertTitleRow(title: String, subtitle: String, systemImage: String, color: Color) -> some View {
+    private func compactAlertTitleRow(
+        title: LocalizedStringKey,
+        subtitle: String,
+        systemImage: String,
+        color: Color
+    ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: resolveSymbol(systemImage, fallback: "bell"))
                 .font(.system(size: 13, weight: .semibold))
@@ -584,12 +708,22 @@ struct BeaconSettingsView: View {
     }
 
     private var actionHUDTab: some View {
-        ActionHUDSettingsPane(
-            showActionHUD: $showActionHUD,
-            showLowBatteryHUD: $showLowBatteryHUD,
-            showChargedHUD: $showChargedHUD,
-            lowBatteryThreshold: clampedLowBatteryThreshold
-        )
+        GeometryReader { proxy in
+            ActionHUDSettingsPane(
+                showActionHUD: $showActionHUD,
+                showLowBatteryHUD: $showLowBatteryHUD,
+                showChargedHUD: $showChargedHUD,
+                autoDismissEnabled: $autoDismissHUD,
+                dismissDelaySeconds: $hudDismissDelaySeconds,
+                showDismissButton: $showHUDDismissButton,
+                lowBatteryThreshold: clampedLowBatteryThreshold
+            )
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height,
+                alignment: .top
+            )
+        }
     }
 
     private var dashboardTab: some View {
@@ -603,6 +737,27 @@ struct BeaconSettingsView: View {
 
     private var quickActionsTab: some View {
         QuickActionsSettingsPane(preferences: $quickActionPreferences)
+    }
+
+    private func applyResetPreferenceState() {
+        lowBatteryThreshold = LowBatteryNotifier.defaultThreshold
+        lowBatteryAlertsEnabled = true
+        chargedBatteryAlertsEnabled = true
+        showActionHUD = true
+        showLowBatteryHUD = true
+        showChargedHUD = true
+        autoDismissHUD = true
+        hudDismissDelaySeconds = BatteryHUDPreferences.defaultDismissDelaySeconds
+        showHUDDismissButton = false
+        showMenuBarBattery = false
+        showDesktopWidget = false
+        desktopWidgetStyleRawValue = DesktopWidgetStyle.compact.rawValue
+        appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
+        showUnavailableDevices = true
+        displayPreferences = DeviceDisplayPreferences()
+        quickActionPreferences = BeaconQuickActionPreferences()
+        StatusWindowPreferences.notifyChanged()
+        reconcileSelectedDeviceSelection()
     }
 
     private func deviceDetail(for row: DeviceInspectorItem) -> some View {
@@ -712,7 +867,7 @@ struct BeaconSettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Bluetooth Controls")
                                 .font(DesignTokens.Typography.captionEmphasis)
-                            Text("Connect and disconnect use the paired Bluetooth address when macOS exposes one.")
+                            Text("Beacon can request a connection change only for paired Bluetooth devices whose address macOS exposes.")
                                 .font(DesignTokens.Typography.caption2)
                                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                         }
@@ -817,12 +972,16 @@ struct BeaconSettingsView: View {
 
     private var devicesSubtitle: String {
         if isRefreshing {
-            return "Refreshing... · \(visibleDeviceCount) visible"
+            return BeaconL10n.format("Refreshing... · %d visible", visibleDeviceCount)
         }
         if !showUnavailableDevices, hiddenDeviceCount > 0 {
-            return "\(visibleDeviceCount) visible · \(hiddenDeviceCount) hidden collapsed"
+            return BeaconL10n.format(
+                "%1$d visible · %2$d hidden collapsed",
+                visibleDeviceCount,
+                hiddenDeviceCount
+            )
         }
-        return "\(visibleDeviceCount) visible · \(hiddenDeviceCount) hidden"
+        return BeaconL10n.format("%1$d visible · %2$d hidden", visibleDeviceCount, hiddenDeviceCount)
     }
 
     private var previewDataBanner: some View {
@@ -922,11 +1081,19 @@ struct BeaconSettingsView: View {
     }
 
     private func detailSubtitle(for row: DeviceInspectorItem) -> String {
-        if row.item.connectionState == .disconnected { return "Paired, currently disconnected" }
-        if !hasBatteryReport(row.item) { return "Connected, waiting for battery report" }
-        if row.isHidden { return "Hidden from the menu bar dashboard" }
-        if row.isPinned { return "Pinned to the top of the dashboard" }
-        return "Visible in the menu bar dashboard"
+        if row.item.connectionState == .disconnected {
+            return BeaconL10n.string("Paired, currently disconnected")
+        }
+        if !hasBatteryReport(row.item) {
+            return BeaconL10n.string("Connected, waiting for battery report")
+        }
+        if row.isHidden {
+            return BeaconL10n.string("Hidden from the menu bar dashboard")
+        }
+        if row.isPinned {
+            return BeaconL10n.string("Pinned to the top of the dashboard")
+        }
+        return BeaconL10n.string("Visible in the menu bar dashboard")
     }
 
     private func detailIconBadge(for row: DeviceInspectorItem) -> DeviceIconBadge? {
@@ -961,21 +1128,27 @@ struct BeaconSettingsView: View {
 
         switch (hasCustomLow, hasCharged) {
         case (true, true):
-            return "\(LowBatteryNotifier.threshold(forDeviceID: item.id))% + Full"
+            return BeaconL10n.format(
+                "%d%% + Full",
+                LowBatteryNotifier.threshold(forDeviceID: item.id)
+            )
         case (true, false):
             return "\(LowBatteryNotifier.threshold(forDeviceID: item.id))%"
         case (false, true):
-            return "Global + Full"
+            return BeaconL10n.string("Global + Full")
         case (false, false):
-            return "Global"
+            return BeaconL10n.string("Global")
         }
     }
 
     private func deviceAlertSubtitle(for row: DeviceInspectorItem) -> String {
         if LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id) {
-            return "Custom low-battery alert at \(LowBatteryNotifier.threshold(forDeviceID: row.id))%."
+            return BeaconL10n.format(
+                "Custom low-battery alert at %d%%.",
+                LowBatteryNotifier.threshold(forDeviceID: row.id)
+            )
         }
-        return "Using the global low-battery threshold."
+        return BeaconL10n.string("Using the global low-battery threshold.")
     }
 
 }

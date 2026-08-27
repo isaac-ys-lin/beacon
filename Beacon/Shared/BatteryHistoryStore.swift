@@ -63,6 +63,40 @@ public enum BatteryHistoryStore {
         defaults.removeObject(forKey: storageKey)
     }
 
+    public static func allSamples(defaults: UserDefaults = .standard) -> [BatteryHistorySample] {
+        loadAll(from: defaults)
+            .values
+            .flatMap { $0 }
+            .sorted { lhs, rhs in
+                if lhs.recordedAt != rhs.recordedAt {
+                    return lhs.recordedAt < rhs.recordedAt
+                }
+                return lhs.deviceID.localizedStandardCompare(rhs.deviceID) == .orderedAscending
+            }
+    }
+
+    public static func sampleCount(defaults: UserDefaults = .standard) -> Int {
+        allSamples(defaults: defaults).count
+    }
+
+    public static func csvData(defaults: UserDefaults = .standard) -> Data {
+        var rows = ["device_id,recorded_at,percent,charge_state,source"]
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        rows.append(contentsOf: allSamples(defaults: defaults).map { sample in
+            [
+                csvField(sample.deviceID),
+                csvField(formatter.string(from: sample.recordedAt)),
+                String(sample.percent),
+                csvField(sample.chargeState.rawValue),
+                csvField(sample.source.rawValue),
+            ].joined(separator: ",")
+        })
+
+        return Data((rows.joined(separator: "\n") + "\n").utf8)
+    }
+
     /// Heuristic charging detection for devices that expose no hardware charge
     /// signal (BLE/HID peripherals): true when the most recent observed battery
     /// change was an increase, and that increase is recent enough to still be
@@ -140,5 +174,9 @@ public enum BatteryHistoryStore {
     ) {
         guard let data = try? JSONEncoder().encode(samplesByDeviceID) else { return }
         defaults.set(data, forKey: storageKey)
+    }
+
+    private static func csvField(_ value: String) -> String {
+        "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
     }
 }

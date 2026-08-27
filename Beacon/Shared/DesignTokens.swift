@@ -14,9 +14,9 @@ enum BeaconAppearanceTheme: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .system: return "System"
-        case .dark: return "Dark"
-        case .light: return "Light"
+        case .system: return BeaconL10n.string("System")
+        case .dark: return BeaconL10n.string("Dark")
+        case .light: return BeaconL10n.string("Light")
         }
     }
 

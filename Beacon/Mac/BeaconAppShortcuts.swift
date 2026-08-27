@@ -5,13 +5,13 @@ import Foundation
 final class BeaconIntentBridge {
     static let shared = BeaconIntentBridge()
 
-    private var actionHandler: ((BeaconQuickAction) -> Void)?
+    private var actionHandler: ((BeaconQuickAction) -> Bool)?
     private var snapshotProvider: (() -> [DecoratedBatterySnapshot])?
 
     private init() {}
 
     func register(
-        handler: @escaping (BeaconQuickAction) -> Void,
+        handler: @escaping (BeaconQuickAction) -> Bool,
         snapshotProvider: (() -> [DecoratedBatterySnapshot])? = nil
     ) {
         actionHandler = handler
@@ -23,8 +23,7 @@ final class BeaconIntentBridge {
         guard action.isSupported, let actionHandler else {
             return false
         }
-        actionHandler(action)
-        return true
+        return actionHandler(action)
     }
 
     func snapshots() -> [DecoratedBatterySnapshot] {
@@ -41,26 +40,42 @@ struct BeaconShortcutSummary: Equatable {
 
     var summaryText: String {
         var lines: [String] = []
-        lines.append("Beacon: \(reportedDeviceCount) reporting device\(reportedDeviceCount == 1 ? "" : "s").")
+        lines.append(
+            BeaconL10n.format(
+                "Beacon: %d reporting device%@.",
+                reportedDeviceCount,
+                reportedDeviceCount == 1 ? "" : "s"
+            )
+        )
 
         if let lowestBatteryLine {
-            lines.append("Lowest: \(lowestBatteryLine).")
+            lines.append(BeaconL10n.format("Lowest: %@.", lowestBatteryLine))
         } else {
-            lines.append("Lowest: no reported battery levels.")
+            lines.append(BeaconL10n.string("Lowest: no reported battery levels."))
         }
 
         if lowBatteryLines.isEmpty {
-            lines.append("Low battery: none.")
+            lines.append(BeaconL10n.string("Low battery: none."))
         } else {
-            lines.append("Low battery: \(lowBatteryLines.joined(separator: ", ")).")
+            lines.append(
+                BeaconL10n.format(
+                    "Low battery: %@.",
+                    lowBatteryLines.joined(separator: ", ")
+                )
+            )
         }
 
         if !chargingLines.isEmpty {
-            lines.append("Charging: \(chargingLines.joined(separator: ", ")).")
+            lines.append(
+                BeaconL10n.format(
+                    "Charging: %@.",
+                    chargingLines.joined(separator: ", ")
+                )
+            )
         }
 
         if staleDeviceCount > 0 {
-            lines.append("Stale reports: \(staleDeviceCount).")
+            lines.append(BeaconL10n.format("Stale reports: %d.", staleDeviceCount))
         }
 
         return lines.joined(separator: " ")
@@ -106,7 +121,8 @@ enum BeaconShortcutSnapshotFormatter {
     }
 
     static func lowestBatteryText(for snapshots: [DecoratedBatterySnapshot]) -> String {
-        summary(for: snapshots).lowestBatteryLine ?? "No reported battery levels."
+        summary(for: snapshots).lowestBatteryLine
+            ?? BeaconL10n.string("No reported battery levels.")
     }
 
     static func lowBatteryText(
@@ -117,7 +133,9 @@ enum BeaconShortcutSnapshotFormatter {
             for: snapshots,
             lowBatteryThreshold: lowBatteryThreshold
         ).lowBatteryLines
-        return lines.isEmpty ? "No low battery devices." : lines.joined(separator: ", ")
+        return lines.isEmpty
+            ? BeaconL10n.string("No low battery devices.")
+            : lines.joined(separator: ", ")
     }
 
     static func batteryTrendText(
@@ -133,11 +151,18 @@ enum BeaconShortcutSnapshotFormatter {
                 ) else {
                     return nil
                 }
-                return "\(decorated.snapshot.displayName): \(summary.trendDescription), range \(summary.minimumPercent)%-\(summary.maximumPercent)% across \(summary.samples.count) reports."
+                return BeaconL10n.format(
+                    "%1$@: %2$@, range %3$d%%-%4$d%% across %5$d reports.",
+                    decorated.snapshot.displayName,
+                    summary.trendDescription,
+                    summary.minimumPercent,
+                    summary.maximumPercent,
+                    summary.samples.count
+                )
             }
 
         return lines.isEmpty
-            ? "No battery trends yet. Beacon builds trends as reports arrive."
+            ? BeaconL10n.string("No battery trends yet. Beacon builds trends as reports arrive.")
             : lines.joined(separator: " ")
     }
 
@@ -175,7 +200,7 @@ struct ShowBeaconDashboardIntent: AppIntent {
 
 struct RefreshBeaconBatteriesIntent: AppIntent {
     static let title: LocalizedStringResource = "Refresh Batteries"
-    static let description = IntentDescription("Refresh battery reports from local and synced devices.")
+    static let description = IntentDescription("Refresh battery reports from locally connected devices.")
     static let openAppWhenRun = true
 
     @MainActor
@@ -198,8 +223,8 @@ struct OpenBeaconSettingsIntent: AppIntent {
 }
 
 struct AddBeaconDeviceIntent: AppIntent {
-    static let title: LocalizedStringResource = "Add Battery Device"
-    static let description = IntentDescription("Open the Beacon add-device guide.")
+    static let title: LocalizedStringResource = "Set Up a Battery Device"
+    static let description = IntentDescription("Open Beacon's guide for pairing or connecting a supported device.")
     static let openAppWhenRun = true
 
     @MainActor
@@ -222,8 +247,8 @@ struct OpenBeaconBluetoothSettingsIntent: AppIntent {
 }
 
 struct ConnectBeaconNearbyDeviceIntent: AppIntent {
-    static let title: LocalizedStringResource = "Connect Nearby Device"
-    static let description = IntentDescription("Connect the first visible paired Beacon device that is currently disconnected.")
+    static let title: LocalizedStringResource = "Connect Prioritized Device"
+    static let description = IntentDescription("Connect a visible disconnected paired Bluetooth device, prioritizing the lowest reported battery.")
     static let openAppWhenRun = true
 
     @MainActor
@@ -231,8 +256,8 @@ struct ConnectBeaconNearbyDeviceIntent: AppIntent {
         let didPerform = BeaconIntentBridge.shared.perform(.connectNearbyDevice)
         return .result(
             value: didPerform
-                ? "Beacon requested a connection for the next nearby device."
-                : "Beacon is not ready to connect a device."
+                ? BeaconL10n.string("Beacon requested a connection for the prioritized paired Bluetooth device.")
+                : BeaconL10n.string("Beacon could not find or connect an eligible paired Bluetooth device.")
         )
     }
 }
@@ -247,8 +272,8 @@ struct DisconnectBeaconLowestDeviceIntent: AppIntent {
         let didPerform = BeaconIntentBridge.shared.perform(.disconnectLowestDevice)
         return .result(
             value: didPerform
-                ? "Beacon requested a disconnect for the lowest battery Bluetooth device."
-                : "Beacon is not ready to disconnect a device."
+                ? BeaconL10n.string("Beacon requested a disconnect for the lowest battery Bluetooth device.")
+                : BeaconL10n.string("Beacon could not find or disconnect an eligible Bluetooth device.")
         )
     }
 }
@@ -347,28 +372,18 @@ struct BeaconAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: AddBeaconDeviceIntent(),
             phrases: [
-                "Add device in \(.applicationName)",
-                "Pair device with \(.applicationName)"
+                "Set up a device in \(.applicationName)",
+                "Show device setup in \(.applicationName)"
             ],
-            shortTitle: "Add Device",
+            shortTitle: "Set Up Device",
             systemImageName: "plus"
-        )
-
-        AppShortcut(
-            intent: OpenBeaconBluetoothSettingsIntent(),
-            phrases: [
-                "Open Bluetooth for \(.applicationName)",
-                "Pair Bluetooth device with \(.applicationName)"
-            ],
-            shortTitle: "Bluetooth Settings",
-            systemImageName: "dot.radiowaves.left.and.right"
         )
 
         AppShortcut(
             intent: ConnectBeaconNearbyDeviceIntent(),
             phrases: [
-                "Connect nearby device with \(.applicationName)",
-                "Connect a device in \(.applicationName)"
+                "Connect prioritized device with \(.applicationName)",
+                "Connect paired device in \(.applicationName)"
             ],
             shortTitle: "Connect Device",
             systemImageName: "dot.radiowaves.left.and.right"
@@ -412,6 +427,16 @@ struct BeaconAppShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Low Batteries",
             systemImageName: "exclamationmark.triangle"
+        )
+
+        AppShortcut(
+            intent: GetBeaconBatteryTrendsIntent(),
+            phrases: [
+                "Get battery trends from \(.applicationName)",
+                "Check battery trends with \(.applicationName)"
+            ],
+            shortTitle: "Battery Trends",
+            systemImageName: "chart.xyaxis.line"
         )
 
     }

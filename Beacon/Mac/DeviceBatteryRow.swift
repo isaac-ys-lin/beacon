@@ -465,22 +465,22 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
 
 func batteryProviderLabel(source: BatterySource, provider: BatteryProvider) -> String {
     switch provider {
-    case .macPowerSource: return "Local Mac"
+    case .macPowerSource: return BeaconL10n.string("Local Mac")
     case .ioRegistry: return "IORegistry"
-    case .coreBluetoothBatteryService: return "Bluetooth Battery Service"
+    case .coreBluetoothBatteryService: return BeaconL10n.string("Bluetooth Battery Service")
     case .ioBluetooth: return "Bluetooth"
-    case .systemProfiler: return "System"
+    case .systemProfiler: return BeaconL10n.string("System")
     case .bluetoothUnsupported: return "Bluetooth"
-    case .ideviceInfo: return "USB iPhone"
+    case .ideviceInfo: return BeaconL10n.string("USB iPhone")
     }
 }
 
 func batteryRelativeAgeText(updatedAt: Date, now: Date = Date()) -> String {
     let age = max(0, now.timeIntervalSince(updatedAt))
-    if age < 60 { return "Now" }
-    if age < 3_600 { return "\(Int(age / 60))m ago" }
-    if age < 86_400 { return "\(Int(age / 3_600))h ago" }
-    return "\(Int(age / 86_400))d ago"
+    if age < 60 { return BeaconL10n.string("Now") }
+    if age < 3_600 { return BeaconL10n.format("%dm ago", Int(age / 60)) }
+    if age < 86_400 { return BeaconL10n.format("%dh ago", Int(age / 3_600)) }
+    return BeaconL10n.format("%dd ago", Int(age / 86_400))
 }
 
 func dashboardBatteryStatusText(
@@ -492,14 +492,14 @@ func dashboardBatteryStatusText(
     updatedAt: Date,
     now: Date = Date()
 ) -> String {
-    if percent == nil { return "No report" }
-    if freshness == .expired { return "Expired" }
+    if percent == nil { return BeaconL10n.string("No report") }
+    if freshness == .expired { return BeaconL10n.string("Expired") }
     if freshness == .stale { return batteryRelativeAgeText(updatedAt: updatedAt, now: now) }
-    if chargeState == .charging { return "Charging" }
-    if chargeState == .full { return "Full" }
-    if isLow { return "Low" }
-    if showsAirPodsComponents { return "Parts" }
-    return "Battery"
+    if chargeState == .charging { return BeaconL10n.string("Charging") }
+    if chargeState == .full { return BeaconL10n.string("Full") }
+    if isLow { return BeaconL10n.string("Low") }
+    if showsAirPodsComponents { return BeaconL10n.string("Parts") }
+    return BeaconL10n.string("Battery")
 }
 
 struct DashboardBatteryProgressBar: View {
@@ -736,16 +736,18 @@ func dashboardBatteryAccessibilityValue(
     if device.kind == .airPods, !device.airPodsComponents.isEmpty {
         parts = device.airPodsComponents.map(airPodsComponentAccessibilityDescription)
     } else if let percent = device.percent {
-        parts = ["\(percent) percent"]
+        parts = [BeaconL10n.format("%d percent", percent)]
     } else {
-        parts = ["No battery report"]
+        parts = [BeaconL10n.string("No battery report")]
     }
 
-    if statusText != "Battery", statusText != "No report", statusText != "Parts" {
+    if statusText != BeaconL10n.string("Battery"),
+       statusText != BeaconL10n.string("No report"),
+       statusText != BeaconL10n.string("Parts") {
         parts.append(statusText)
     }
     if device.isPinned {
-        parts.append("Pinned")
+        parts.append(BeaconL10n.string("Pinned"))
     }
     return parts.joined(separator: ", ")
 }
@@ -754,24 +756,24 @@ private func airPodsComponentAccessibilityDescription(_ component: AirPodsCompon
     let name: String
     switch component.slot {
     case .case:
-        name = "Charging case"
+        name = BeaconL10n.string("Charging case")
     case .left:
-        name = "Left AirPod"
+        name = BeaconL10n.string("Left AirPod")
     case .right:
-        name = "Right AirPod"
+        name = BeaconL10n.string("Right AirPod")
     }
 
     var parts = [name]
     if let percent = component.percent {
-        parts.append("\(percent) percent")
+        parts.append(BeaconL10n.format("%d percent", percent))
     } else {
-        parts.append("no battery report")
+        parts.append(BeaconL10n.string("no battery report"))
     }
     switch component.chargeState {
     case .charging:
-        parts.append("charging")
+        parts.append(BeaconL10n.string("charging"))
     case .full:
-        parts.append("full")
+        parts.append(BeaconL10n.string("full"))
     case .unknown, .unplugged:
         break
     }
@@ -779,9 +781,9 @@ private func airPodsComponentAccessibilityDescription(_ component: AirPodsCompon
     case .fresh:
         break
     case .stale:
-        parts.append("stale")
+        parts.append(BeaconL10n.string("stale"))
     case .expired:
-        parts.append("expired")
+        parts.append(BeaconL10n.string("expired"))
     }
     return parts.joined(separator: " ")
 }
@@ -842,22 +844,22 @@ private struct AirPodsDashboardComponentChip: View {
     private var slotLabel: String {
         switch component.slot {
         case .case:
-            return "Case"
+            return BeaconL10n.string("Case")
         case .left:
-            return "L"
+            return BeaconL10n.string("L")
         case .right:
-            return "R"
+            return BeaconL10n.string("R")
         }
     }
 
     private var accessibilityLabel: String {
         switch component.slot {
         case .case:
-            return "Charging case \(percentText)"
+            return BeaconL10n.format("Charging case %@", percentText)
         case .left:
-            return "Left AirPod \(percentText)"
+            return BeaconL10n.format("Left AirPod %@", percentText)
         case .right:
-            return "Right AirPod \(percentText)"
+            return BeaconL10n.format("Right AirPod %@", percentText)
         }
     }
 }

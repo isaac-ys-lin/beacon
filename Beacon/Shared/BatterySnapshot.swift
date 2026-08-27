@@ -282,8 +282,8 @@ public struct BatteryHistorySummary: Equatable, Sendable {
     public let maximumPercent: Int
 
     public var trendDescription: String {
-        if delta > 0 { return "+\(delta)% trend" }
-        if delta < 0 { return "\(delta)% trend" }
-        return "Stable"
+        if delta > 0 { return BeaconL10n.format("+%d%% trend", delta) }
+        if delta < 0 { return BeaconL10n.format("%d%% trend", delta) }
+        return BeaconL10n.string("Stable")
     }
 }

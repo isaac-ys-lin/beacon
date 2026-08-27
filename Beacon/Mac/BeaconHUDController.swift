@@ -37,7 +37,7 @@ final class BeaconHUDController {
         guard let window else { return }
         window.styleMask.remove(.nonactivatingPanel)
         window.styleMask.formUnion([.titled, .fullSizeContentView])
-        window.title = "Beacon HUD Preview"
+        window.title = BeaconL10n.string("Beacon HUD Preview")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.setContentSize(Self.hudSize)

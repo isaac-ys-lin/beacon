@@ -301,21 +301,25 @@ func statusMenuHeaderSubtitle(
     now: Date = Date()
 ) -> String {
     if isRefreshing {
-        return "Scanning nearby"
+        return BeaconL10n.string("Scanning nearby")
     }
     if visibleItemCount == 0 {
-        return "No reporting devices"
+        return BeaconL10n.string("No reporting devices")
     }
 
     let countLabel = statusMenuDeviceCountLabel(visibleItemCount)
     if isPreviewingData {
-        return "Preview data · \(countLabel)"
+        return BeaconL10n.format("Preview data · %@", countLabel)
     }
     guard let latestUpdatedAt else {
         return countLabel
     }
 
-    return "\(countLabel) · Updated \(statusMenuCompactAgeText(updatedAt: latestUpdatedAt, now: now))"
+    return BeaconL10n.format(
+        "%1$@ · Updated %2$@",
+        countLabel,
+        statusMenuCompactAgeText(updatedAt: latestUpdatedAt, now: now)
+    )
 }
 
 func latestStatusMenuUpdateDate(for items: [DeviceListItem]) -> Date? {
@@ -331,27 +335,27 @@ func latestStatusMenuUpdateDate(for items: [DeviceListItem]) -> Date? {
 }
 
 private func statusMenuDeviceCountLabel(_ count: Int) -> String {
-    "\(count) \(count == 1 ? "device" : "devices")"
+    BeaconL10n.format(count == 1 ? "%d device" : "%d devices", count)
 }
 
 private func statusMenuCompactAgeText(updatedAt: Date, now: Date) -> String {
     let elapsedSeconds = max(0, Int(now.timeIntervalSince(updatedAt)))
     if elapsedSeconds < 60 {
-        return "now"
+        return BeaconL10n.string("now")
     }
 
     let elapsedMinutes = elapsedSeconds / 60
     if elapsedMinutes < 60 {
-        return "\(elapsedMinutes)m ago"
+        return BeaconL10n.format("%dm ago", elapsedMinutes)
     }
 
     let elapsedHours = elapsedMinutes / 60
     if elapsedHours < 24 {
-        return "\(elapsedHours)h ago"
+        return BeaconL10n.format("%dh ago", elapsedHours)
     }
 
     let elapsedDays = elapsedHours / 24
-    return "\(elapsedDays)d ago"
+    return BeaconL10n.format("%dd ago", elapsedDays)
 }
 
 // MARK: - Settings preview

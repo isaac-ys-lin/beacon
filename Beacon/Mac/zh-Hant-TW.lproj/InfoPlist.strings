@@ -1,0 +1,2 @@
+"CFBundleDisplayName" = "Beacon";
+"NSBluetoothAlwaysUsageDescription" = "Beacon 會在可用時讀取已連接藍牙裝置的電量回報。";

@@ -44,9 +44,9 @@ struct AddDeviceGuideView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Add New Device")
+                    Text("Set Up a Device")
                         .font(DesignTokens.Typography.windowTitle)
-                    Text("Choose the kind of device you want Beacon to monitor.")
+                    Text("Pair or connect a supported device. Beacon discovers it automatically after a battery report arrives.")
                         .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
@@ -81,7 +81,7 @@ struct AddDeviceGuideView: View {
 
                 AddDeviceGuideRow(
                     title: "iPhone via USB",
-                    subtitle: "Connect a cable, tap Trust This Mac, then refresh the battery reading.",
+                    subtitle: "Connect by cable, trust this Mac, then refresh.",
                     systemImage: resolveSymbol("iphone", fallback: "mobilephone"),
                     actionTitle: "Refresh",
                     action: onRefresh
@@ -104,10 +104,10 @@ struct AddDeviceGuideView: View {
 }
 
 struct AddDeviceGuideRow: View {
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
     let systemImage: String
-    let actionTitle: String
+    let actionTitle: LocalizedStringKey
     var isEnabled = true
     var action: (() -> Void)?
 
@@ -206,10 +206,16 @@ struct RefreshHealthDisclosureView: View {
     }
 
     private func refreshHealthSummary(_ presentation: BatteryRefreshDiagnosticsPresentation) -> String {
-        guard !presentation.attempts.isEmpty else { return "No completed refresh yet" }
+        guard !presentation.attempts.isEmpty else {
+            return BeaconL10n.string("No completed refresh yet")
+        }
         let relative = RelativeDateTimeFormatter()
         relative.unitsStyle = .abbreviated
-        return "\(presentation.summary) · \(relative.localizedString(for: presentation.refreshedAt, relativeTo: Date()))"
+        return BeaconL10n.format(
+            "%1$@ · %2$@",
+            presentation.summary,
+            relative.localizedString(for: presentation.refreshedAt, relativeTo: Date())
+        )
     }
 
     private func refreshHealthSymbol(for tone: BatteryRefreshHealthTone) -> String {
@@ -249,11 +255,14 @@ private struct RefreshHealthAttemptRow: View {
                         .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(statusColor)
                     if attempt.candidateCount > 0 {
-                        Text("· \(attempt.candidateCount) result\(attempt.candidateCount == 1 ? "" : "s")")
+                        Text(BeaconL10n.format(
+                            attempt.candidateCount == 1 ? "· %d result" : "· %d results",
+                            attempt.candidateCount
+                        ))
                             .font(DesignTokens.Typography.caption2)
                             .foregroundStyle(DesignTokens.Palette.tertiaryText)
                     }
-                    Text("· tried \(attemptAgeText)")
+                    Text(BeaconL10n.format("· tried %@", attemptAgeText))
                         .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(DesignTokens.Palette.tertiaryText)
                 }
@@ -301,8 +310,8 @@ private struct RefreshHealthAttemptRow: View {
 }
 
 struct SettingsEmptyStateCard: View {
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
     let systemImage: String
     var tint = DesignTokens.Palette.accent
 
@@ -355,6 +364,7 @@ struct SettingsPaneIcon: View {
 }
 
 enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
+    case general
     case devices
     case alerts
     case actionHUD
@@ -365,16 +375,18 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .devices: return "Devices"
-        case .alerts: return "Alerts"
-        case .actionHUD: return "Action HUD"
-        case .quickActions: return "Quick Actions"
-        case .dashboard: return "Dashboard"
+        case .general: return BeaconL10n.string("General")
+        case .devices: return BeaconL10n.string("Devices")
+        case .alerts: return BeaconL10n.string("Alerts")
+        case .actionHUD: return BeaconL10n.string("Action HUD")
+        case .quickActions: return BeaconL10n.string("Quick Actions")
+        case .dashboard: return BeaconL10n.string("Dashboard")
         }
     }
 
     var systemImage: String {
         switch self {
+        case .general: return "gearshape"
         case .devices: return BeaconSymbols.bluetooth
         case .alerts: return "bell.badge"
         case .actionHUD: return "sparkles"
@@ -463,6 +475,7 @@ struct AutomationShortcutsBanner: View {
         ("Battery Summary", "list.bullet.rectangle"),
         ("Lowest Battery", "battery.25"),
         ("Low List", "exclamationmark.triangle"),
+        ("Battery Trends", "chart.xyaxis.line"),
         ("Connect", BeaconSymbols.bluetooth),
         ("Disconnect", "bolt.horizontal.circle")
     ]
@@ -521,8 +534,8 @@ struct AutomationShortcutsBanner: View {
 }
 
 struct ActionHUDEventToggle: View {
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
     let systemImage: String
     let color: Color
     @Binding var isOn: Bool
@@ -581,7 +594,7 @@ struct AirPodsAudioControlsCard: View {
                 Label("Audio Controls", systemImage: "waveform")
                     .font(DesignTokens.Typography.captionEmphasis)
                 Spacer()
-                Text("AirPods")
+                Text("Reference only")
                     .font(DesignTokens.Typography.caption2Emphasis)
                     .foregroundStyle(DesignTokens.Palette.accent)
                     .padding(.horizontal, 7)
@@ -604,14 +617,19 @@ struct AirPodsAudioControlsCard: View {
                 )
             }
 
-            Picker("Listening Mode", selection: listeningModeBinding) {
+            Text("These choices are notes saved in Beacon; they do not change your AirPods.")
+                .font(DesignTokens.Typography.caption2)
+                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Picker("Preferred Listening Mode", selection: listeningModeBinding) {
                 ForEach(AirPodsListeningModePreference.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
 
-            Picker("Microphone", selection: microphoneBinding) {
+            Picker("Preferred Microphone", selection: microphoneBinding) {
                 ForEach(AirPodsMicrophonePreference.allCases) { microphone in
                     Text(microphone.shortTitle).tag(microphone)
                 }
@@ -635,7 +653,7 @@ struct AirPodsAudioControlsCard: View {
             }
             .font(DesignTokens.Typography.captionEmphasis)
 
-            Text("Beacon keeps your preferred AirPods audio choices here; macOS applies the actual listening mode and mic switch from Sound Settings.")
+            Text("Use Sound Settings to apply the actual listening mode or microphone change.")
                 .font(DesignTokens.Typography.caption2)
                 .foregroundStyle(DesignTokens.Palette.tertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -669,7 +687,7 @@ struct AirPodsAudioControlsCard: View {
 }
 
 struct AudioPreferenceTile: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let systemImage: String
     let color: Color
@@ -815,11 +833,14 @@ struct DeviceCurrentStatsCard: View {
     private var batteryText: String {
         switch item {
         case .device(let decorated):
-            return decorated.snapshot.percent.map { "\($0)%" } ?? "No report"
+            return decorated.snapshot.percent.map { "\($0)%" }
+                ?? BeaconL10n.string("No report")
         case .airPods(_, _, let components):
             let percents = components.compactMap(\.percent)
-            guard let lowest = percents.min() else { return "No report" }
-            return "\(lowest)% low"
+            guard let lowest = percents.min() else {
+                return BeaconL10n.string("No report")
+            }
+            return BeaconL10n.format("%d%% low", lowest)
         }
     }
 
@@ -867,6 +888,10 @@ struct DeviceCurrentStatsCard: View {
     }
 
     private var reportText: String {
+        BeaconL10n.string(reportKey)
+    }
+
+    private var reportKey: String {
         switch item {
         case .device(let decorated):
             guard decorated.snapshot.percent != nil else { return "No report" }
@@ -884,7 +909,7 @@ struct DeviceCurrentStatsCard: View {
     }
 
     private var reportIcon: String {
-        switch reportText {
+        switch reportKey {
         case "Reporting": return "checkmark.circle.fill"
         case "No report": return "minus.circle"
         case "Stale", "Expired": return "clock.badge.exclamationmark"
@@ -893,7 +918,7 @@ struct DeviceCurrentStatsCard: View {
     }
 
     private var reportColor: Color {
-        switch reportText {
+        switch reportKey {
         case "Reporting": return DesignTokens.Palette.charging
         case "Stale", "Expired": return DesignTokens.Palette.stale
         default: return DesignTokens.Palette.secondaryText
@@ -901,7 +926,7 @@ struct DeviceCurrentStatsCard: View {
     }
 
     private var connectionText: String {
-        item.connectionState == .disconnected ? "Disconnected" : "Connected"
+        BeaconL10n.string(item.connectionState == .disconnected ? "Disconnected" : "Connected")
     }
 
     private var connectionColor: Color {
@@ -916,12 +941,12 @@ struct DeviceCurrentStatsCard: View {
         switch item {
         case .device(let decorated):
             let interval = abs(decorated.snapshot.updatedAt.timeIntervalSinceNow)
-            if interval < 60 { return "Now" }
+            if interval < 60 { return BeaconL10n.string("Now") }
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .abbreviated
             return formatter.localizedString(for: decorated.snapshot.updatedAt, relativeTo: Date())
         case .airPods:
-            return "Grouped"
+            return BeaconL10n.string("Grouped")
         }
     }
 
@@ -935,7 +960,7 @@ struct DeviceCurrentStatsCard: View {
     }
 
     private var trendText: String {
-        guard let historySummary else { return "Collecting" }
+        guard let historySummary else { return BeaconL10n.string("Collecting") }
         return historySummary.trendDescription
     }
 
@@ -948,9 +973,14 @@ struct DeviceCurrentStatsCard: View {
 
     private var rangeText: String {
         guard let historySummary else {
-            return "Beacon will build a trend as reports arrive."
+            return BeaconL10n.string("Beacon will build a trend as reports arrive.")
         }
-        return "Range \(historySummary.minimumPercent)% - \(historySummary.maximumPercent)% across \(historySummary.samples.count) reports."
+        return BeaconL10n.format(
+            "Range %1$d%% - %2$d%% across %3$d reports.",
+            historySummary.minimumPercent,
+            historySummary.maximumPercent,
+            historySummary.samples.count
+        )
     }
 
 }
@@ -1031,7 +1061,7 @@ struct BatteryHistorySparkline: View {
 }
 
 struct SettingsInfoRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let systemImage: String
     let color: Color
@@ -1128,16 +1158,23 @@ struct SettingsDeviceSidebarRow: View {
     }
 
     private var rowSubtitle: String {
-        if item.isUserHidden { return "Hidden · \(alertSummary)" }
-        if item.isUnavailable { return "Hidden until connected · \(alertSummary)" }
-        if item.isPinned { return "Pinned · \(alertSummary)" }
-        return "Visible · \(alertSummary)"
+        let visibility: String
+        if item.isUserHidden {
+            visibility = BeaconL10n.string("Hidden")
+        } else if item.isUnavailable {
+            visibility = BeaconL10n.string("Hidden until connected")
+        } else if item.isPinned {
+            visibility = BeaconL10n.string("Pinned")
+        } else {
+            visibility = BeaconL10n.string("Visible")
+        }
+        return BeaconL10n.format("%1$@ · %2$@", visibility, alertSummary)
     }
 }
 
 struct SettingsDetailToggle: View {
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
     let systemImage: String
     @Binding var isOn: Bool
 
@@ -1173,7 +1210,7 @@ struct SettingsDetailToggle: View {
 }
 
 struct SettingsAlertPreview: View {
-    let title: String
+    let title: LocalizedStringKey
     let subtitle: String
     let systemImage: String
     let color: Color

@@ -21,35 +21,35 @@ enum BeaconQuickAction: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .showDashboard: return "Show Dashboard"
-        case .refreshBatteries: return "Refresh Batteries"
-        case .openSettings: return "Open Settings"
-        case .addDevice: return "Add New Device"
-        case .openBluetoothSettings: return "Open Bluetooth Settings"
-        case .connectNearbyDevice: return "Connect Nearby Device"
-        case .disconnectLowestDevice: return "Disconnect Lowest Device"
-        case .transferToMac: return "Transfer to Another Mac"
+        case .showDashboard: return BeaconL10n.string("Show Dashboard")
+        case .refreshBatteries: return BeaconL10n.string("Refresh Batteries")
+        case .openSettings: return BeaconL10n.string("Open Settings")
+        case .addDevice: return BeaconL10n.string("Set Up a Device")
+        case .openBluetoothSettings: return BeaconL10n.string("Open Bluetooth Settings")
+        case .connectNearbyDevice: return BeaconL10n.string("Connect Prioritized Device")
+        case .disconnectLowestDevice: return BeaconL10n.string("Disconnect Lowest Device")
+        case .transferToMac: return BeaconL10n.string("Transfer to Another Mac")
         }
     }
 
     var subtitle: String {
         switch self {
         case .showDashboard:
-            return "Show or hide the menu bar battery dashboard."
+            return BeaconL10n.string("Show or hide the menu bar battery dashboard.")
         case .refreshBatteries:
-            return "Request fresh reports from local and synced devices."
+            return BeaconL10n.string("Request fresh reports from locally connected devices.")
         case .openSettings:
-            return "Open the dedicated Beacon settings window."
+            return BeaconL10n.string("Open the dedicated Beacon settings window.")
         case .addDevice:
-            return "Open the add-device guide without digging through menus."
+            return BeaconL10n.string("Open the setup guide for pairing or connecting a supported device.")
         case .openBluetoothSettings:
-            return "Jump to macOS Bluetooth settings for pairing."
+            return BeaconL10n.string("Jump to macOS Bluetooth settings for pairing.")
         case .connectNearbyDevice:
-            return "Connect the first visible paired device that is currently disconnected."
+            return BeaconL10n.string("Connect a visible disconnected paired device, prioritizing the lowest reported battery.")
         case .disconnectLowestDevice:
-            return "Disconnect the visible connected Bluetooth device with the lowest battery."
+            return BeaconL10n.string("Disconnect the visible connected Bluetooth device with the lowest battery.")
         case .transferToMac:
-            return "Excluded from this build by product scope."
+            return BeaconL10n.string("Excluded from this build by product scope.")
         }
     }
 

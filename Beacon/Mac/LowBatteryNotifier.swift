@@ -64,30 +64,30 @@ enum NotificationCenterAuthorizationState: Equatable, Sendable {
     var title: String {
         switch self {
         case .unknown:
-            return "Checking"
+            return BeaconL10n.string("Checking")
         case .notDetermined:
-            return "Needs Permission"
+            return BeaconL10n.string("Needs Permission")
         case .denied:
-            return "Disabled"
+            return BeaconL10n.string("Disabled")
         case .authorized:
-            return "Allowed"
+            return BeaconL10n.string("Allowed")
         case .provisional:
-            return "Limited"
+            return BeaconL10n.string("Limited")
         }
     }
 
     var subtitle: String {
         switch self {
         case .unknown:
-            return "Checking macOS notification permission."
+            return BeaconL10n.string("Checking macOS notification permission.")
         case .notDetermined:
-            return "Allow Beacon to show system notifications."
+            return BeaconL10n.string("Allow Beacon to show system notifications.")
         case .denied:
-            return "Enable Beacon in macOS Notifications settings."
+            return BeaconL10n.string("Enable Beacon in macOS Notifications settings.")
         case .authorized:
-            return "System notifications can appear in Notification Center."
+            return BeaconL10n.string("System notifications can appear in Notification Center.")
         case .provisional:
-            return "System notifications are allowed with limited delivery."
+            return BeaconL10n.string("System notifications are allowed with limited delivery.")
         }
     }
 
@@ -127,7 +127,7 @@ struct NotificationCenterDeliveryResult: Equatable, Sendable {
     static func queued(_ notificationTitle: String) -> NotificationCenterDeliveryResult {
         NotificationCenterDeliveryResult(
             state: .queued,
-            title: "Queued",
+            title: BeaconL10n.string("Queued"),
             subtitle: notificationTitle
         )
     }
@@ -135,7 +135,7 @@ struct NotificationCenterDeliveryResult: Equatable, Sendable {
     static func failed(_ message: String) -> NotificationCenterDeliveryResult {
         NotificationCenterDeliveryResult(
             state: .failed,
-            title: "Could not send",
+            title: BeaconL10n.string("Could not send"),
             subtitle: message
         )
     }
@@ -302,11 +302,15 @@ enum LowBatteryNotifier {
             let content = UNMutableNotificationContent()
             switch event.kind {
             case .lowBattery:
-                content.title = "\(event.displayName) needs charging"
-                content.body = event.percent.map { "Battery is at \($0)%." } ?? "Battery is low."
+                content.title = BeaconL10n.format("%@ needs charging", event.displayName)
+                content.body = event.percent.map {
+                    BeaconL10n.format("Battery is at %d%%.", $0)
+                } ?? BeaconL10n.string("Battery is low.")
             case .charged:
-                content.title = "\(event.displayName) is fully charged"
-                content.body = event.percent.map { "Battery has reached \($0)%." } ?? "Battery has finished charging."
+                content.title = BeaconL10n.format("%@ is fully charged", event.displayName)
+                content.body = event.percent.map {
+                    BeaconL10n.format("Battery has reached %d%%.", $0)
+                } ?? BeaconL10n.string("Battery has finished charging.")
             }
             content.sound = .default
             let notificationTitle = content.title
@@ -335,8 +339,8 @@ enum LowBatteryNotifier {
         deliveryHandler: @escaping @Sendable (NotificationCenterDeliveryResult) -> Void
     ) {
         let content = UNMutableNotificationContent()
-        content.title = "Beacon Test Notification"
-        content.body = "System notifications are working."
+        content.title = BeaconL10n.string("Beacon Test Notification")
+        content.body = BeaconL10n.string("System notifications are working.")
         content.sound = .default
         let notificationTitle = content.title
 

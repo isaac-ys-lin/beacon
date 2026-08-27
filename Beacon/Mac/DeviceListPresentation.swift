@@ -106,74 +106,74 @@ public struct BatteryRefreshAttemptPresentation: Equatable, Identifiable, Sendab
     private static func providerTitle(for provider: BatteryProvider) -> String {
         switch provider {
         case .macPowerSource:
-            return "Mac power source"
+            return BeaconL10n.string("Mac power source")
         case .ioRegistry:
-            return "Local device battery services"
+            return BeaconL10n.string("Local device battery services")
         case .coreBluetoothBatteryService:
-            return "Bluetooth battery service"
+            return BeaconL10n.string("Bluetooth battery service")
         case .ioBluetooth:
-            return "Classic Bluetooth"
+            return BeaconL10n.string("Classic Bluetooth")
         case .systemProfiler:
-            return "Bluetooth profiler"
+            return BeaconL10n.string("Bluetooth profiler")
         case .bluetoothUnsupported:
-            return "Bluetooth fallback"
+            return BeaconL10n.string("Bluetooth fallback")
         case .ideviceInfo:
-            return "iPhone USB helper"
+            return BeaconL10n.string("iPhone USB helper")
         }
     }
 
     private static func statusTitle(for status: BatteryReadStatus) -> String {
         switch status {
         case .reported:
-            return "Reported"
+            return BeaconL10n.string("Reported")
         case .noReport:
-            return "No report"
+            return BeaconL10n.string("No report")
         case .unavailable:
-            return "Unavailable"
+            return BeaconL10n.string("Unavailable")
         case .timedOut:
-            return "Timed out"
+            return BeaconL10n.string("Timed out")
         case .unauthorized:
-            return "Permission needed"
+            return BeaconL10n.string("Permission needed")
         case .commandMissing:
-            return "Helper missing"
+            return BeaconL10n.string("Helper missing")
         }
     }
 
     private static func explanation(for provider: BatteryProvider, status: BatteryReadStatus) -> String {
         switch status {
         case .reported:
-            return "This source returned a battery reading."
+            return BeaconL10n.string("This source returned a battery reading.")
         case .noReport:
-            return "The source responded, but no battery level was available."
+            return BeaconL10n.string("The source responded, but no battery level was available.")
         case .unavailable:
-            return "Beacon could not read this source right now."
+            return BeaconL10n.string("Beacon could not read this source right now.")
         case .timedOut:
-            return "This source did not respond before the refresh deadline."
+            return BeaconL10n.string("This source did not respond before the refresh deadline.")
         case .unauthorized:
             return provider == .coreBluetoothBatteryService
-                ? "macOS has not granted Bluetooth access to Beacon."
-                : "macOS has not granted access to this source."
+                ? BeaconL10n.string("macOS has not granted Bluetooth access to Beacon.")
+                : BeaconL10n.string("macOS has not granted access to this source.")
         case .commandMissing:
-            return "The optional helper needed for this source is not installed."
+            return BeaconL10n.string("The optional helper needed for this source is not installed.")
         }
     }
 
     private static func nextStep(for provider: BatteryProvider, status: BatteryReadStatus) -> String {
         switch status {
         case .reported:
-            return "No action needed."
+            return BeaconL10n.string("No action needed.")
         case .noReport:
             return provider == .ideviceInfo
-                ? "Connect the iPhone, tap Trust, then refresh."
-                : "Reconnect the device and refresh."
+                ? BeaconL10n.string("Connect the iPhone, tap Trust, then refresh.")
+                : BeaconL10n.string("Reconnect the device and refresh.")
         case .unavailable:
-            return "Keep the device awake and refresh."
+            return BeaconL10n.string("Keep the device awake and refresh.")
         case .timedOut:
-            return "Try again; a slow source did not answer in time."
+            return BeaconL10n.string("Try again; a slow source did not answer in time.")
         case .unauthorized:
-            return "Allow access in macOS Settings, then refresh."
+            return BeaconL10n.string("Allow access in macOS Settings, then refresh.")
         case .commandMissing:
-            return "Install the optional iPhone helper, then refresh."
+            return BeaconL10n.string("Install the optional iPhone helper, then refresh.")
         }
     }
 }
@@ -208,8 +208,8 @@ public func batteryRefreshDiagnosticsPresentation(
     guard !attempts.isEmpty else {
         return BatteryRefreshDiagnosticsPresentation(
             tone: .neutral,
-            title: "Waiting for first refresh",
-            summary: "Beacon has not completed a battery refresh yet.",
+            title: BeaconL10n.string("Waiting for first refresh"),
+            summary: BeaconL10n.string("Beacon has not completed a battery refresh yet."),
             attempts: [],
             refreshedAt: diagnostics.refreshedAt,
             snapshotCount: diagnostics.snapshotCount
@@ -233,31 +233,38 @@ public func batteryRefreshDiagnosticsPresentation(
     let summary: String
     if reportedCount == attempts.count {
         tone = .success
-        title = "Refresh healthy"
-        summary = "All \(reportedCount) provider checks returned battery data."
+        title = BeaconL10n.string("Refresh healthy")
+        summary = BeaconL10n.format(
+            "All %d provider checks returned battery data.",
+            reportedCount
+        )
     } else if reportedCount > 0 {
         tone = hasHardFailure ? .error : .warning
-        title = "Partial refresh"
-        summary = "\(reportedCount) of \(attempts.count) provider checks returned battery data."
+        title = BeaconL10n.string("Partial refresh")
+        summary = BeaconL10n.format(
+            "%1$d of %2$d provider checks returned battery data.",
+            reportedCount,
+            attempts.count
+        )
     } else if hasHardFailure {
         tone = .error
-        title = "Refresh needs attention"
-        summary = "No provider returned battery data this time."
+        title = BeaconL10n.string("Refresh needs attention")
+        summary = BeaconL10n.string("No provider returned battery data this time.")
     } else if statuses.allSatisfy({ $0 == .noReport }) {
         // A provider can legitimately have no battery service (for example a
         // Bluetooth device that only exposes connection state). Keep this
         // informational instead of presenting it as a fault.
         tone = .neutral
-        title = "No battery reports"
-        summary = "The providers responded, but none returned a battery level."
+        title = BeaconL10n.string("No battery reports")
+        summary = BeaconL10n.string("The providers responded, but none returned a battery level.")
     } else if hasSoftFailure {
         tone = .warning
-        title = "Refresh incomplete"
-        summary = "Some providers did not return a battery level."
+        title = BeaconL10n.string("Refresh incomplete")
+        summary = BeaconL10n.string("Some providers did not return a battery level.")
     } else {
         tone = .neutral
-        title = "Refresh completed"
-        summary = "The refresh completed without a battery reading."
+        title = BeaconL10n.string("Refresh completed")
+        summary = BeaconL10n.string("The refresh completed without a battery reading.")
     }
 
     return BatteryRefreshDiagnosticsPresentation(
@@ -405,19 +412,19 @@ public enum AirPodsListeningModePreference: String, CaseIterable, Identifiable, 
 
     public var title: String {
         switch self {
-        case .automatic: return "Automatic"
-        case .noiseCancellation: return "Noise Cancellation"
-        case .transparency: return "Transparency"
-        case .off: return "Off"
+        case .automatic: return BeaconL10n.string("Automatic")
+        case .noiseCancellation: return BeaconL10n.string("Noise Cancellation")
+        case .transparency: return BeaconL10n.string("Transparency")
+        case .off: return BeaconL10n.string("Off")
         }
     }
 
     public var shortTitle: String {
         switch self {
-        case .automatic: return "Auto"
-        case .noiseCancellation: return "Noise"
-        case .transparency: return "Trans"
-        case .off: return "Off"
+        case .automatic: return BeaconL10n.string("Auto")
+        case .noiseCancellation: return BeaconL10n.string("Noise")
+        case .transparency: return BeaconL10n.string("Trans")
+        case .off: return BeaconL10n.string("Off")
         }
     }
 
@@ -440,17 +447,17 @@ public enum AirPodsMicrophonePreference: String, CaseIterable, Identifiable, Sen
 
     public var title: String {
         switch self {
-        case .automatic: return "Automatic"
-        case .left: return "Always Left"
-        case .right: return "Always Right"
+        case .automatic: return BeaconL10n.string("Automatic")
+        case .left: return BeaconL10n.string("Always Left")
+        case .right: return BeaconL10n.string("Always Right")
         }
     }
 
     public var shortTitle: String {
         switch self {
-        case .automatic: return "Auto"
-        case .left: return "Left"
-        case .right: return "Right"
+        case .automatic: return BeaconL10n.string("Auto")
+        case .left: return BeaconL10n.string("Left")
+        case .right: return BeaconL10n.string("Right")
         }
     }
 }
@@ -566,15 +573,15 @@ public enum DeviceContextMenuAction: String, CaseIterable, Identifiable, Equatab
 
     public func title(for displayName: String) -> String {
         switch self {
-        case .batteryAlerts: return "Battery Alerts..."
-        case .audioControls: return "Audio Controls..."
-        case .options: return "Options"
-        case .refresh: return "Refresh Battery"
-        case .connect: return "Connect"
-        case .pin: return "Pin \(displayName)"
-        case .unpin: return "Unpin \(displayName)"
-        case .disconnect: return "Disconnect"
-        case .remove: return "Hide from Beacon"
+        case .batteryAlerts: return BeaconL10n.string("Battery Alerts...")
+        case .audioControls: return BeaconL10n.string("Audio Controls...")
+        case .options: return BeaconL10n.string("Options")
+        case .refresh: return BeaconL10n.string("Refresh Battery")
+        case .connect: return BeaconL10n.string("Connect")
+        case .pin: return BeaconL10n.format("Pin %@", displayName)
+        case .unpin: return BeaconL10n.format("Unpin %@", displayName)
+        case .disconnect: return BeaconL10n.string("Disconnect")
+        case .remove: return BeaconL10n.string("Hide from Beacon")
         }
     }
 }
@@ -715,8 +722,11 @@ public func isDashboardVisibleItem(_ item: DeviceListItem) -> Bool {
             && decorated.snapshot.percent != nil
             && decorated.freshness != .expired
     case .airPods(_, _, let components):
-        return item.connectionState == .connected
-            && activeAirPodsComponents(components).contains { $0.percent != nil }
+        // macOS commonly exposes the latest AirPods component levels under
+        // system_profiler's device_not_connected section while they are in
+        // their case. Keep those useful last-known readings in the UI; alert
+        // delivery remains restricted to connected external snapshots.
+        return activeAirPodsComponents(components).contains { $0.percent != nil }
     }
 }
 

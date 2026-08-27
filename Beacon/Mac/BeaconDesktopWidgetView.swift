@@ -25,15 +25,15 @@ enum DesktopWidgetStyle: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .compact: return "Compact"
-        case .expanded: return "Expanded"
+        case .compact: return BeaconL10n.string("Compact")
+        case .expanded: return BeaconL10n.string("Expanded")
         }
     }
 
     var accessibilityTitle: String {
         switch self {
-        case .compact: return "Compact widget"
-        case .expanded: return "Expanded widget"
+        case .compact: return BeaconL10n.string("Compact widget")
+        case .expanded: return BeaconL10n.string("Expanded widget")
         }
     }
 
@@ -160,12 +160,17 @@ struct BatteryDesktopWidgetView: View {
     }
 
     private var latestUpdateText: String {
-        guard let latest = snapshots.map(\.snapshot.updatedAt).max() else { return "No reports" }
+        guard let latest = snapshots.map(\.snapshot.updatedAt).max() else {
+            return BeaconL10n.string("No reports")
+        }
         let interval = abs(latest.timeIntervalSinceNow)
-        if interval < 60 { return "Updated now" }
+        if interval < 60 { return BeaconL10n.string("Updated now") }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return "Updated \(formatter.localizedString(for: latest, relativeTo: Date()))"
+        return BeaconL10n.format(
+            "Updated %@",
+            formatter.localizedString(for: latest, relativeTo: Date())
+        )
     }
 
     var body: some View {

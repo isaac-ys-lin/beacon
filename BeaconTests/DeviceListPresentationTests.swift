@@ -4,6 +4,31 @@ import SwiftUI
 import XCTest
 @testable import Beacon
 
+private final class FakeLaunchAtLoginService: LaunchAtLoginServicing {
+    var status: LaunchAtLoginServiceStatus
+    var statusAfterRegister: LaunchAtLoginServiceStatus = .enabled
+    var registerError: Error?
+    var unregisterError: Error?
+    private(set) var registerCallCount = 0
+    private(set) var unregisterCallCount = 0
+
+    init(status: LaunchAtLoginServiceStatus) {
+        self.status = status
+    }
+
+    func register() throws {
+        registerCallCount += 1
+        if let registerError { throw registerError }
+        status = statusAfterRegister
+    }
+
+    func unregister() throws {
+        unregisterCallCount += 1
+        if let unregisterError { throw unregisterError }
+        status = .notRegistered
+    }
+}
+
 final class DeviceListPresentationTests: XCTestCase {
 
     // MARK: - Helpers
@@ -663,7 +688,7 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(items.map(\.displayName), ["Keychron K3 Max"])
     }
 
-    func testStatusMenuHidesDisconnectedAirPodsWithLastKnownBatteryReports() {
+    func testStatusMenuShowsDisconnectedAirPodsWithLastKnownBatteryReports() {
         let addr = "7C-F3-4D-74-56-78"
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "\(addr)-case", displayName: "Yi Sung’s AirPods Pro Case", kind: .airPods, percent: 65, connectionState: .disconnected),
@@ -677,7 +702,7 @@ final class DeviceListPresentationTests: XCTestCase {
             preferences: DeviceDisplayPreferences()
         ).flatMap(\.items)
 
-        XCTAssertEqual(items.map(\.displayName), ["Keychron K3 Max"])
+        XCTAssertEqual(items.map(\.displayName), ["Keychron K3 Max", "Yi Sung’s AirPods Pro"])
     }
 
     func testInspectorTreatsDisconnectedAirPodsAsUnavailable() {
@@ -1895,8 +1920,12 @@ final class DeviceListPresentationTests: XCTestCase {
         defaults.set(false, forKey: BatteryHUDPreferences.autoDismissEnabledKey)
         defaults.set(false, forKey: BatteryHUDPreferences.showDismissButtonKey)
 
-        XCTAssertFalse(BatteryHUDPreferences.isAutoDismissEnabled(defaults: defaults))
+        XCTAssertTrue(BatteryHUDPreferences.isAutoDismissEnabled(defaults: defaults))
         XCTAssertFalse(BatteryHUDPreferences.showsDismissButton(defaults: defaults))
+
+        defaults.set(true, forKey: BatteryHUDPreferences.showDismissButtonKey)
+        XCTAssertFalse(BatteryHUDPreferences.isAutoDismissEnabled(defaults: defaults))
+        XCTAssertTrue(BatteryHUDPreferences.showsDismissButton(defaults: defaults))
     }
 
     func testQuickActionPreferencesDefaultToSafeEnabledActions() {
@@ -1967,13 +1996,15 @@ final class DeviceListPresentationTests: XCTestCase {
         BeaconIntentBridge.shared.register(
             handler: { action in
                 handledActions.append(action)
+                return action == .refreshBatteries
             },
             snapshotProvider: { [] }
         )
 
         XCTAssertTrue(BeaconIntentBridge.shared.perform(.refreshBatteries))
+        XCTAssertFalse(BeaconIntentBridge.shared.perform(.openSettings))
         XCTAssertFalse(BeaconIntentBridge.shared.perform(.transferToMac))
-        XCTAssertEqual(handledActions, [.refreshBatteries])
+        XCTAssertEqual(handledActions, [.refreshBatteries, .openSettings])
     }
 
     @MainActor
@@ -1984,7 +2015,7 @@ final class DeviceListPresentationTests: XCTestCase {
         ]
 
         BeaconIntentBridge.shared.register(
-            handler: { _ in },
+            handler: { _ in true },
             snapshotProvider: { snapshots }
         )
 
@@ -2074,6 +2105,167 @@ final class DeviceListPresentationTests: XCTestCase {
             ),
             "Magic Keyboard: -5% trend, range 82%-87% across 2 reports."
         )
+    }
+
+    func testBatteryHistoryExportsStableEscapedCSVAndClears() throws {
+        let defaults = isolatedDefaults()
+        let base = Date(timeIntervalSince1970: 2_000)
+        BatteryHistoryStore.record(
+            [
+                BatterySnapshot(
+                    deviceID: "mouse,\"desk\"",
+                    displayName: "Desk Mouse",
+                    kind: .mouse,
+                    percent: 44,
+                    chargeState: .charging,
+                    source: .coreBluetooth,
+                    updatedAt: base
+                ),
+                BatterySnapshot(
+                    deviceID: "keyboard",
+                    displayName: "Keyboard",
+                    kind: .keyboard,
+                    percent: 82,
+                    chargeState: .unplugged,
+                    source: .ioRegistry,
+                    updatedAt: base.addingTimeInterval(60)
+                ),
+            ],
+            now: base.addingTimeInterval(60),
+            defaults: defaults
+        )
+
+        XCTAssertEqual(BatteryHistoryStore.sampleCount(defaults: defaults), 2)
+        let csv = try XCTUnwrap(String(data: BatteryHistoryStore.csvData(defaults: defaults), encoding: .utf8))
+        XCTAssertTrue(csv.hasPrefix("device_id,recorded_at,percent,charge_state,source\n"))
+        XCTAssertTrue(csv.contains("\"mouse,\"\"desk\"\"\",\"1970-01-01T00:33:20.000Z\",44,\"charging\",\"coreBluetooth\""))
+        XCTAssertTrue(csv.contains("\"keyboard\",\"1970-01-01T00:34:20.000Z\",82,\"unplugged\",\"ioRegistry\""))
+
+        BatteryHistoryStore.clear(defaults: defaults)
+        XCTAssertEqual(BatteryHistoryStore.sampleCount(defaults: defaults), 0)
+    }
+
+    func testResetPreferencesPreservesHistoryAndUnrelatedDefaults() {
+        let defaults = isolatedDefaults()
+        let history = Data([1, 2, 3])
+        defaults.set("dark", forKey: BeaconAppearanceTheme.defaultsKey)
+        defaults.set(true, forKey: "Beacon.airPodsAudio.listeningMode.device")
+        defaults.set(history, forKey: BatteryHistoryStore.storageKey)
+        defaults.set("keep", forKey: "Unrelated.preference")
+
+        let removedCount = BeaconPreferencesResetter.resetAppPreferences(defaults: defaults)
+
+        XCTAssertEqual(removedCount, 2)
+        XCTAssertNil(defaults.object(forKey: BeaconAppearanceTheme.defaultsKey))
+        XCTAssertNil(defaults.object(forKey: "Beacon.airPodsAudio.listeningMode.device"))
+        XCTAssertEqual(defaults.data(forKey: BatteryHistoryStore.storageKey), history)
+        XCTAssertEqual(defaults.string(forKey: "Unrelated.preference"), "keep")
+    }
+
+    func testVersionInfoUsesBundleVersionAndBuildWithSafeFallbacks() {
+        XCTAssertEqual(
+            BeaconVersionInfo.from(
+                infoDictionary: [
+                    "CFBundleShortVersionString": "2.4",
+                    "CFBundleVersion": "37",
+                ]
+            ),
+            BeaconVersionInfo(version: "2.4", build: "37")
+        )
+        XCTAssertEqual(
+            BeaconVersionInfo.from(infoDictionary: [:]).displayText,
+            "Version Unknown (Unknown)"
+        )
+    }
+
+    func testTaiwanTraditionalChineseLocalizationIsBundledAndFormatsCoreCopy() throws {
+        let localizationURL = try XCTUnwrap(
+            Bundle.main.url(forResource: "zh-Hant-TW", withExtension: "lproj")
+        )
+        let bundle = try XCTUnwrap(Bundle(url: localizationURL))
+
+        XCTAssertEqual(BeaconL10n.string("General", bundle: bundle), "一般")
+        XCTAssertEqual(BeaconL10n.string("Launch at Login", bundle: bundle), "登入時啟動")
+        XCTAssertEqual(BeaconL10n.string("Battery Trend", bundle: bundle), "電量趨勢")
+        XCTAssertEqual(BeaconL10n.string("AirPods or Beats", bundle: bundle), "AirPods 或 Beats")
+        XCTAssertEqual(BeaconL10n.string("Core actions available", bundle: bundle), "核心動作可用")
+        XCTAssertEqual(BeaconL10n.string("Keep visible", bundle: bundle), "保持可見")
+        XCTAssertEqual(BeaconL10n.string("Low Battery", bundle: bundle), "低電量")
+        XCTAssertEqual(BeaconL10n.string("Waiting for first refresh", bundle: bundle), "等待第一次重新整理")
+        XCTAssertEqual(BeaconL10n.string("Updated %@", bundle: bundle), "更新於 %@")
+        XCTAssertEqual(BeaconL10n.string("Beacon Test Notification", bundle: bundle), "Beacon 測試通知")
+        XCTAssertEqual(
+            String(
+                format: BeaconL10n.string("Version %1$@ (%2$@)", bundle: bundle),
+                locale: Locale(identifier: "zh_Hant_TW"),
+                arguments: ["2.4", "37"]
+            ),
+            "版本 2.4（37）"
+        )
+        XCTAssertEqual(
+            String(
+                format: BeaconL10n.string("%@ is running low", bundle: bundle),
+                locale: Locale(identifier: "zh_Hant_TW"),
+                arguments: ["Magic Mouse"]
+            ),
+            "Magic Mouse 電量偏低"
+        )
+        XCTAssertEqual(
+            String(
+                format: BeaconL10n.string("Down to %d%%. Charge it soon.", bundle: bundle),
+                locale: Locale(identifier: "zh_Hant_TW"),
+                arguments: [20]
+            ),
+            "剩下 20%，請儘快充電。"
+        )
+        XCTAssertEqual(
+            String(
+                format: BeaconL10n.string("Auto dismiss (%d sec)", bundle: bundle),
+                locale: Locale(identifier: "zh_Hant_TW"),
+                arguments: [4]
+            ),
+            "自動關閉（4 秒）"
+        )
+        XCTAssertEqual(
+            String(
+                format: BeaconL10n.string("%1$d of %2$d", bundle: bundle),
+                locale: Locale(identifier: "zh_Hant_TW"),
+                arguments: [1, 7]
+            ),
+            "1 / 7"
+        )
+        XCTAssertEqual(
+            bundle.localizedString(
+                forKey: "NSBluetoothAlwaysUsageDescription",
+                value: nil,
+                table: "InfoPlist"
+            ),
+            "Beacon 會在可用時讀取已連接藍牙裝置的電量回報。"
+        )
+    }
+
+    @MainActor
+    func testLaunchAtLoginModelReflectsRegistrationAndApprovalStates() {
+        let service = FakeLaunchAtLoginService(status: .notRegistered)
+        let model = LaunchAtLoginSettingsModel(service: service)
+
+        XCTAssertFalse(model.isRequested)
+        XCTAssertEqual(model.title, "Disabled")
+
+        model.setEnabled(true)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertTrue(model.isRequested)
+        XCTAssertEqual(model.status, .enabled)
+
+        model.setEnabled(false)
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertFalse(model.isRequested)
+
+        service.statusAfterRegister = .requiresApproval
+        model.setEnabled(true)
+        XCTAssertTrue(model.isRequested)
+        XCTAssertEqual(model.title, "Needs Approval")
+        XCTAssertTrue(model.subtitle.contains("Login Items"))
     }
 
     func testBeaconShortcutTrendSummaryFallsBackWhileCollecting() {
@@ -2975,6 +3167,92 @@ final class DeviceListPresentationTests: XCTestCase {
 
         try pngData?.write(to: outputURL, options: .atomic)
         XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testBeaconGeneralSettingsRenderProducesNonBlankImage() throws {
+        let view = BeaconSettingsView(
+            snapshots: [],
+            onRefresh: {},
+            initialPane: .general
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-general-settings-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+    }
+
+    @MainActor
+    func testTallSettingsPanesKeepTheWindowChromeVisibleAtMinimumSize() throws {
+        try withAppearanceTheme(.light) {
+            let addr = "AA-BB-CC-DD-EE-FF"
+            let now = Date()
+            let scenarios: [(SettingsPane, [DecoratedBatterySnapshot], String?)] = [
+                (.general, [], nil),
+                (
+                    .actionHUD,
+                    [makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18)],
+                    nil
+                ),
+                (
+                    .devices,
+                    [
+                        makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82, updatedAt: now),
+                        makeDecorated(deviceID: "\(addr)-case", displayName: "Isaac's AirPods Pro Case", kind: .airPods, percent: 90, updatedAt: now),
+                        makeDecorated(deviceID: "\(addr)-left", displayName: "Isaac's AirPods Pro Left", kind: .airPods, percent: 72, updatedAt: now),
+                        makeDecorated(deviceID: "\(addr)-right", displayName: "Isaac's AirPods Pro Right", kind: .airPods, percent: 68, updatedAt: now),
+                    ],
+                    addr
+                ),
+            ]
+
+            for (pane, snapshots, selectedDeviceID) in scenarios {
+                let (hostingView, bitmap) = try renderedBitmap(
+                    for: BeaconSettingsView(
+                        snapshots: snapshots,
+                        onRefresh: {},
+                        initialPane: pane,
+                        initialSelectedDeviceID: selectedDeviceID
+                    ),
+                    width: 900,
+                    height: 620
+                )
+                let scale = backingScale(for: bitmap, in: hostingView)
+                XCTAssertLessThanOrEqual(
+                    hostingView.fittingSize.height,
+                    620,
+                    "The \(pane.title) pane must fit the minimum settings-window height."
+                )
+                let brandAreaColors = sampledColors(
+                    in: bitmap,
+                    xValues: stride(from: 18, to: 85, by: 2),
+                    yValues: stride(from: 584, to: 608, by: 2),
+                    backingScale: scale
+                )
+                let darkBrandPixels = brandAreaColors.filter { color in
+                    color.alphaComponent > 0.5
+                        && (color.redComponent + color.greenComponent + color.blueComponent) / 3 < 0.6
+                }
+
+                XCTAssertGreaterThan(
+                    darkBrandPixels.count,
+                    12,
+                    "The \(pane.title) pane must not push the Beacon sidebar title above the window."
+                )
+            }
+        }
     }
 
     @MainActor

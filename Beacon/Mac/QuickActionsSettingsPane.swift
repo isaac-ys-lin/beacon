@@ -63,7 +63,11 @@ struct QuickActionsSettingsPane: View {
             VStack(spacing: 8) {
                 summaryMetricRow(
                     "Enabled",
-                    value: "\(summary.enabledSupportedActions.count) of \(summary.supportedActionCount)",
+                    value: BeaconL10n.format(
+                        "%1$d of %2$d",
+                        summary.enabledSupportedActions.count,
+                        summary.supportedActionCount
+                    ),
                     systemImage: "checkmark.circle.fill",
                     color: DesignTokens.Palette.charging
                 )
@@ -97,7 +101,10 @@ struct QuickActionsSettingsPane: View {
                     }
 
                     if summary.enabledSupportedActions.count > 4 {
-                        Text("+\(summary.enabledSupportedActions.count - 4) more")
+                        Text(BeaconL10n.format(
+                            "+%@ more",
+                            String(summary.enabledSupportedActions.count - 4)
+                        ))
                             .font(DesignTokens.Typography.caption)
                             .foregroundStyle(DesignTokens.Palette.secondaryText)
                     }
@@ -134,7 +141,7 @@ struct QuickActionsSettingsPane: View {
             Image(systemName: systemImage)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(color)
-            Text(title)
+            Text(BeaconL10n.string(title))
                 .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
             Spacer(minLength: 0)
@@ -169,7 +176,7 @@ struct QuickActionsSettingsPane: View {
             Image(systemName: isActive ? "checkmark.circle.fill" : "minus.circle")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(isActive ? DesignTokens.Palette.charging : DesignTokens.Palette.secondaryText)
-            Text(title)
+            Text(BeaconL10n.string(title))
                 .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
             Spacer(minLength: 0)

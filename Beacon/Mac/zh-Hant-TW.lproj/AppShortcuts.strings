@@ -1,0 +1,22 @@
+/* Spoken App Shortcut phrases for Traditional Chinese (Taiwan). */
+
+"Check batteries with ${applicationName}" = "用 ${applicationName} 檢查電量";
+"Check battery trends with ${applicationName}" = "用 ${applicationName} 檢查電量趨勢";
+"Connect paired device in ${applicationName}" = "在 ${applicationName} 連接已配對裝置";
+"Connect prioritized device with ${applicationName}" = "用 ${applicationName} 連接優先裝置";
+"Disconnect lowest battery device with ${applicationName}" = "用 ${applicationName} 中斷最低電量裝置";
+"Disconnect lowest device in ${applicationName}" = "在 ${applicationName} 中斷最低電量裝置";
+"Find lowest battery in ${applicationName}" = "在 ${applicationName} 尋找最低電量";
+"Get battery summary from ${applicationName}" = "從 ${applicationName} 取得電量摘要";
+"Get battery trends from ${applicationName}" = "從 ${applicationName} 取得電量趨勢";
+"Get low battery devices from ${applicationName}" = "從 ${applicationName} 取得低電量裝置";
+"Get lowest battery from ${applicationName}" = "從 ${applicationName} 取得最低電量";
+"List low batteries in ${applicationName}" = "列出 ${applicationName} 的低電量裝置";
+"Open ${applicationName} settings" = "打開 ${applicationName} 設定";
+"Refresh ${applicationName}" = "重新整理 ${applicationName}";
+"Refresh batteries in ${applicationName}" = "在 ${applicationName} 重新整理電量";
+"Set up a device in ${applicationName}" = "在 ${applicationName} 設定裝置";
+"Show ${applicationName}" = "顯示 ${applicationName}";
+"Show battery dashboard in ${applicationName}" = "在 ${applicationName} 顯示電量儀表板";
+"Show device setup in ${applicationName}" = "在 ${applicationName} 顯示裝置設定";
+"Show settings in ${applicationName}" = "在 ${applicationName} 顯示設定";

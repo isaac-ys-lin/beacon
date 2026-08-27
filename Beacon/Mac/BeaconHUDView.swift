@@ -36,10 +36,12 @@ enum BatteryHUDPreferences {
     }
 
     static func isAutoDismissEnabled(defaults: UserDefaults = .standard) -> Bool {
-        guard defaults.object(forKey: autoDismissEnabledKey) != nil else {
-            return true
-        }
-        return defaults.bool(forKey: autoDismissEnabledKey)
+        let requestedValue = defaults.object(forKey: autoDismissEnabledKey) == nil
+            ? true
+            : defaults.bool(forKey: autoDismissEnabledKey)
+        // A persistent HUD must retain a visible close affordance. Treat legacy
+        // or externally-written false/false preferences as safe auto-dismiss.
+        return requestedValue || !showsDismissButton(defaults: defaults)
     }
 
     static func showsDismissButton(defaults: UserDefaults = .standard) -> Bool {
@@ -138,9 +140,9 @@ struct BatteryActionHUDView: View {
     private var title: String {
         switch event.kind {
         case .lowBattery:
-            return "\(event.displayName) is running low"
+            return BeaconL10n.format("%@ is running low", event.displayName)
         case .charged:
-            return "\(event.displayName) is charged"
+            return BeaconL10n.format("%@ is charged", event.displayName)
         }
     }
 
@@ -148,11 +150,11 @@ struct BatteryActionHUDView: View {
         switch event.kind {
         case .lowBattery:
             if let percent = event.percent {
-                return "Down to \(percent)%. Charge it soon."
+                return BeaconL10n.format("Down to %d%%. Charge it soon.", percent)
             }
-            return "Battery below alert level."
+            return BeaconL10n.string("Battery below alert level.")
         case .charged:
-            return "Charged alert point reached."
+            return BeaconL10n.string("Charged alert point reached.")
         }
     }
 

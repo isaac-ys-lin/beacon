@@ -58,6 +58,7 @@ final class BeaconSettingsWindowController {
             isPreviewingData: model.isUsingPreviewData,
             refreshDiagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics,
             notificationAuthorizationState: notificationAuthorizationState ?? model.notificationAuthorizationState,
+            latestNotificationDeliveryResult: model.latestNotificationDeliveryResult,
             onRefresh: { [weak model] in
                 Task { await model?.refresh() }
             },
@@ -75,6 +76,9 @@ final class BeaconSettingsWindowController {
             },
             onOpenNotificationSettings: {
                 BeaconSystemSettingsActions.openNotificationSettings()
+            },
+            onSendTestNotification: { [weak model] in
+                model?.sendTestNotification()
             },
             onQuit: {
                 NSApp.terminate(nil)
@@ -118,7 +122,7 @@ final class BeaconSettingsWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Beacon Settings"
+        window.title = BeaconL10n.string("Beacon Settings")
         // This requirement is expressed in SwiftUI content coordinates. Using
         // `minSize` would include the title bar and leave only 588pt of content.
         window.contentMinSize = Self.minimumContentSize

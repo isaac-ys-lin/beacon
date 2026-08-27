@@ -99,7 +99,7 @@ final class BeaconStatusController: NSObject {
         ]
         BeaconIntentBridge.shared.register(
             handler: { [weak self] action in
-                self?.performQuickAction(action)
+                self?.performQuickAction(action) ?? false
             },
             snapshotProvider: { [weak model] in
                 model?.store.decoratedSnapshots ?? []
@@ -250,63 +250,72 @@ final class BeaconStatusController: NSObject {
     private func registerQuickActions() {
         shortcutController.registerEnabledShortcuts { [weak self] action in
             Task { @MainActor in
-                self?.performQuickAction(action)
+                _ = self?.performQuickAction(action)
             }
         }
     }
 
-    private func performQuickAction(_ action: BeaconQuickAction) {
+    @discardableResult
+    private func performQuickAction(_ action: BeaconQuickAction) -> Bool {
         quickActionLogger.info("Quick action performed action=\(action.rawValue, privacy: .public)")
         switch action {
         case .showDashboard:
-            guard let button = statusItem.button else { return }
+            guard let button = statusItem.button else { return false }
             if statusMenuPanelController.isShown {
                 closeStatusMenu()
             } else {
                 showStatusMenu(relativeTo: button)
             }
+            return true
         case .refreshBatteries:
             Task { await model.refresh() }
+            return true
         case .openSettings:
             showSettingsWindow()
+            return true
         case .addDevice:
             closeStatusMenu()
             settingsWindowController.showWindow(
                 initialPane: .devices,
                 initiallyShowingAddDeviceGuide: true
             )
+            return true
         case .openBluetoothSettings:
             BeaconSystemSettingsActions.openBluetoothSettings()
+            return true
         case .connectNearbyDevice:
-            performDeviceControlQuickAction(.connectNearby)
+            return performDeviceControlQuickAction(.connectNearby)
         case .disconnectLowestDevice:
-            performDeviceControlQuickAction(.disconnectLowest)
+            return performDeviceControlQuickAction(.disconnectLowest)
         case .transferToMac:
-            break
+            return false
         }
     }
 
-    private func performDeviceControlQuickAction(_ action: DeviceControlQuickAction) {
+    private func performDeviceControlQuickAction(_ action: DeviceControlQuickAction) -> Bool {
         guard let target = deviceControlTarget(
             for: action,
             snapshots: model.store.decoratedSnapshots,
             preferences: DeviceDisplayPreferences.load()
         ) else {
-            return
+            return false
         }
 
         switch target.action {
         case .connect:
             if BluetoothDeviceController.connect(deviceID: target.item.id) {
                 Task { await model.refresh() }
+                return true
             }
         case .disconnect:
             if BluetoothDeviceController.disconnect(deviceID: target.item.id) {
                 Task { await model.refresh() }
+                return true
             }
         default:
-            return
+            return false
         }
+        return false
     }
 
     private func updateStatusButton(

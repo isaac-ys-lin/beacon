@@ -1,6 +1,10 @@
 name: Beacon
 options:
   bundleIdPrefix: com.isaacyslin
+  developmentLanguage: en
+  knownRegions:
+    - en
+    - zh-Hant-TW
   deploymentTarget:
     macOS: "14.0"
 settings:
@@ -9,6 +13,7 @@ settings:
     ENABLE_DEBUG_DYLIB: "NO"
     CODE_SIGNING_ALLOWED: "NO"
     CODE_SIGN_STYLE: Manual
+    SWIFT_EMIT_LOC_STRINGS: YES
 targets:
   BeaconMac:
     type: application
