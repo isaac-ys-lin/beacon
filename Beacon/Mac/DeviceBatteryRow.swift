@@ -471,7 +471,7 @@ func batteryProviderLabel(source: BatterySource, provider: BatteryProvider) -> S
     case .ioBluetooth: return "Bluetooth"
     case .systemProfiler: return BeaconL10n.string("System")
     case .bluetoothUnsupported: return "Bluetooth"
-    case .ideviceInfo: return BeaconL10n.string("USB iPhone")
+    case .ideviceInfo: return BeaconL10n.string("Trusted iPhone")
     }
 }
 

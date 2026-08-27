@@ -57,6 +57,8 @@ final class BeaconSettingsWindowController {
             isRefreshing: isRefreshing ?? model.isRefreshing,
             isPreviewingData: model.isUsingPreviewData,
             refreshDiagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics,
+            trustedIPhones: model.trustedIPhoneRegistry.devices,
+            trustedIPhoneEnrollmentResult: model.trustedIPhoneEnrollmentResult,
             notificationAuthorizationState: notificationAuthorizationState ?? model.notificationAuthorizationState,
             latestNotificationDeliveryResult: model.latestNotificationDeliveryResult,
             onRefresh: { [weak model] in
@@ -79,6 +81,12 @@ final class BeaconSettingsWindowController {
             },
             onSendTestNotification: { [weak model] in
                 model?.sendTestNotification()
+            },
+            onTrustConnectedIPhone: { [weak model] in
+                Task { await model?.trustConnectedIPhones() }
+            },
+            onForgetTrustedIPhone: { [weak model] udid in
+                model?.forgetTrustedIPhone(udid: udid)
             },
             onQuit: {
                 NSApp.terminate(nil)

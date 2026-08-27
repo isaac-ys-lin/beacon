@@ -3,6 +3,20 @@ import XCTest
 @testable import Beacon
 
 final class BluetoothBatteryResolverTests: XCTestCase {
+    private static func lockdownCommandSet() -> IPhoneLockdownCommandSet {
+        IPhoneLockdownCommandSet(
+            ideviceIDURL: URL(fileURLWithPath: "/tmp/idevice_id"),
+            ideviceInfoURL: URL(fileURLWithPath: "/tmp/ideviceinfo")
+        )
+    }
+
+    private func isolatedDefaults(name: String = UUID().uuidString) -> UserDefaults {
+        let suiteName = "BluetoothBatteryResolverTests.\(name)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+
     func testIORegistryBatteryPercentCreatesKeyboardSnapshot() {
         let device = BluetoothBatteryCandidate(
             deviceID: "apple-keyboard",
@@ -100,10 +114,49 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         let scanReport = BluetoothCandidateScanReport(
             candidates: [
                 BluetoothBatteryCandidate(
+                    deviceID: "apple-keyboard",
+                    displayName: "Magic Keyboard",
+                    transport: .hid,
+                    batteryPercent: 80,
+                    kindHint: .keyboard
+                )
+            ],
+            attempts: [
+                BatteryProviderAttempt(
+                    provider: .ioRegistry,
+                    status: .reported,
+                    candidateCount: 1,
+                    message: "IORegistry returned 1 battery candidate",
+                    attemptedAt: Date(timeIntervalSince1970: 40)
+                )
+            ]
+        )
+
+        let report = BluetoothBatteryResolver.report(from: scanReport, now: Date(timeIntervalSince1970: 50))
+
+        XCTAssertEqual(report.snapshots.map(\.deviceID), ["bluetooth-apple-keyboard"])
+        XCTAssertEqual(report.diagnostics.snapshotCount, 1)
+        XCTAssertEqual(report.diagnostics.attempts.count, 1)
+        XCTAssertEqual(report.diagnostics.attempts[0].provider, .ioRegistry)
+        XCTAssertEqual(report.diagnostics.attempts[0].status, .reported)
+        XCTAssertEqual(report.diagnostics.attempts[0].candidateCount, 1)
+    }
+
+    func testResolverReportDropsBLEIPhoneCandidates() {
+        let scanReport = BluetoothCandidateScanReport(
+            candidates: [
+                BluetoothBatteryCandidate(
                     deviceID: "16AE09F1-3309-CF7D-793F-80F1EE3B4933",
                     displayName: "YiSungiPhone",
                     transport: .ble,
                     batteryPercent: 80
+                ),
+                BluetoothBatteryCandidate(
+                    deviceID: "apple-keyboard",
+                    displayName: "Magic Keyboard",
+                    transport: .hid,
+                    batteryPercent: 64,
+                    kindHint: .keyboard
                 )
             ],
             attempts: [
@@ -119,48 +172,390 @@ final class BluetoothBatteryResolverTests: XCTestCase {
 
         let report = BluetoothBatteryResolver.report(from: scanReport, now: Date(timeIntervalSince1970: 50))
 
-        XCTAssertEqual(report.snapshots.map(\.deviceID), ["bluetooth-iphone-yisungiphone"])
+        XCTAssertEqual(report.snapshots.map(\.deviceID), ["bluetooth-apple-keyboard"])
         XCTAssertEqual(report.diagnostics.snapshotCount, 1)
-        XCTAssertEqual(report.diagnostics.attempts.count, 1)
-        XCTAssertEqual(report.diagnostics.attempts[0].provider, .coreBluetoothBatteryService)
-        XCTAssertEqual(report.diagnostics.attempts[0].status, .reported)
-        XCTAssertEqual(report.diagnostics.attempts[0].candidateCount, 1)
     }
 
-    func testIPhoneUSBBatteryParserReadsCapacityAndDeviceName() {
-        let output = """
-        BatteryCurrentCapacity: 77
-        BatteryIsCharging: false
-        DeviceName: YiSungiPhone
-        """
+    func testTrustedIPhoneSnapshotUsesUDIDIdentity() {
+        let usbSnapshot = BluetoothBatteryResolver.snapshot(
+            from: BluetoothBatteryCandidate(
+                deviceID: "00008030-001A",
+                displayName: "YiSungiPhone",
+                transport: .usb,
+                batteryPercent: 77,
+                kindHint: .iPhone
+            ),
+            now: Date(timeIntervalSince1970: 70)
+        )
+        let networkSnapshot = BluetoothBatteryResolver.snapshot(
+            from: BluetoothBatteryCandidate(
+                deviceID: "00008110-00BB",
+                displayName: "YiSungiPhone",
+                transport: .lockdownNetwork,
+                batteryPercent: 72,
+                kindHint: .iPhone
+            ),
+            now: Date(timeIntervalSince1970: 70)
+        )
 
-        let reading = IPhoneUSBBatteryProvider.parse(output)
+        XCTAssertEqual(usbSnapshot.deviceID, "trusted-iphone-00008030-001A")
+        XCTAssertEqual(usbSnapshot.kind, .iPhone)
+        XCTAssertEqual(usbSnapshot.percent, 77)
+        XCTAssertEqual(usbSnapshot.source, .ideviceInfo)
+        XCTAssertEqual(usbSnapshot.provider, .ideviceInfo)
+        XCTAssertEqual(usbSnapshot.confidence, .high)
+        XCTAssertEqual(networkSnapshot.deviceID, "trusted-iphone-00008110-00BB")
+        XCTAssertEqual(networkSnapshot.source, .ideviceInfo)
+    }
+
+    func testIPhoneLockdownBatteryParserReadsCapacityAndDeviceName() {
+        let reading = IPhoneLockdownBatteryProvider.parseBatteryReading(
+            """
+            BatteryCurrentCapacity: 77
+            BatteryIsCharging: false
+            DeviceName: YiSungiPhone
+            """,
+            fallbackDisplayName: "Fallback iPhone"
+        )
 
         XCTAssertEqual(reading?.percent, 77)
         XCTAssertEqual(reading?.displayName, "YiSungiPhone")
     }
 
-    func testIPhoneUSBBatteryCandidateCreatesUSBProviderSnapshot() throws {
-        let candidate = try XCTUnwrap(
-            IPhoneUSBBatteryProvider.candidate(
-                from: IPhoneUSBBatteryReading(percent: 77, displayName: "YiSungiPhone")
+    func testIPhoneLockdownProviderReadsOnlyAllowlistedDevices() async throws {
+        let trustedAt = Date(timeIntervalSince1970: 1_000)
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner(responses: [
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(
+                exitStatus: 0,
+                output: "trusted-usb\nuntrusted-usb\n"
+            ),
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-n"]): .init(
+                exitStatus: 0,
+                output: "trusted-usb\nuntrusted-network\n"
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "trusted-usb", "-k", "DeviceName"]): .init(
+                exitStatus: 0,
+                output: "Live iPhone\n"
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "trusted-usb", "-q", "com.apple.mobile.battery"]): .init(
+                exitStatus: 0,
+                output: "BatteryCurrentCapacity: 64\nDeviceName: Live iPhone\n"
             )
+        ])
+        let registry = TrustedIPhoneRegistry()
+            .trusting(TrustedIPhone(udid: "trusted-usb", displayName: "Registry iPhone", trustedAt: trustedAt))
+        let provider = IPhoneLockdownBatteryProvider(
+            registry: registry,
+            commandSet: commandSet,
+            commandRunner: runner
         )
 
-        let snapshot = BluetoothBatteryResolver.snapshot(
-            from: candidate,
-            now: Date(timeIntervalSince1970: 70)
-        )
+        let report = await provider.readReport(now: Date(timeIntervalSince1970: 2_000))
 
-        XCTAssertEqual(snapshot.deviceID, "usb-iphone-yisungiphone")
-        XCTAssertEqual(snapshot.kind, .iPhone)
-        XCTAssertEqual(snapshot.percent, 77)
-        XCTAssertEqual(snapshot.source, .ideviceInfo)
-        XCTAssertEqual(snapshot.provider, .ideviceInfo)
-        XCTAssertEqual(snapshot.confidence, .high)
+        XCTAssertEqual(report.candidates.count, 1)
+        let candidate = try XCTUnwrap(report.candidates.first)
+        XCTAssertEqual(candidate.deviceID, "trusted-usb")
+        XCTAssertEqual(candidate.displayName, "Live iPhone")
+        XCTAssertEqual(candidate.transport, .usb)
+        XCTAssertEqual(candidate.batteryPercent, 64)
+        XCTAssertEqual(candidate.kindHint, .iPhone)
+        XCTAssertEqual(report.attempts.first?.status, .reported)
+        XCTAssertEqual(report.attempt?.status, .reported)
+        XCTAssertFalse(runner.invocations.contains { $0.arguments.contains("untrusted-usb") })
+        XCTAssertFalse(runner.invocations.contains { $0.arguments.contains("untrusted-network") })
     }
 
-    func testIPhoneUSBParserSurfacesChargingState() {
+    func testIPhoneLockdownProviderReadsNetworkAllowlistedDevice() async throws {
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner(responses: [
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(exitStatus: 0, output: ""),
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-n"]): .init(exitStatus: 0, output: "trusted-network\n"),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-n", "-u", "trusted-network", "-k", "DeviceName"]): .init(
+                exitStatus: 0,
+                output: ""
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-n", "-u", "trusted-network", "-q", "com.apple.mobile.battery"]): .init(
+                exitStatus: 0,
+                output: "BatteryCurrentCapacity: 52\n"
+            )
+        ])
+        let registry = TrustedIPhoneRegistry(devices: [
+            TrustedIPhone(
+                udid: "trusted-network",
+                displayName: "Registry Network iPhone",
+                trustedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        ])
+        let provider = IPhoneLockdownBatteryProvider(
+            registry: registry,
+            commandSet: commandSet,
+            commandRunner: runner
+        )
+
+        let report = await provider.readReport(now: Date(timeIntervalSince1970: 2_000))
+
+        let candidate = try XCTUnwrap(report.candidates.first)
+        XCTAssertEqual(candidate.deviceID, "trusted-network")
+        XCTAssertEqual(candidate.displayName, "Registry Network iPhone")
+        XCTAssertEqual(candidate.transport, .lockdownNetwork)
+        XCTAssertEqual(candidate.batteryPercent, 52)
+
+        let snapshot = BluetoothBatteryResolver.snapshot(from: candidate, now: Date(timeIntervalSince1970: 3_000))
+        XCTAssertEqual(snapshot.deviceID, "trusted-iphone-trusted-network")
+        XCTAssertEqual(snapshot.source, .ideviceInfo)
+        XCTAssertEqual(snapshot.provider, .ideviceInfo)
+    }
+
+    func testIPhoneLockdownProviderSkipsCommandsWhenRegistryIsEmpty() async {
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner()
+        let provider = IPhoneLockdownBatteryProvider(
+            registry: TrustedIPhoneRegistry(),
+            commandSet: commandSet,
+            commandRunner: runner
+        )
+
+        let report = await provider.readReport(now: Date(timeIntervalSince1970: 2_000))
+
+        XCTAssertTrue(report.candidates.isEmpty)
+        XCTAssertEqual(report.attempt?.status, .noReport)
+        XCTAssertEqual(report.attempt?.candidateCount, 0)
+        XCTAssertEqual(report.attempt?.message, "No trusted iPhones are allowlisted")
+        XCTAssertTrue(runner.invocations.isEmpty)
+    }
+
+    func testIPhoneLockdownProviderKeepsUSBCandidateWhenNetworkListingFails() async throws {
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner(responses: [
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(
+                exitStatus: 0,
+                output: "trusted-usb\n"
+            ),
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-n"]): .init(
+                exitStatus: 255,
+                output: "",
+                errorOutput: "network unavailable"
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "trusted-usb", "-k", "DeviceName"]): .init(
+                exitStatus: 0,
+                output: "USB iPhone\n"
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "trusted-usb", "-q", "com.apple.mobile.battery"]): .init(
+                exitStatus: 0,
+                output: "BatteryCurrentCapacity: 66\n"
+            )
+        ])
+        let registry = TrustedIPhoneRegistry(devices: [
+            TrustedIPhone(udid: "trusted-usb", displayName: "Registry iPhone", trustedAt: Date(timeIntervalSince1970: 1_000))
+        ])
+
+        let report = await IPhoneLockdownBatteryProvider.readCandidates(
+            registry: registry,
+            commandSet: commandSet,
+            runner: runner,
+            now: Date(timeIntervalSince1970: 2_000)
+        )
+
+        let candidate = try XCTUnwrap(report.candidates.first)
+        XCTAssertEqual(candidate.deviceID, "trusted-usb")
+        XCTAssertEqual(candidate.transport, .usb)
+        XCTAssertEqual(candidate.batteryPercent, 66)
+        XCTAssertEqual(report.attempt?.status, .reported)
+        XCTAssertEqual(report.attempt?.candidateCount, 1)
+        XCTAssertTrue(report.attempt?.message.contains("idevice_id -n returned status 255") == true)
+    }
+
+    func testIPhoneLockdownProviderPrefersUSBWhenSameUDIDAppearsOnNetwork() async throws {
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner(responses: [
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(exitStatus: 0, output: "same-udid\n"),
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-n"]): .init(exitStatus: 0, output: "same-udid\n"),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "same-udid", "-k", "DeviceName"]): .init(
+                exitStatus: 0,
+                output: "USB Preferred iPhone\n"
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "same-udid", "-q", "com.apple.mobile.battery"]): .init(
+                exitStatus: 0,
+                output: "BatteryCurrentCapacity: 71\n"
+            )
+        ])
+        let registry = TrustedIPhoneRegistry(devices: [
+            TrustedIPhone(udid: "same-udid", displayName: "Registry iPhone", trustedAt: Date(timeIntervalSince1970: 1_000))
+        ])
+        let provider = IPhoneLockdownBatteryProvider(
+            registry: registry,
+            commandSet: commandSet,
+            commandRunner: runner
+        )
+
+        let report = await provider.readReport(now: Date(timeIntervalSince1970: 2_000))
+
+        let candidate = try XCTUnwrap(report.candidates.first)
+        XCTAssertEqual(candidate.transport, .usb)
+        XCTAssertEqual(candidate.batteryPercent, 71)
+        XCTAssertTrue(runner.invocations.contains {
+            $0.arguments == ["-u", "same-udid", "-q", "com.apple.mobile.battery"]
+        })
+        XCTAssertFalse(runner.invocations.contains {
+            $0.arguments == ["-n", "-u", "same-udid", "-q", "com.apple.mobile.battery"]
+        })
+    }
+
+    func testIPhoneLockdownProviderReportsTimedOutWhenListingTimesOut() async {
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner(responses: [
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(
+                exitStatus: -1,
+                output: "",
+                timedOut: true
+            )
+        ])
+        let provider = IPhoneLockdownBatteryProvider(
+            registry: TrustedIPhoneRegistry(devices: [
+                TrustedIPhone(udid: "trusted-usb", displayName: "Registry iPhone", trustedAt: Date(timeIntervalSince1970: 1_000))
+            ]),
+            commandSet: commandSet,
+            commandRunner: runner
+        )
+
+        let report = await provider.readReport(now: Date(timeIntervalSince1970: 2_000))
+
+        XCTAssertTrue(report.candidates.isEmpty)
+        XCTAssertEqual(report.attempts.first?.status, .timedOut)
+        XCTAssertEqual(report.attempts.first?.candidateCount, 0)
+    }
+
+    func testIPhoneLockdownProviderReportsMissingCommands() async {
+        let provider = IPhoneLockdownBatteryProvider(
+            registry: TrustedIPhoneRegistry(devices: [
+                TrustedIPhone(udid: "trusted-usb", displayName: "Registry iPhone", trustedAt: Date(timeIntervalSince1970: 1_000))
+            ]),
+            commandSet: nil,
+            commandRunner: MockIPhoneLockdownCommandRunner()
+        )
+
+        let report = await provider.readReport(now: Date(timeIntervalSince1970: 2_000))
+
+        XCTAssertTrue(report.candidates.isEmpty)
+        XCTAssertEqual(report.attempts.first?.status, .commandMissing)
+        XCTAssertEqual(report.attempts.first?.candidateCount, 0)
+    }
+
+    func testIPhoneLockdownDiscoveryListsUSBDevicesForEnrollment() async {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner(responses: [
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(
+                exitStatus: 0,
+                output: "first-usb\nsecond-usb\n"
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "first-usb", "-k", "DeviceName"]): .init(
+                exitStatus: 0,
+                output: "First iPhone\n"
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "second-usb", "-k", "DeviceName"]): .init(
+                exitStatus: 0,
+                output: "Second iPhone\n"
+            )
+        ])
+        let report = await IPhoneLockdownBatteryProvider.discoverUSBTrustedDevices(
+            commandSet: commandSet,
+            runner: runner,
+            now: now
+        )
+
+        XCTAssertEqual(report.devices, [
+            TrustedIPhone(udid: "first-usb", displayName: "First iPhone", trustedAt: now),
+            TrustedIPhone(udid: "second-usb", displayName: "Second iPhone", trustedAt: now)
+        ])
+        XCTAssertEqual(report.status, .reported)
+        XCTAssertEqual(report.message, "ideviceinfo verified 2 USB iPhones for enrollment")
+        XCTAssertEqual(report.attempts.first?.status, .reported)
+        XCTAssertEqual(report.attempts.first?.candidateCount, 2)
+    }
+
+    func testIPhoneLockdownDiscoverySkipsUSBDeviceWhenTrustProofFails() async {
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner(responses: [
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(exitStatus: 0, output: "locked-usb\n"),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "locked-usb", "-k", "DeviceName"]): .init(
+                exitStatus: 255,
+                output: ""
+            )
+        ])
+        let provider = IPhoneLockdownBatteryProvider(commandSet: commandSet, commandRunner: runner)
+
+        let report = await provider.discoverUSBDevicesForEnrollment(now: Date(timeIntervalSince1970: 2_000))
+
+        XCTAssertTrue(report.devices.isEmpty)
+        XCTAssertEqual(report.status, .unavailable)
+        XCTAssertEqual(report.message, "No trusted USB iPhone found. Unlock the iPhone, tap Trust, and reconnect by USB.")
+        XCTAssertEqual(report.attempts.first?.status, .unavailable)
+    }
+
+    func testIPhoneLockdownBatteryParserReadsAndClampsCapacity() {
+        let reading = IPhoneLockdownBatteryProvider.parseBatteryReading(
+            "BatteryCurrentCapacity: 155\nDeviceName: YiSungiPhone\n",
+            fallbackDisplayName: "Fallback iPhone"
+        )
+
+        XCTAssertEqual(reading?.percent, 100)
+        XCTAssertEqual(reading?.displayName, "YiSungiPhone")
+    }
+
+    func testTrustedIPhoneRegistryPersistsAllowlistedUDIDs() {
+        let defaults = isolatedDefaults()
+        let firstTrustedAt = Date(timeIntervalSince1970: 1_000)
+        let secondTrustedAt = Date(timeIntervalSince1970: 2_000)
+        let registry = TrustedIPhoneRegistry()
+            .trusting(TrustedIPhone(udid: "00008030-001A", displayName: "YiSungiPhone", trustedAt: firstTrustedAt))
+            .trusting(TrustedIPhone(udid: "00008110-00BB", displayName: "Work iPhone", trustedAt: secondTrustedAt))
+
+        registry.save(to: defaults)
+        let loaded = TrustedIPhoneRegistry.load(from: defaults)
+
+        XCTAssertTrue(loaded.isTrusted(udid: "00008030-001A"))
+        XCTAssertEqual(loaded.displayName(for: "00008110-00BB"), "Work iPhone")
+        XCTAssertEqual(loaded.devices.first { $0.udid == "00008030-001A" }?.trustedAt, firstTrustedAt)
+        XCTAssertEqual(loaded.devices.first { $0.udid == "00008110-00BB" }?.trustedAt, secondTrustedAt)
+        XCTAssertEqual(loaded.devices, registry.devices)
+    }
+
+    func testTrustedIPhoneRegistryUpdatesExistingUDIDWithoutDuplicate() {
+        let oldTrustedAt = Date(timeIntervalSince1970: 1_000)
+        let newTrustedAt = Date(timeIntervalSince1970: 2_000)
+        let registry = TrustedIPhoneRegistry()
+            .trusting(TrustedIPhone(udid: "00008030-001A", displayName: "Old Name", trustedAt: oldTrustedAt))
+            .trusting(TrustedIPhone(udid: "00008030-001A", displayName: "YiSungiPhone", trustedAt: newTrustedAt))
+
+        XCTAssertEqual(registry.devices.count, 1)
+        XCTAssertEqual(registry.displayName(for: "00008030-001A"), "YiSungiPhone")
+        XCTAssertEqual(registry.devices.first?.trustedAt, newTrustedAt)
+    }
+
+    func testTrustedIPhoneRegistryRemovesUDID() {
+        let trustedAt = Date(timeIntervalSince1970: 1_000)
+        let registry = TrustedIPhoneRegistry()
+            .trusting(TrustedIPhone(udid: "00008030-001A", displayName: "YiSungiPhone", trustedAt: trustedAt))
+            .trusting(TrustedIPhone(udid: "00008110-00BB", displayName: "Work iPhone", trustedAt: trustedAt))
+            .removing(udid: "00008030-001A")
+
+        XCTAssertFalse(registry.isTrusted(udid: "00008030-001A"))
+        XCTAssertTrue(registry.isTrusted(udid: "00008110-00BB"))
+        XCTAssertEqual(registry.devices.map(\.udid), ["00008110-00BB"])
+    }
+
+    func testTrustedIPhoneRegistryLoadsEmptyFromCorruptData() {
+        let defaults = isolatedDefaults()
+        defaults.set(Data("not-json".utf8), forKey: TrustedIPhoneRegistry.storageKey)
+
+        let registry = TrustedIPhoneRegistry.load(from: defaults)
+
+        XCTAssertTrue(registry.devices.isEmpty)
+    }
+
+    func testIPhoneLockdownParserSurfacesChargingState() {
         let charging = """
         BatteryCurrentCapacity: 64
         BatteryIsCharging: true
@@ -168,7 +563,10 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         FullyCharged: false
         DeviceName: YiSungiPhone
         """
-        XCTAssertEqual(IPhoneUSBBatteryProvider.parse(charging)?.chargeState, .charging)
+        XCTAssertEqual(
+            IPhoneLockdownBatteryProvider.parseBatteryReading(charging, fallbackDisplayName: "iPhone")?.chargeState,
+            .charging
+        )
 
         let full = """
         BatteryCurrentCapacity: 100
@@ -177,7 +575,10 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         FullyCharged: true
         DeviceName: YiSungiPhone
         """
-        XCTAssertEqual(IPhoneUSBBatteryProvider.parse(full)?.chargeState, .full)
+        XCTAssertEqual(
+            IPhoneLockdownBatteryProvider.parseBatteryReading(full, fallbackDisplayName: "iPhone")?.chargeState,
+            .full
+        )
 
         let unplugged = """
         BatteryCurrentCapacity: 55
@@ -186,14 +587,21 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         FullyCharged: false
         DeviceName: YiSungiPhone
         """
-        XCTAssertEqual(IPhoneUSBBatteryProvider.parse(unplugged)?.chargeState, .unplugged)
+        XCTAssertEqual(
+            IPhoneLockdownBatteryProvider.parseBatteryReading(unplugged, fallbackDisplayName: "iPhone")?.chargeState,
+            .unplugged
+        )
     }
 
-    func testChargingCandidateProducesChargingSnapshotForPulse() throws {
-        let candidate = try XCTUnwrap(
-            IPhoneUSBBatteryProvider.candidate(
-                from: IPhoneUSBBatteryReading(percent: 50, displayName: "YiSungiPhone", chargeState: .charging)
-            )
+    func testChargingCandidateProducesChargingSnapshotForPulse() {
+        let candidate = BluetoothBatteryCandidate(
+            deviceID: "trusted-udid",
+            displayName: "YiSungiPhone",
+            transport: .usb,
+            batteryPercent: 50,
+            kindHint: .iPhone,
+            chargeState: .charging,
+            identityEvidence: .serialNumber
         )
         let snapshot = BluetoothBatteryResolver.snapshot(from: candidate, now: Date(timeIntervalSince1970: 70))
         XCTAssertEqual(snapshot.chargeState, .charging)
@@ -680,5 +1088,36 @@ final class BluetoothBatteryResolverTests: XCTestCase {
 
         XCTAssertEqual(candidates.map(\.displayName), ["Magic Mouse", "Magic Trackpad", "Magic Keyboard"])
         XCTAssertEqual(kinds, ["mouse", "trackpad", "keyboard"])
+    }
+}
+
+private struct IPhoneLockdownInvocation: Hashable, Sendable {
+    let commandURL: URL
+    let arguments: [String]
+}
+
+private final class MockIPhoneLockdownCommandRunner: IPhoneLockdownCommandRunning, @unchecked Sendable {
+    private let lock = NSLock()
+    private let responses: [IPhoneLockdownInvocation: IPhoneLockdownCommandResult]
+    private var recordedInvocations: [IPhoneLockdownInvocation] = []
+
+    var invocations: [IPhoneLockdownInvocation] {
+        lock.withLock { recordedInvocations }
+    }
+
+    init(responses: [IPhoneLockdownInvocation: IPhoneLockdownCommandResult] = [:]) {
+        self.responses = responses
+    }
+
+    func run(commandURL: URL, arguments: [String], timeout: TimeInterval) async -> IPhoneLockdownCommandResult {
+        let invocation = IPhoneLockdownInvocation(commandURL: commandURL, arguments: arguments)
+        lock.withLock {
+            recordedInvocations.append(invocation)
+        }
+        return responses[invocation] ?? IPhoneLockdownCommandResult(
+            exitStatus: 1,
+            output: "",
+            errorOutput: "No mock response for \(commandURL.path) \(arguments.joined(separator: " "))"
+        )
     }
 }

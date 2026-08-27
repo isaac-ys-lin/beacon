@@ -1,15 +1,16 @@
 import Foundation
 
-public enum BluetoothTransport: Sendable {
+public enum BluetoothTransport: Equatable, Sendable {
     case hid
     case ble
     case classic
     case systemProfiler
     case usb
+    case lockdownNetwork
     case unknown
 }
 
-public enum BluetoothIdentityEvidence: Sendable {
+public enum BluetoothIdentityEvidence: Equatable, Sendable {
     case physicalDeviceUniqueID
     case deviceAddress
     case serialNumber
@@ -28,7 +29,7 @@ public enum BluetoothIdentityEvidence: Sendable {
     }
 }
 
-public struct BluetoothBatteryCandidate: Sendable {
+public struct BluetoothBatteryCandidate: Equatable, Sendable {
     public let deviceID: String
     public let displayName: String
     public let transport: BluetoothTransport
@@ -81,6 +82,16 @@ public struct BluetoothBatteryReadReport: Sendable {
     public let snapshots: [BatterySnapshot]
     public let diagnostics: BatteryRefreshDiagnostics
     public let authoritativeProviders: Set<BatteryProvider>
+
+    public init(
+        snapshots: [BatterySnapshot],
+        diagnostics: BatteryRefreshDiagnostics,
+        authoritativeProviders: Set<BatteryProvider> = []
+    ) {
+        self.snapshots = snapshots
+        self.diagnostics = diagnostics
+        self.authoritativeProviders = authoritativeProviders
+    }
 }
 
 public struct BluetoothBatteryResolver {
@@ -98,7 +109,9 @@ public struct BluetoothBatteryResolver {
     }
 
     static func report(from scanReport: BluetoothCandidateScanReport, now: Date) -> BluetoothBatteryReadReport {
-        let snapshots = scanReport.candidates.map {
+        let snapshots = scanReport.candidates.filter {
+            !Self.shouldDropFromReport($0)
+        }.map {
             Self.snapshot(from: $0, now: now)
         }
         return BluetoothBatteryReadReport(
@@ -135,10 +148,15 @@ public struct BluetoothBatteryResolver {
         if kind == .iPhone, candidate.transport == .ble {
             return "bluetooth-iphone-\(candidate.displayName.stableBluetoothIdentitySlug)"
         }
-        if kind == .iPhone, candidate.transport == .usb {
-            return "usb-iphone-\(candidate.displayName.stableBluetoothIdentitySlug)"
+        if kind == .iPhone,
+           candidate.transport == .usb || candidate.transport == .lockdownNetwork {
+            return "trusted-iphone-\(candidate.deviceID)"
         }
         return "bluetooth-\(candidate.deviceID)"
+    }
+
+    private static func shouldDropFromReport(_ candidate: BluetoothBatteryCandidate) -> Bool {
+        kind(for: candidate) == .iPhone && candidate.transport == .ble
     }
 
     private static func source(for candidate: BluetoothBatteryCandidate) -> BatterySource {
@@ -148,7 +166,7 @@ public struct BluetoothBatteryResolver {
         case .ble: return .coreBluetooth
         case .classic: return .ioBluetooth
         case .systemProfiler: return .systemProfiler
-        case .usb: return .ideviceInfo
+        case .usb, .lockdownNetwork: return .ideviceInfo
         case .unknown: return .bluetoothUnsupported
         }
     }
@@ -159,7 +177,7 @@ public struct BluetoothBatteryResolver {
         case .ble: return .coreBluetoothBatteryService
         case .classic: return .ioBluetooth
         case .systemProfiler: return .systemProfiler
-        case .usb: return .ideviceInfo
+        case .usb, .lockdownNetwork: return .ideviceInfo
         case .unknown: return .bluetoothUnsupported
         }
     }
@@ -184,234 +202,6 @@ public struct BluetoothBatteryResolver {
         if name.contains("mouse") { return .mouse }
         if name.contains("trackpad") { return .trackpad }
         return .bluetoothPeripheral
-    }
-}
-
-public struct IPhoneUSBBatteryReading: Equatable, Sendable {
-    public let percent: Int
-    public let displayName: String
-    public let chargeState: ChargeState
-
-    public init(percent: Int, displayName: String, chargeState: ChargeState = .unknown) {
-        self.percent = percent
-        self.displayName = displayName
-        self.chargeState = chargeState
-    }
-}
-
-enum IPhoneUSBBatteryProvider {
-    private static let commandPaths = [
-        "/opt/homebrew/bin/ideviceinfo",
-        "/usr/local/bin/ideviceinfo",
-        "/usr/bin/ideviceinfo"
-    ]
-    private static let commandTimeout: Duration = .seconds(3)
-
-    static func candidate(from reading: IPhoneUSBBatteryReading) -> BluetoothBatteryCandidate? {
-        BluetoothBatteryCandidate(
-            deviceID: "usb-\(reading.displayName.stableBluetoothIdentitySlug)",
-            displayName: reading.displayName,
-            transport: .usb,
-            batteryPercent: reading.percent,
-            kindHint: .iPhone,
-            connectionState: .connected,
-            chargeState: reading.chargeState,
-            identityEvidence: .normalizedName
-        )
-    }
-
-    static func parse(_ output: String, fallbackDisplayName: String = "iPhone") -> IPhoneUSBBatteryReading? {
-        let values = keyValuePairs(from: output)
-        let percent = [
-            "batterycurrentcapacity",
-            "batterycurrentcapacitypercent",
-            "batterypercent",
-            "batterylevel",
-            "battery level"
-        ]
-        .compactMap { values[$0].flatMap(percentValue) }
-        .first
-
-        guard let percent else { return nil }
-
-        let displayName = [
-            "devicename",
-            "device name",
-            "name",
-            "productname"
-        ]
-        .compactMap { values[$0]?.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .first { !$0.isEmpty } ?? fallbackDisplayName
-
-        return IPhoneUSBBatteryReading(
-            percent: max(0, min(100, percent)),
-            displayName: displayName,
-            chargeState: chargeState(from: values)
-        )
-    }
-
-    static func chargeState(from values: [String: String]) -> ChargeState {
-        let fullyCharged = boolValue(values["fullycharged"])
-        let isCharging = boolValue(values["batteryischarging"])
-        let externalConnected = boolValue(values["externalconnected"])
-
-        if fullyCharged == true { return .full }
-        if isCharging == true { return .charging }
-        // External power present but not actively charging (e.g. optimized
-        // charging hold) still reads as charging to the user.
-        if externalConnected == true { return .charging }
-        if isCharging == false || externalConnected == false { return .unplugged }
-        return .unknown
-    }
-
-    private static func boolValue(_ value: String?) -> Bool? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
-            return nil
-        }
-        switch value {
-        case "true", "yes", "1": return true
-        case "false", "no", "0": return false
-        default: return nil
-        }
-    }
-
-    static func readCandidate(
-        now: Date = Date(),
-        deadline: ContinuousClock.Instant,
-        runner: BatteryProviderRunner = BatteryProviderRunner()
-    ) async -> (candidate: BluetoothBatteryCandidate?, attempt: BatteryProviderAttempt) {
-        guard let commandURL = availableCommandURL() else {
-            return (
-                nil,
-                BatteryProviderAttempt(
-                    provider: .ideviceInfo,
-                    status: .commandMissing,
-                    candidateCount: 0,
-                    message: "ideviceinfo command not found",
-                    attemptedAt: now
-                )
-            )
-        }
-
-        // Try USB first, then the Wi-Fi lockdown pairing. Every subprocess is
-        // capped by the remaining shared refresh deadline.
-        var batteryResult = await run(
-            commandURL: commandURL,
-            arguments: ["-q", "com.apple.mobile.battery"],
-            deadline: deadline,
-            runner: runner
-        )
-        var networkMode = false
-        if batteryResult.status != 0, !batteryResult.timedOut, !batteryResult.cancelled {
-            batteryResult = await run(
-                commandURL: commandURL,
-                arguments: ["-n", "-q", "com.apple.mobile.battery"],
-                deadline: deadline,
-                runner: runner
-            )
-            networkMode = true
-        }
-        guard batteryResult.status == 0 else {
-            return (
-                nil,
-                BatteryProviderAttempt(
-                    provider: .ideviceInfo,
-                    status: batteryResult.timedOut || batteryResult.cancelled ? .timedOut : .unavailable,
-                    candidateCount: 0,
-                    message: batteryResult.timedOut || batteryResult.cancelled
-                        ? "ideviceinfo timed out while reading iPhone battery"
-                        : "ideviceinfo returned status \(batteryResult.status)",
-                    attemptedAt: now
-                )
-            )
-        }
-
-        let nameArgs = networkMode ? ["-n", "-k", "DeviceName"] : ["-k", "DeviceName"]
-        let nameResult = await run(
-            commandURL: commandURL,
-            arguments: nameArgs,
-            deadline: deadline,
-            runner: runner
-        )
-        let deviceName = nameResult.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        let fallbackName = deviceName.isEmpty ? "iPhone" : deviceName
-        guard let reading = parse(batteryResult.output, fallbackDisplayName: fallbackName),
-              let candidate = candidate(from: reading)
-        else {
-            return (
-                nil,
-                BatteryProviderAttempt(
-                    provider: .ideviceInfo,
-                    status: .noReport,
-                    candidateCount: 0,
-                    message: "ideviceinfo did not return an iPhone battery percentage",
-                    attemptedAt: now
-                )
-            )
-        }
-
-        return (
-            candidate,
-            BatteryProviderAttempt(
-                provider: .ideviceInfo,
-                status: .reported,
-                candidateCount: 1,
-                message: "ideviceinfo returned 1 iPhone battery candidate (\(networkMode ? "Wi-Fi" : "USB"))",
-                attemptedAt: now
-            )
-        )
-    }
-
-    private static func availableCommandURL(fileManager: FileManager = .default) -> URL? {
-        commandPaths
-            .first { fileManager.isExecutableFile(atPath: $0) }
-            .map(URL.init(fileURLWithPath:))
-    }
-
-    private static func keyValuePairs(from output: String) -> [String: String] {
-        var values: [String: String] = [:]
-        for rawLine in output.split(whereSeparator: \.isNewline) {
-            let line = String(rawLine)
-            let separatorIndex = line.firstIndex(of: ":") ?? line.firstIndex(of: "=")
-            guard let separatorIndex else { continue }
-            let key = line[..<separatorIndex]
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-            let value = line[line.index(after: separatorIndex)...]
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            values[key] = value
-        }
-        return values
-    }
-
-    private static func percentValue(_ value: String) -> Int? {
-        let trimmed = value.trimmingCharacters(in: CharacterSet(charactersIn: "%").union(.whitespacesAndNewlines))
-        return Int(trimmed)
-    }
-
-    private static func run(
-        commandURL: URL,
-        arguments: [String],
-        deadline: ContinuousClock.Instant,
-        runner: BatteryProviderRunner
-    ) async -> (status: Int32, output: String, timedOut: Bool, cancelled: Bool) {
-        let remaining = ContinuousClock().now.duration(to: deadline)
-        guard remaining > .zero else { return (-1, "", true, false) }
-        do {
-            let result = try await runner.run(
-                executableURL: commandURL,
-                arguments: arguments,
-                timeout: min(commandTimeout, remaining)
-            )
-            return (
-                result.terminationStatus,
-                String(data: result.output, encoding: .utf8) ?? "",
-                result.timedOut,
-                result.wasCancelled
-            )
-        } catch {
-            return (-1, "", false, false)
-        }
     }
 }
 

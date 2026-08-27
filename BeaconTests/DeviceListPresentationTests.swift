@@ -35,6 +35,33 @@ final class DeviceListPresentationTests: XCTestCase {
 
     private static let fixedDate = Date(timeIntervalSince1970: 1_000)
 
+    private actor ControlledBluetoothReportReader {
+        private var readContinuation: CheckedContinuation<BluetoothBatteryReadReport?, Never>?
+        private var startedContinuation: CheckedContinuation<Void, Never>?
+        private var hasStarted = false
+
+        func read() async -> BluetoothBatteryReadReport? {
+            hasStarted = true
+            startedContinuation?.resume()
+            startedContinuation = nil
+            return await withCheckedContinuation { continuation in
+                readContinuation = continuation
+            }
+        }
+
+        func waitUntilStarted() async {
+            guard !hasStarted else { return }
+            await withCheckedContinuation { continuation in
+                startedContinuation = continuation
+            }
+        }
+
+        func finish(returning report: BluetoothBatteryReadReport?) {
+            readContinuation?.resume(returning: report)
+            readContinuation = nil
+        }
+    }
+
     private func makeSnapshot(
         deviceID: String,
         displayName: String,
@@ -177,6 +204,59 @@ final class DeviceListPresentationTests: XCTestCase {
         return view.subviews.reduce(current.map { [$0] } ?? []) { partial, subview in
             partial + scrollViews(in: subview)
         }
+    }
+
+    private func emptyBluetoothReadReport(now: Date = fixedDate) -> BluetoothBatteryReadReport {
+        BluetoothBatteryReadReport(
+            snapshots: [],
+            diagnostics: BatteryRefreshDiagnostics(refreshedAt: now, snapshotCount: 0)
+        )
+    }
+
+    // MARK: - Refresh Activity
+
+    @MainActor
+    func testBackgroundRefreshDoesNotShowSettingsSpinner() async {
+        let reader = ControlledBluetoothReportReader()
+        let model = BeaconModel(
+            environment: [:],
+            bluetoothReportReader: {
+                await reader.read()
+            }
+        )
+
+        let refreshTask = Task {
+            await model.refresh(userInitiated: false)
+        }
+        await reader.waitUntilStarted()
+
+        XCTAssertFalse(model.isRefreshing)
+
+        await reader.finish(returning: emptyBluetoothReadReport())
+        await refreshTask.value
+        XCTAssertFalse(model.isRefreshing)
+    }
+
+    @MainActor
+    func testManualRefreshShowsSpinnerUntilRefreshCompletes() async {
+        let reader = ControlledBluetoothReportReader()
+        let model = BeaconModel(
+            environment: [:],
+            bluetoothReportReader: {
+                await reader.read()
+            }
+        )
+
+        let refreshTask = Task {
+            await model.refresh()
+        }
+        await reader.waitUntilStarted()
+
+        XCTAssertTrue(model.isRefreshing)
+
+        await reader.finish(returning: emptyBluetoothReadReport())
+        await refreshTask.value
+        XCTAssertFalse(model.isRefreshing)
     }
 
     // MARK: - airPodsPrefix
@@ -408,7 +488,7 @@ final class DeviceListPresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             batteryProviderLabel(source: .ideviceInfo, provider: .ideviceInfo),
-            "USB iPhone"
+            "Trusted iPhone"
         )
     }
 
@@ -2188,6 +2268,8 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(BeaconL10n.string("Launch at Login", bundle: bundle), "登入時啟動")
         XCTAssertEqual(BeaconL10n.string("Battery Trend", bundle: bundle), "電量趨勢")
         XCTAssertEqual(BeaconL10n.string("AirPods or Beats", bundle: bundle), "AirPods 或 Beats")
+        XCTAssertEqual(BeaconL10n.string("Trusted iPhone", bundle: bundle), "受信任的 iPhone")
+        XCTAssertEqual(BeaconL10n.string("Trust Connected iPhone", bundle: bundle), "信任已連接的 iPhone")
         XCTAssertEqual(BeaconL10n.string("Core actions available", bundle: bundle), "核心動作可用")
         XCTAssertEqual(BeaconL10n.string("Keep visible", bundle: bundle), "保持可見")
         XCTAssertEqual(BeaconL10n.string("Low Battery", bundle: bundle), "低電量")
@@ -3095,7 +3177,16 @@ final class DeviceListPresentationTests: XCTestCase {
 
     @MainActor
     func testAddDeviceGuideRenderProducesNonBlankImage() throws {
-        let view = AddDeviceGuideView(onOpenBluetoothSettings: {}, onDismiss: {})
+        let view = AddDeviceGuideView(
+            trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport(
+                devices: [],
+                status: .noReport,
+                message: "Connect by USB, unlock, and trust this Mac."
+            ),
+            onOpenBluetoothSettings: {},
+            onTrustConnectedIPhone: {},
+            onDismiss: {}
+        )
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(x: 0, y: 0, width: 520, height: 330)
         hostingView.layoutSubtreeIfNeeded()
@@ -3106,12 +3197,64 @@ final class DeviceListPresentationTests: XCTestCase {
         guard let bitmap else { return }
         hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
 
-        let outputURL = URL(fileURLWithPath: "/tmp/batteryhub-add-device-guide-render.png")
+        let outputURL = URL(fileURLWithPath: "/tmp/beacon-add-device-guide-render.png")
         let pngData = bitmap.representation(using: .png, properties: [:])
         XCTAssertNotNil(pngData)
 
         try pngData?.write(to: outputURL, options: .atomic)
         XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
+    }
+
+    @MainActor
+    func testBeaconSettingsDevicesRenderTrustedIPhoneDiagnostics() throws {
+        let diagnostics = BatteryRefreshDiagnostics(
+            attempts: [
+                BatteryProviderAttempt(
+                    provider: .ideviceInfo,
+                    status: .commandMissing,
+                    candidateCount: 0,
+                    message: "idevice_id or ideviceinfo command not found",
+                    attemptedAt: Date(timeIntervalSince1970: 4_000)
+                )
+            ],
+            refreshedAt: Date(timeIntervalSince1970: 4_000),
+            snapshotCount: 0
+        )
+        let view = BeaconSettingsView(
+            snapshots: [],
+            refreshDiagnostics: diagnostics,
+            trustedIPhones: [
+                TrustedIPhone(
+                    udid: "trusted-usb",
+                    displayName: "Yi-Sung iPhone",
+                    trustedAt: Date(timeIntervalSince1970: 3_000)
+                )
+            ],
+            trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport(
+                devices: [],
+                status: .commandMissing,
+                message: "idevice_id or ideviceinfo command not found"
+            ),
+            onRefresh: {},
+            onTrustConnectedIPhone: {},
+            onForgetTrustedIPhone: { _ in }
+        )
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        XCTAssertNotNil(bitmap)
+
+        guard let bitmap else { return }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+        let outputURL = URL(fileURLWithPath: "/tmp/beacon-settings-trusted-iphone-render.png")
+        let pngData = bitmap.representation(using: .png, properties: [:])
+        XCTAssertNotNil(pngData)
+
+        try pngData?.write(to: outputURL, options: .atomic)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
     }
 
     @MainActor

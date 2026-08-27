@@ -45,6 +45,8 @@ struct BeaconSettingsView: View {
     let isRefreshing: Bool
     let isPreviewingData: Bool
     let refreshDiagnostics: BatteryRefreshDiagnostics
+    let trustedIPhones: [TrustedIPhone]
+    let trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport?
     let notificationAuthorizationState: NotificationCenterAuthorizationState
     let latestNotificationDeliveryResult: NotificationCenterDeliveryResult?
     let onRefresh: () -> Void
@@ -54,6 +56,8 @@ struct BeaconSettingsView: View {
     let onRequestNotificationPermission: () -> Void
     let onOpenNotificationSettings: () -> Void
     let onSendTestNotification: () -> Void
+    let onTrustConnectedIPhone: () -> Void
+    let onForgetTrustedIPhone: (String) -> Void
     let onQuit: () -> Void
 
     @AppStorage(LowBatteryNotifier.thresholdDefaultsKey) private var lowBatteryThreshold = LowBatteryNotifier.defaultThreshold
@@ -82,6 +86,8 @@ struct BeaconSettingsView: View {
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
         refreshDiagnostics: BatteryRefreshDiagnostics = BatteryRefreshDiagnostics(),
+        trustedIPhones: [TrustedIPhone] = [],
+        trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport? = nil,
         notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown,
         latestNotificationDeliveryResult: NotificationCenterDeliveryResult? = nil,
         onRefresh: @escaping () -> Void,
@@ -91,6 +97,8 @@ struct BeaconSettingsView: View {
         onRequestNotificationPermission: @escaping () -> Void = {},
         onOpenNotificationSettings: @escaping () -> Void = {},
         onSendTestNotification: @escaping () -> Void = {},
+        onTrustConnectedIPhone: @escaping () -> Void = {},
+        onForgetTrustedIPhone: @escaping (String) -> Void = { _ in },
         onQuit: @escaping () -> Void = {},
         initialPane: SettingsPane = .devices,
         initialSelectedDeviceID: String? = nil,
@@ -100,6 +108,8 @@ struct BeaconSettingsView: View {
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
         self.refreshDiagnostics = refreshDiagnostics
+        self.trustedIPhones = trustedIPhones
+        self.trustedIPhoneEnrollmentResult = trustedIPhoneEnrollmentResult
         self.notificationAuthorizationState = notificationAuthorizationState
         self.latestNotificationDeliveryResult = latestNotificationDeliveryResult
         self.onRefresh = onRefresh
@@ -109,6 +119,8 @@ struct BeaconSettingsView: View {
         self.onRequestNotificationPermission = onRequestNotificationPermission
         self.onOpenNotificationSettings = onOpenNotificationSettings
         self.onSendTestNotification = onSendTestNotification
+        self.onTrustConnectedIPhone = onTrustConnectedIPhone
+        self.onForgetTrustedIPhone = onForgetTrustedIPhone
         self.onQuit = onQuit
         _selectedPane = State(initialValue: initialPane)
         _selectedDeviceID = State(initialValue: initialSelectedDeviceID)
@@ -152,8 +164,9 @@ struct BeaconSettingsView: View {
         }
         .sheet(isPresented: $isShowingAddDeviceGuide) {
             AddDeviceGuideView(
+                trustedIPhoneEnrollmentResult: trustedIPhoneEnrollmentResult,
                 onOpenBluetoothSettings: onOpenBluetoothSettings,
-                onRefresh: onRefresh,
+                onTrustConnectedIPhone: onTrustConnectedIPhone,
                 onDismiss: { isShowingAddDeviceGuide = false }
             )
         }
@@ -284,15 +297,23 @@ struct BeaconSettingsView: View {
             HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
                 deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
 
-                Group {
-                    if let selectedDevice {
-                        ScrollView(showsIndicators: false) {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        TrustedIPhoneSettingsCard(
+                            latestRefreshDiagnostics: refreshDiagnostics,
+                            trustedIPhones: trustedIPhones,
+                            enrollmentResult: trustedIPhoneEnrollmentResult,
+                            onTrustConnectedIPhone: onTrustConnectedIPhone,
+                            onForgetTrustedIPhone: onForgetTrustedIPhone
+                        )
+
+                        if let selectedDevice {
                             deviceDetail(for: selectedDevice)
-                                .padding(1)
+                        } else {
+                            emptyDeviceDetail
                         }
-                    } else {
-                        emptyDeviceDetail
                     }
+                    .padding(1)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }

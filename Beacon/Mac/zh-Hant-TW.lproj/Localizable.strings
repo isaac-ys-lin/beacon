@@ -281,6 +281,15 @@
 "Bluetooth profiler" = "藍牙系統描述";
 "Bluetooth fallback" = "藍牙備援";
 "iPhone USB helper" = "iPhone USB 輔助工具";
+"Trusted iPhone" = "受信任的 iPhone";
+"iPhone or iPad" = "iPhone 或 iPad";
+"Connect by USB, unlock, trust this Mac, then add it here." = "以 USB 連接並解鎖裝置、信任這台 Mac，再於此加入。";
+"Trust" = "信任";
+"Only enrolled iPhones and iPads can provide battery reports." = "只有已登錄的 iPhone 與 iPad 可以提供電量回報。";
+"Trust Connected iPhone" = "信任已連接的 iPhone";
+"No trusted iPhone diagnostic has run yet." = "尚未執行受信任 iPhone 診斷。";
+"No trusted iPhones saved." = "尚未儲存受信任的 iPhone。";
+"Forget" = "忘記";
 "Reported" = "已有回報";
 "Timed out" = "逾時";
 "Permission needed" = "需要權限";

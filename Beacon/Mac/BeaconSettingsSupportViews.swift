@@ -26,17 +26,20 @@ extension View {
 }
 
 struct AddDeviceGuideView: View {
+    let trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport?
     let onOpenBluetoothSettings: () -> Void
-    let onRefresh: () -> Void
+    let onTrustConnectedIPhone: () -> Void
     let onDismiss: () -> Void
 
     init(
+        trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport? = nil,
         onOpenBluetoothSettings: @escaping () -> Void,
-        onRefresh: @escaping () -> Void = {},
+        onTrustConnectedIPhone: @escaping () -> Void = {},
         onDismiss: @escaping () -> Void
     ) {
+        self.trustedIPhoneEnrollmentResult = trustedIPhoneEnrollmentResult
         self.onOpenBluetoothSettings = onOpenBluetoothSettings
-        self.onRefresh = onRefresh
+        self.onTrustConnectedIPhone = onTrustConnectedIPhone
         self.onDismiss = onDismiss
     }
 
@@ -80,11 +83,18 @@ struct AddDeviceGuideView: View {
                 )
 
                 AddDeviceGuideRow(
-                    title: "iPhone via USB",
-                    subtitle: "Connect by cable, trust this Mac, then refresh.",
+                    title: "iPhone or iPad",
+                    subtitle: "Connect by USB, unlock, trust this Mac, then add it here.",
                     systemImage: resolveSymbol("iphone", fallback: "mobilephone"),
-                    actionTitle: "Refresh",
-                    action: onRefresh
+                    actionTitle: "Trust",
+                    action: onTrustConnectedIPhone
+                )
+            }
+
+            if let trustedIPhoneEnrollmentResult {
+                TrustedIPhoneStatusLine(
+                    status: trustedIPhoneEnrollmentResult.status,
+                    message: trustedIPhoneEnrollmentResult.message
                 )
             }
 
@@ -100,6 +110,183 @@ struct AddDeviceGuideView: View {
         .padding(24)
         .frame(width: 520)
         .beaconSettingsCardSurface(cornerRadius: DesignTokens.Radius.panel)
+    }
+}
+
+struct TrustedIPhoneSettingsCard: View {
+    let latestRefreshDiagnostics: BatteryRefreshDiagnostics
+    let trustedIPhones: [TrustedIPhone]
+    let enrollmentResult: IPhoneLockdownDiscoveryReport?
+    let onTrustConnectedIPhone: () -> Void
+    let onForgetTrustedIPhone: (String) -> Void
+
+    private var latestIPhoneAttempt: BatteryProviderAttempt? {
+        latestRefreshDiagnostics.attempts.last { $0.provider == .ideviceInfo }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: resolveSymbol("iphone.gen3", fallback: "iphone"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(statusColor)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(DesignTokens.Palette.controlPill)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Trusted iPhone")
+                        .font(DesignTokens.Typography.captionEmphasis)
+                    Text("Only enrolled iPhones and iPads can provide battery reports.")
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(DesignTokens.Palette.secondaryText)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 8)
+
+                Button(action: onTrustConnectedIPhone) {
+                    Label("Trust Connected iPhone", systemImage: "checkmark.shield")
+                }
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+                .padding(.leading, 58)
+
+            VStack(alignment: .leading, spacing: 9) {
+                if let enrollmentResult {
+                    TrustedIPhoneStatusLine(
+                        status: enrollmentResult.status,
+                        message: enrollmentResult.message
+                    )
+                }
+
+                if let latestIPhoneAttempt {
+                    TrustedIPhoneStatusLine(
+                        status: latestIPhoneAttempt.status,
+                        message: latestIPhoneAttempt.message
+                    )
+                } else {
+                    Text("No trusted iPhone diagnostic has run yet.")
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(DesignTokens.Palette.secondaryText)
+                }
+
+                if trustedIPhones.isEmpty {
+                    Text("No trusted iPhones saved.")
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(DesignTokens.Palette.tertiaryText)
+                } else {
+                    VStack(spacing: 6) {
+                        ForEach(trustedIPhones) { phone in
+                            HStack(spacing: 10) {
+                                Image(systemName: resolveSymbol("iphone.gen3", fallback: "iphone"))
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(DesignTokens.Palette.accent)
+                                    .frame(width: 24, height: 24)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                            .fill(DesignTokens.Palette.controlPill)
+                                    )
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(phone.displayName)
+                                        .font(DesignTokens.Typography.captionEmphasis)
+                                        .lineLimit(1)
+                                    Text(phone.udid)
+                                        .font(DesignTokens.Typography.caption2)
+                                        .foregroundStyle(DesignTokens.Palette.tertiaryText)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+
+                                Spacer(minLength: 8)
+
+                                Button(role: .destructive) {
+                                    onForgetTrustedIPhone(phone.udid)
+                                } label: {
+                                    Label("Forget", systemImage: "trash")
+                                }
+                                .controlSize(.small)
+                            }
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 7)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                                    .fill(DesignTokens.Palette.card)
+                            )
+                        }
+                    }
+                }
+            }
+            .padding(12)
+        }
+        .frame(maxWidth: 560, alignment: .topLeading)
+        .beaconSettingsCardSurface()
+    }
+
+    private var statusColor: Color {
+        if let enrollmentResult {
+            return color(for: enrollmentResult.status)
+        }
+        if let latestIPhoneAttempt {
+            return color(for: latestIPhoneAttempt.status)
+        }
+        return DesignTokens.Palette.secondaryText
+    }
+
+    private func color(for status: BatteryReadStatus) -> Color {
+        switch status {
+        case .reported: return DesignTokens.Palette.healthy
+        case .noReport: return DesignTokens.Palette.secondaryText
+        case .unavailable, .timedOut, .commandMissing: return DesignTokens.Palette.warning
+        case .unauthorized: return DesignTokens.Palette.critical
+        }
+    }
+}
+
+struct TrustedIPhoneStatusLine: View {
+    let status: BatteryReadStatus
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: symbolName)
+                .font(.system(size: 11, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(color)
+                .frame(width: 14, height: 14)
+
+            Text(message)
+                .font(DesignTokens.Typography.caption2)
+                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var symbolName: String {
+        switch status {
+        case .reported: return "checkmark.circle.fill"
+        case .noReport: return "info.circle.fill"
+        case .unavailable, .timedOut, .commandMissing: return "exclamationmark.triangle.fill"
+        case .unauthorized: return "xmark.circle.fill"
+        }
+    }
+
+    private var color: Color {
+        switch status {
+        case .reported: return DesignTokens.Palette.healthy
+        case .noReport: return DesignTokens.Palette.secondaryText
+        case .unavailable, .timedOut, .commandMissing: return DesignTokens.Palette.warning
+        case .unauthorized: return DesignTokens.Palette.critical
+        }
     }
 }
 

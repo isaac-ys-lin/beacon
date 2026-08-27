@@ -162,7 +162,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots.map(\.percent), [82])
     }
 
-    func testMergeDeduplicatesSameIPhoneAcrossBLEAndUSBSources() {
+    func testMergeDeduplicatesSameIPhoneAcrossBLEAndTrustedSources() {
         let bleReport = BatterySnapshot(
             deviceID: "bluetooth-iphone-yisungiphone",
             displayName: "YiSungiPhone",
@@ -173,7 +173,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
             updatedAt: Date(timeIntervalSince1970: 100)
         )
         let usbReport = BatterySnapshot(
-            deviceID: "usb-iphone-yisungiphone",
+            deviceID: "trusted-iphone-00008030",
             displayName: "YiSungiPhone",
             kind: .iPhone,
             percent: 77,
@@ -186,9 +186,65 @@ final class BatterySnapshotStoreTests: XCTestCase {
         store.merge([bleReport])
         store.merge([usbReport])
 
-        XCTAssertEqual(store.snapshots.map(\.deviceID), ["usb-iphone-yisungiphone"])
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["trusted-iphone-00008030"])
         XCTAssertEqual(store.snapshots.map(\.source), [.ideviceInfo])
         XCTAssertEqual(store.snapshots.map(\.percent), [77])
+    }
+
+    func testRemoveDeviceIDsDropsTrustedIPhoneSnapshot() {
+        let trustedIPhone = BatterySnapshot(
+            deviceID: "trusted-iphone-00008030",
+            displayName: "YiSungiPhone",
+            kind: .iPhone,
+            percent: 64,
+            chargeState: .unplugged,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+        let keyboard = BatterySnapshot(
+            deviceID: "bluetooth-hid-keyboard",
+            displayName: "Magic Keyboard",
+            kind: .keyboard,
+            percent: 82,
+            chargeState: .unplugged,
+            source: .ioRegistry,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 140) })
+        store.merge([trustedIPhone, keyboard])
+        store.removeDeviceIDs(["trusted-iphone-00008030"])
+
+        XCTAssertEqual(store.snapshots.map(\.deviceID), ["bluetooth-hid-keyboard"])
+    }
+
+    func testMergeKeepsTwoTrustedIPhonesWithSameDisplayNameWhenUDIDsDiffer() {
+        let first = BatterySnapshot(
+            deviceID: "trusted-iphone-00008030",
+            displayName: "iPhone",
+            kind: .iPhone,
+            percent: 64,
+            chargeState: .unplugged,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+        let second = BatterySnapshot(
+            deviceID: "trusted-iphone-00008110",
+            displayName: "iPhone",
+            kind: .iPhone,
+            percent: 72,
+            chargeState: .charging,
+            source: .ideviceInfo,
+            updatedAt: Date(timeIntervalSince1970: 130)
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 140) })
+        store.merge([first, second])
+
+        let snapshotsByID = Dictionary(uniqueKeysWithValues: store.snapshots.map { ($0.deviceID, $0) })
+        XCTAssertEqual(Set(snapshotsByID.keys), ["trusted-iphone-00008030", "trusted-iphone-00008110"])
+        XCTAssertEqual(snapshotsByID["trusted-iphone-00008030"]?.percent, 64)
+        XCTAssertEqual(snapshotsByID["trusted-iphone-00008110"]?.percent, 72)
     }
 
     func testMergeKeepsBatteryReportWhenSameRefreshAlsoHasUnsupportedBluetoothDuplicate() {

@@ -297,6 +297,8 @@ final class BeaconModel: ObservableObject {
     @Published private(set) var notificationAuthorizationState: NotificationCenterAuthorizationState = .unknown
     @Published private(set) var latestNotificationDeliveryResult: NotificationCenterDeliveryResult?
     @Published private(set) var latestRefreshDiagnostics = BatteryRefreshDiagnostics()
+    @Published private(set) var trustedIPhoneRegistry = TrustedIPhoneRegistry.load()
+    @Published private(set) var trustedIPhoneEnrollmentResult: IPhoneLockdownDiscoveryReport?
 
     private let logger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "refresh")
     private var refreshLoop: Task<Void, Never>?
@@ -304,17 +306,22 @@ final class BeaconModel: ObservableObject {
     /// 45s background poll can run without surfacing the UI spinner.
     private var refreshInFlight = false
     private let usesPreviewData: Bool
+    private let bluetoothReportReader: (@Sendable () async -> BluetoothBatteryReadReport?)?
 
     var isUsingPreviewData: Bool {
         usesPreviewData
     }
 
-    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+    init(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        bluetoothReportReader: (@Sendable () async -> BluetoothBatteryReadReport?)? = nil
+    ) {
         #if DEBUG
         usesPreviewData = environment["BEACON_PREVIEW_DATA"] == "1"
         #else
         usesPreviewData = false
         #endif
+        self.bluetoothReportReader = bluetoothReportReader
     }
 
     func start() {
@@ -359,7 +366,28 @@ final class BeaconModel: ObservableObject {
         }
 
         var nextStore = store
-        let readReport = await BluetoothBatteryResolver().readReport()
+        let readReport = if let bluetoothReportReader {
+            await bluetoothReportReader()
+        } else {
+            await BluetoothBatteryResolver().readReport()
+        }
+        guard let readReport else {
+            logger.error("Battery refresh timed out before producing a report")
+            latestRefreshDiagnostics = BatteryRefreshDiagnostics(
+                attempts: [
+                    BatteryProviderAttempt(
+                        provider: .coreBluetoothBatteryService,
+                        status: .timedOut,
+                        candidateCount: 0,
+                        message: "Battery refresh timed out before producing a report",
+                        attemptedAt: Date()
+                    )
+                ],
+                refreshedAt: Date(),
+                snapshotCount: 0
+            )
+            return
+        }
         let bluetoothSnapshots = readReport.snapshots
         latestRefreshDiagnostics = readReport.diagnostics
         logger.info("Bluetooth refresh returned \(bluetoothSnapshots.count) snapshots")
@@ -390,6 +418,26 @@ final class BeaconModel: ObservableObject {
                 }
             }
         )
+    }
+
+    func trustConnectedIPhones() async {
+        let report = await IPhoneLockdownBatteryProvider.discoverUSBTrustedDevices()
+        trustedIPhoneEnrollmentResult = report
+        guard !report.devices.isEmpty else { return }
+
+        var nextRegistry = trustedIPhoneRegistry
+        for device in report.devices {
+            nextRegistry = nextRegistry.trusting(device)
+        }
+        trustedIPhoneRegistry = nextRegistry
+        nextRegistry.save()
+        await refresh()
+    }
+
+    func forgetTrustedIPhone(udid: String) {
+        trustedIPhoneRegistry = trustedIPhoneRegistry.removing(udid: udid)
+        trustedIPhoneRegistry.save()
+        store.removeDeviceIDs(Set(["trusted-iphone-\(udid)"]))
     }
 
     func refreshNotificationAuthorizationStatus() {

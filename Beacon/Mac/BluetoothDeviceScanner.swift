@@ -53,10 +53,16 @@ public struct BluetoothDeviceScanner {
             }
             group.addTask {
                 .outcome(await Self.instrumented(provider: .ideviceInfo) {
-                    let result = await IPhoneUSBBatteryProvider.readCandidate(now: now, deadline: deadline)
+                    let report = await IPhoneLockdownBatteryProvider().readReport(now: now)
                     return BluetoothProviderOutcome(
-                        candidates: result.candidate.map { [$0] } ?? [],
-                        attempt: result.attempt
+                        candidates: report.candidates,
+                        attempt: report.attempt ?? BatteryProviderAttempt(
+                            provider: .ideviceInfo,
+                            status: .noReport,
+                            candidateCount: 0,
+                            message: "Trusted iPhone provider returned no diagnostic",
+                            attemptedAt: now
+                        )
                     )
                 })
             }
@@ -182,16 +188,22 @@ public struct BluetoothDeviceScanner {
         return outcome
     }
 
-    /// The same iPhone can surface through multiple providers (USB `ideviceinfo`,
-    /// BLE, system_profiler) under different display names — iOS `DeviceName`
-    /// ("Yi's iPhone") vs the Bluetooth name ("YisiPhone") — which `upsert`'s
-    /// name-based dedup cannot collapse. Fold all iPhone candidates into one,
-    /// preferring the battery-bearing (USB) reading.
+    /// The same iPhone can surface through multiple providers. When one or more
+    /// allowlisted lockdown reports exist, keep every distinct trusted UDID and
+    /// discard the weaker duplicate surfaces. Otherwise retain the legacy
+    /// single-iPhone preference behavior.
     static func collapsingDuplicateIPhones(
         _ candidates: [BluetoothBatteryCandidate]
     ) -> [BluetoothBatteryCandidate] {
         let iPhones = candidates.filter(Self.isIPhoneCandidate)
         guard iPhones.count > 1 else { return candidates }
+
+        let trustedIPhones = iPhones.filter(Self.isTrustedIPhoneCandidate)
+        if !trustedIPhones.isEmpty {
+            return candidates.filter { candidate in
+                !Self.isIPhoneCandidate(candidate) || Self.isTrustedIPhoneCandidate(candidate)
+            }
+        }
 
         let preferred = iPhones.max { left, right in
             candidatePreference(left) < candidatePreference(right)
@@ -210,6 +222,10 @@ public struct BluetoothDeviceScanner {
             }
         }
         return result
+    }
+
+    private static func isTrustedIPhoneCandidate(_ candidate: BluetoothBatteryCandidate) -> Bool {
+        candidate.transport == .usb || candidate.transport == .lockdownNetwork
     }
 
     private static func isIPhoneCandidate(_ candidate: BluetoothBatteryCandidate) -> Bool {
@@ -776,7 +792,8 @@ public struct BluetoothDeviceScanner {
 
     private static func transportRank(_ transport: BluetoothTransport) -> Int {
         switch transport {
-        case .usb: return 6
+        case .usb: return 7
+        case .lockdownNetwork: return 6
         case .hid: return 5
         case .systemProfiler: return 4
         case .classic: return 3

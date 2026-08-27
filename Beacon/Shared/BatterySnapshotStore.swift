@@ -55,6 +55,13 @@ public struct BatterySnapshotStore: Sendable {
         }
     }
 
+    public mutating func removeDeviceIDs(_ deviceIDs: Set<String>) {
+        guard !deviceIDs.isEmpty else { return }
+        snapshotsByID = snapshotsByID.filter { deviceID, _ in
+            !deviceIDs.contains(deviceID)
+        }
+    }
+
     /// Merges the latest live read, then drops any Bluetooth-sourced device that
     /// no provider reported this cycle. Without this, a disconnected or removed
     /// device keeps its stale `.connected` snapshot (under a now-orphaned id)
@@ -277,9 +284,20 @@ public struct BatterySnapshotStore: Sendable {
         _ left: BatterySnapshot,
         _ right: BatterySnapshot
     ) -> Bool {
-        !(left.identityStrength == .strong
+        if left.isTrustedIPhoneSnapshot,
+           right.isTrustedIPhoneSnapshot,
+           left.deviceID != right.deviceID {
+            return false
+        }
+        return !(left.identityStrength == .strong
             && right.identityStrength == .strong
             && left.deviceID != right.deviceID)
+    }
+}
+
+private extension BatterySnapshot {
+    var isTrustedIPhoneSnapshot: Bool {
+        source == .ideviceInfo && deviceID.hasPrefix("trusted-iphone-")
     }
 }
 

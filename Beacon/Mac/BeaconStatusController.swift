@@ -21,6 +21,8 @@ final class BeaconStatusController: NSObject {
     private var alertEventsObserver: AnyCancellable?
     private var notificationAuthorizationObserver: AnyCancellable?
     private var notificationDeliveryObserver: AnyCancellable?
+    private var trustedIPhoneRegistryObserver: AnyCancellable?
+    private var trustedIPhoneEnrollmentObserver: AnyCancellable?
     private var bluetoothPowerStateCancellable: AnyCancellable?
     private var preferencesObservers: [NSObjectProtocol] = []
     private var outsideClickMonitor: Any?
@@ -66,6 +68,16 @@ final class BeaconStatusController: NSObject {
         }
         notificationDeliveryObserver = model.$latestNotificationDeliveryResult.sink { [weak self] _ in
             self?.settingsWindowController.updateContent()
+        }
+        trustedIPhoneRegistryObserver = model.$trustedIPhoneRegistry.sink { [weak self] _ in
+            self?.updateStatusMenuContent()
+            self?.settingsWindowController.updateContent()
+            self?.updateDesktopWidget()
+        }
+        trustedIPhoneEnrollmentObserver = model.$trustedIPhoneEnrollmentResult.sink { [weak self] _ in
+            self?.updateStatusMenuContent()
+            self?.settingsWindowController.updateContent()
+            self?.updateDesktopWidget()
         }
         alertEventsObserver = model.$latestAlertEvents
             .filter { !$0.isEmpty }
