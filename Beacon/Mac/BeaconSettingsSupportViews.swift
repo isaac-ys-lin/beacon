@@ -149,7 +149,7 @@ struct TrustedIPhoneSettingsCard: View {
                 Spacer(minLength: 8)
 
                 Button(action: onTrustConnectedIPhone) {
-                    Label("Trust Connected iPhone", systemImage: "checkmark.shield")
+                    Label("Add Paired iPhone", systemImage: "iphone.badge.plus")
                 }
                 .controlSize(.small)
             }

@@ -310,14 +310,14 @@ public struct BluetoothDeviceScanner {
             defer { IOObjectRelease(service) }
 
             let name = property("Product", service: service) ?? property("ProductID", service: service) ?? "Bluetooth Device"
+            let address = Self.canonicalBluetoothAddress(property("DeviceAddress", service: service))
             let physicalID = property("PhysicalDeviceUniqueID", service: service)
-            let address = property("DeviceAddress", service: service)
             let serial = property("SerialNumber", service: service)
-            let id = physicalID ?? address ?? serial ?? name
-            let identityEvidence: BluetoothIdentityEvidence = if physicalID != nil {
-                .physicalDeviceUniqueID
-            } else if address != nil {
+            let id = address ?? physicalID ?? serial ?? name
+            let identityEvidence: BluetoothIdentityEvidence = if address != nil {
                 .deviceAddress
+            } else if physicalID != nil {
+                .physicalDeviceUniqueID
             } else if serial != nil {
                 .serialNumber
             } else {
@@ -346,7 +346,8 @@ public struct BluetoothDeviceScanner {
                         transport: .hid,
                         batteryPercent: percent,
                         kindHint: kindHint,
-                        identityEvidence: identityEvidence
+                        identityEvidence: identityEvidence,
+                        alternateDeviceID: address == nil ? nil : physicalID
                     )
                 )
             }
@@ -491,9 +492,9 @@ public struct BluetoothDeviceScanner {
     }
 
     private static func candidates(fromSystemProfilerDeviceNamed name: String, device: [String: Any], connectionState: ConnectionState = .connected) -> [BluetoothBatteryCandidate] {
-        let reportedAddress = stringValue(device["device_address"])
-        let address = reportedAddress ?? name
-        let identityEvidence: BluetoothIdentityEvidence = reportedAddress == nil ? .normalizedName : .deviceAddress
+        let address = canonicalBluetoothAddress(stringValue(device["device_address"]))
+        let deviceID = address ?? name
+        let identityEvidence: BluetoothIdentityEvidence = address == nil ? .normalizedName : .deviceAddress
         let minorType = stringValue(device["device_minorType"]) ?? ""
         let kindHint = kindHint(name: name, minorType: minorType)
         let levels = batteryLevels(from: device)
@@ -503,7 +504,7 @@ public struct BluetoothDeviceScanner {
             return levels.map { level in
                 let component = level.component ?? "Battery"
                 return BluetoothBatteryCandidate(
-                    deviceID: "\(address)-\(component.lowercased())",
+                    deviceID: "\(deviceID)-\(component.lowercased())",
                     displayName: "\(name) \(component)",
                     transport: .systemProfiler,
                     batteryPercent: level.percent,
@@ -520,7 +521,7 @@ public struct BluetoothDeviceScanner {
 
         return [
             BluetoothBatteryCandidate(
-                deviceID: address,
+                deviceID: deviceID,
                 displayName: name,
                 transport: .systemProfiler,
                 batteryPercent: percent,
@@ -644,14 +645,19 @@ public struct BluetoothDeviceScanner {
             return nil
         }
 
-        let address = stringValue(properties["DeviceAddress"])
-            ?? stringValue(properties["BluetoothDeviceAddress"])
+        let address = canonicalBluetoothAddress(
+            stringValue(properties["DeviceAddress"])
+                ?? stringValue(properties["BluetoothDeviceAddress"])
+        )
+        let physicalID = stringValue(properties["PhysicalDeviceUniqueID"])
         let serial = stringValue(properties["SerialNumber"])
         let fallbackID = stringValue(properties["HIDDeviceID"])
             ?? stringValue(properties["LocationID"])
-        let id = address ?? serial ?? fallbackID ?? name
+        let id = address ?? physicalID ?? serial ?? fallbackID ?? name
         let identityEvidence: BluetoothIdentityEvidence = if address != nil {
             .deviceAddress
+        } else if physicalID != nil {
+            .physicalDeviceUniqueID
         } else if serial != nil {
             .serialNumber
         } else {
@@ -665,7 +671,8 @@ public struct BluetoothDeviceScanner {
             batteryPercent: percent,
             kindHint: kindHint,
             connectionState: .connected,
-            identityEvidence: identityEvidence
+            identityEvidence: identityEvidence,
+            alternateDeviceID: address == nil ? nil : physicalID
         )
     }
 
@@ -712,6 +719,9 @@ public struct BluetoothDeviceScanner {
             .filter { $0.chargeState != .unknown }
             .max { transportRank($0.transport) < transportRank($1.transport) }?
             .chargeState ?? .unknown
+        let alternateDeviceID = values
+            .compactMap(\.alternateDeviceID)
+            .first { $0 != identityWinner.deviceID }
         return BluetoothBatteryCandidate(
             deviceID: identityWinner.deviceID,
             displayName: displayWinner.displayName,
@@ -720,7 +730,8 @@ public struct BluetoothDeviceScanner {
             kindHint: displayWinner.kindHint ?? identityWinner.kindHint ?? provenanceWinner.kindHint,
             connectionState: connectionWinner.connectionState,
             chargeState: chargeState,
-            identityEvidence: identityWinner.identityEvidence
+            identityEvidence: identityWinner.identityEvidence,
+            alternateDeviceID: alternateDeviceID
         )
     }
 
@@ -737,7 +748,7 @@ public struct BluetoothDeviceScanner {
         for candidate in candidates {
             let clusterIsAmbiguous = ambiguousStrongClusters.contains(candidateClusterKey(candidate))
             let matchingIndex = merged.firstIndex { existing in
-                if clusterIsAmbiguous, existing.deviceID != candidate.deviceID {
+                if clusterIsAmbiguous, !hasSharedIdentity(existing, candidate) {
                     return false
                 }
                 return canMerge(existing, candidate)
@@ -755,7 +766,7 @@ public struct BluetoothDeviceScanner {
         _ left: BluetoothBatteryCandidate,
         _ right: BluetoothBatteryCandidate
     ) -> Bool {
-        if left.deviceID == right.deviceID { return true }
+        if hasSharedIdentity(left, right) { return true }
         guard candidateKind(left) == candidateKind(right),
               left.displayName.normalizedDeviceName == right.displayName.normalizedDeviceName
         else {
@@ -765,6 +776,18 @@ public struct BluetoothDeviceScanner {
             && right.identityEvidence.strength == 2
             && left.deviceID != right.deviceID
         return !hasConflictingStrongIDs
+    }
+
+    private static func hasSharedIdentity(
+        _ left: BluetoothBatteryCandidate,
+        _ right: BluetoothBatteryCandidate
+    ) -> Bool {
+        if left.deviceID == right.deviceID { return true }
+        if let alternateID = left.alternateDeviceID,
+           alternateID == right.deviceID || alternateID == right.alternateDeviceID {
+            return true
+        }
+        return right.alternateDeviceID == left.deviceID
     }
 
     private static func candidateClusterKey(_ candidate: BluetoothBatteryCandidate) -> String {
@@ -843,6 +866,11 @@ public struct BluetoothDeviceScanner {
         if let string = value as? String { return string }
         if let number = value as? NSNumber { return number.stringValue }
         return nil
+    }
+
+    private static func canonicalBluetoothAddress(_ value: String?) -> String? {
+        guard let value else { return nil }
+        return BluetoothDeviceControlSupport.normalizedAddress(from: value)?.uppercased()
     }
 
     private static func intValue(_ value: Any?) -> Int? {
@@ -935,7 +963,18 @@ public struct BluetoothDeviceScanner {
         else {
             return [:]
         }
-        return properties
+        var enrichedProperties = properties
+        if enrichedProperties["DeviceAddress"] == nil,
+           let address = IORegistryEntrySearchCFProperty(
+               service,
+               kIOServicePlane,
+               "DeviceAddress" as CFString,
+               kCFAllocatorDefault,
+               IOOptionBits(kIORegistryIterateRecursively | kIORegistryIterateParents)
+           ) as? String {
+            enrichedProperties["DeviceAddress"] = address
+        }
+        return enrichedProperties
     }
 
     private func property(_ key: String, service: io_object_t) -> String? {

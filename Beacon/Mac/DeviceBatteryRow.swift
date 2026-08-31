@@ -187,6 +187,7 @@ struct BeaconHeaderControls: View {
                     )
                 }
                 .buttonStyle(BeaconUtilityIconButtonStyle(theme: theme))
+                .disabled(isRefreshing)
                 .accessibilityLabel(isRefreshing ? "Refreshing Batteries" : "Refresh Batteries")
                 .help(isRefreshing ? "Refreshing Batteries" : "Refresh Batteries")
             }

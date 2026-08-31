@@ -903,7 +903,7 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(items.map(\.displayName), ["Magic Keyboard"])
     }
 
-    func testStatusMenuSectionsPreferBatteryReportsOverNoReportFallback() {
+    func testStatusMenuSectionsKeepConnectedNoReportDevicesBesideBatteryReports() {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 89),
             makeDecorated(
@@ -921,7 +921,7 @@ final class DeviceListPresentationTests: XCTestCase {
             preferences: DeviceDisplayPreferences()
         ).flatMap(\.items)
 
-        XCTAssertEqual(items.map(\.displayName), ["Magic Keyboard"])
+        XCTAssertEqual(items.map(\.displayName), ["Magic Keyboard", "Magic Trackpad"])
     }
 
     func testSettingsDeviceInspectorRowsCanCollapseHiddenUnavailableItems() {
@@ -2269,7 +2269,7 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(BeaconL10n.string("Battery Trend", bundle: bundle), "電量趨勢")
         XCTAssertEqual(BeaconL10n.string("AirPods or Beats", bundle: bundle), "AirPods 或 Beats")
         XCTAssertEqual(BeaconL10n.string("Trusted iPhone", bundle: bundle), "受信任的 iPhone")
-        XCTAssertEqual(BeaconL10n.string("Trust Connected iPhone", bundle: bundle), "信任已連接的 iPhone")
+        XCTAssertEqual(BeaconL10n.string("Add Paired iPhone", bundle: bundle), "加入已配對的 iPhone")
         XCTAssertEqual(BeaconL10n.string("Core actions available", bundle: bundle), "核心動作可用")
         XCTAssertEqual(BeaconL10n.string("Keep visible", bundle: bundle), "保持可見")
         XCTAssertEqual(BeaconL10n.string("Low Battery", bundle: bundle), "低電量")

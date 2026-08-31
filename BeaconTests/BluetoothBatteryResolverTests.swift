@@ -450,6 +450,7 @@ final class BluetoothBatteryResolverTests: XCTestCase {
                 exitStatus: 0,
                 output: "first-usb\nsecond-usb\n"
             ),
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-n"]): .init(exitStatus: 0, output: ""),
             .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "first-usb", "-k", "DeviceName"]): .init(
                 exitStatus: 0,
                 output: "First iPhone\n"
@@ -475,10 +476,42 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(report.attempts.first?.candidateCount, 2)
     }
 
+    func testIPhoneLockdownDiscoveryCanEnrollAlreadyPairedNetworkDevice() async {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let commandSet = Self.lockdownCommandSet()
+        let runner = MockIPhoneLockdownCommandRunner(responses: [
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(
+                exitStatus: 0,
+                output: ""
+            ),
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-n"]): .init(
+                exitStatus: 0,
+                output: "paired-network\n"
+            ),
+            .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-n", "-u", "paired-network", "-k", "DeviceName"]): .init(
+                exitStatus: 0,
+                output: "Network iPhone\n"
+            )
+        ])
+
+        let report = await IPhoneLockdownBatteryProvider.discoverUSBTrustedDevices(
+            commandSet: commandSet,
+            runner: runner,
+            now: now
+        )
+
+        XCTAssertEqual(report.devices, [
+            TrustedIPhone(udid: "paired-network", displayName: "Network iPhone", trustedAt: now)
+        ])
+        XCTAssertEqual(report.status, .reported)
+        XCTAssertEqual(report.attempts.first?.candidateCount, 1)
+    }
+
     func testIPhoneLockdownDiscoverySkipsUSBDeviceWhenTrustProofFails() async {
         let commandSet = Self.lockdownCommandSet()
         let runner = MockIPhoneLockdownCommandRunner(responses: [
             .init(commandURL: commandSet.ideviceIDURL, arguments: ["-l"]): .init(exitStatus: 0, output: "locked-usb\n"),
+            .init(commandURL: commandSet.ideviceIDURL, arguments: ["-n"]): .init(exitStatus: 0, output: ""),
             .init(commandURL: commandSet.ideviceInfoURL, arguments: ["-u", "locked-usb", "-k", "DeviceName"]): .init(
                 exitStatus: 255,
                 output: ""
@@ -490,7 +523,7 @@ final class BluetoothBatteryResolverTests: XCTestCase {
 
         XCTAssertTrue(report.devices.isEmpty)
         XCTAssertEqual(report.status, .unavailable)
-        XCTAssertEqual(report.message, "No trusted USB iPhone found. Unlock the iPhone, tap Trust, and reconnect by USB.")
+        XCTAssertEqual(report.message, "No paired iPhone could be verified. Unlock the iPhone and keep it reachable by USB or Wi-Fi.")
         XCTAssertEqual(report.attempts.first?.status, .unavailable)
     }
 
@@ -720,6 +753,55 @@ final class BluetoothBatteryResolverTests: XCTestCase {
         XCTAssertEqual(snapshot.source, .ioRegistry)
     }
 
+    func testHIDAndSystemProfilerShareCanonicalBluetoothAddress() throws {
+        let physicalID = "D5EDF66C-CB91-4C04-9767-74789AF36129"
+        let hid = try XCTUnwrap(
+            BluetoothDeviceScanner.appleDeviceManagementCandidate(
+                from: [
+                    "Product": "MX Master 3S B",
+                    "Transport": "Bluetooth Low Energy",
+                    "PhysicalDeviceUniqueID": physicalID,
+                    "DeviceAddress": "d5-90-37-87-47-17",
+                    "SerialNumber": "1B477367",
+                    "BatteryPercent": 100,
+                    "PrimaryUsagePage": 1,
+                    "PrimaryUsage": 2
+                ]
+            )
+        )
+        let profilerJSON = """
+        {
+          "SPBluetoothDataType": [{
+            "device_connected": [{
+              "MX Master 3S B": {
+                "device_address": "D5:90:37:87:47:17",
+                "device_batteryLevelMain": "100%",
+                "device_minorType": "Mouse"
+              }
+            }]
+          }]
+        }
+        """
+        let profiler = try XCTUnwrap(
+            BluetoothDeviceScanner.parseSystemProfilerBluetoothData(Data(profilerJSON.utf8)).first
+        )
+        let ble = BluetoothBatteryCandidate(
+            deviceID: physicalID,
+            displayName: "MX Master 3S B",
+            transport: .ble,
+            batteryPercent: 100,
+            identityEvidence: .coreBluetoothUUID
+        )
+
+        let merged = BluetoothDeviceScanner.mergingCandidates([hid, profiler, ble])
+
+        XCTAssertEqual(hid.deviceID, "D5:90:37:87:47:17")
+        XCTAssertEqual(hid.identityEvidence, .deviceAddress)
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged.first?.deviceID, "D5:90:37:87:47:17")
+        XCTAssertEqual(merged.first?.identityEvidence, .deviceAddress)
+    }
+
     func testAppleDeviceManagementFindsNestedBatteryPercent() throws {
         let candidate = try XCTUnwrap(
             BluetoothDeviceScanner.appleDeviceManagementCandidate(
@@ -886,7 +968,8 @@ final class BluetoothBatteryResolverTests: XCTestCase {
             transport: .hid,
             batteryPercent: 70,
             kindHint: .mouse,
-            identityEvidence: .deviceAddress
+            identityEvidence: .deviceAddress,
+            alternateDeviceID: "physical-mouse-1"
         )
         let second = BluetoothBatteryCandidate(
             deviceID: "AA:BB:CC:DD:EE:02",
@@ -894,10 +977,28 @@ final class BluetoothBatteryResolverTests: XCTestCase {
             transport: .systemProfiler,
             batteryPercent: 60,
             kindHint: .mouse,
-            identityEvidence: .deviceAddress
+            identityEvidence: .deviceAddress,
+            alternateDeviceID: "physical-mouse-2"
+        )
+        let firstBLE = BluetoothBatteryCandidate(
+            deviceID: "physical-mouse-1",
+            displayName: "Magic Mouse",
+            transport: .ble,
+            batteryPercent: 70,
+            identityEvidence: .coreBluetoothUUID
+        )
+        let secondBLE = BluetoothBatteryCandidate(
+            deviceID: "physical-mouse-2",
+            displayName: "Magic Mouse",
+            transport: .ble,
+            batteryPercent: 60,
+            identityEvidence: .coreBluetoothUUID
         )
 
-        XCTAssertEqual(BluetoothDeviceScanner.mergingCandidates([first, second]).count, 2)
+        let merged = BluetoothDeviceScanner.mergingCandidates([first, second, firstBLE, secondBLE])
+
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertEqual(Set(merged.map(\.deviceID)), Set([first.deviceID, second.deviceID]))
     }
 
     func testWeakSameNameCandidateDoesNotAttachToAmbiguousStrongIdentity() {

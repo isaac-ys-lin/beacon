@@ -41,6 +41,9 @@ public struct BatterySnapshotStore: Sendable {
 
     public mutating func merge(_ incoming: [BatterySnapshot]) {
         for snapshot in incoming {
+            if shouldPreserveExistingBatteryReport(over: snapshot) {
+                continue
+            }
             if hasNewerDuplicateBluetoothSnapshot(matching: snapshot) {
                 continue
             }
@@ -230,6 +233,9 @@ public struct BatterySnapshotStore: Sendable {
         preservingStrongSnapshotsOutside authoritativeProviders: Set<BatteryProvider>
     ) {
         for snapshot in incoming {
+            if shouldPreserveExistingBatteryReport(over: snapshot) {
+                continue
+            }
             if hasNewerDuplicateBluetoothSnapshot(matching: snapshot) {
                 continue
             }
@@ -245,6 +251,18 @@ public struct BatterySnapshotStore: Sendable {
             )
             snapshotsByID[snapshot.deviceID] = snapshot
         }
+    }
+
+    private func shouldPreserveExistingBatteryReport(over snapshot: BatterySnapshot) -> Bool {
+        guard snapshot.percent == nil,
+              snapshot.connectionState == .connected,
+              let existing = snapshotsByID[snapshot.deviceID]
+        else {
+            return false
+        }
+        return existing.percent != nil
+            && existing.connectionState == .connected
+            && Self.freshness(for: existing, now: now()) != .expired
     }
 
     private mutating func removeDuplicateBluetoothSnapshots(

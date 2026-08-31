@@ -702,16 +702,13 @@ public func statusMenuDeviceSections(
     _ snapshots: [DecoratedBatterySnapshot],
     preferences: DeviceDisplayPreferences
 ) -> [DeviceSection] {
-    let dashboardSections = dashboardDeviceSections(snapshots, preferences: preferences)
-    if !dashboardSections.isEmpty {
-        return dashboardSections
-    }
-
     return configuredDeviceSections(snapshots, preferences: preferences)
         .compactMap { section in
-            let connectedItems = section.items.filter(isStatusMenuFallbackVisibleItem)
-            guard !connectedItems.isEmpty else { return nil }
-            return DeviceSection(items: connectedItems)
+            let visibleItems = section.items.filter {
+                isDashboardVisibleItem($0) || isStatusMenuFallbackVisibleItem($0)
+            }
+            guard !visibleItems.isEmpty else { return nil }
+            return DeviceSection(items: visibleItems)
         }
 }
 

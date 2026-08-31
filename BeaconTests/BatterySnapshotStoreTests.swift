@@ -38,6 +38,36 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots[0].chargeState, .charging)
     }
 
+    func testReconcileKeepsRecentBatteryWhenSameDeviceTemporarilyReportsNoPercent() {
+        let batteryReport = BatterySnapshot(
+            deviceID: "bluetooth-keychron",
+            displayName: "Keychron K3 Max",
+            kind: .keyboard,
+            percent: 90,
+            chargeState: .unknown,
+            source: .ioRegistry,
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let missingReport = BatterySnapshot(
+            deviceID: batteryReport.deviceID,
+            displayName: batteryReport.displayName,
+            kind: .keyboard,
+            percent: nil,
+            chargeState: .unknown,
+            source: .bluetoothUnsupported,
+            provider: .ioRegistry,
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+
+        var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 140) })
+        store.merge([batteryReport])
+        store.reconcile(with: [missingReport], authoritativeProviders: [.ioRegistry])
+
+        XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), [batteryReport.deviceID])
+        XCTAssertEqual(store.snapshots.first?.percent, 90)
+        XCTAssertEqual(store.snapshots.first?.updatedAt, batteryReport.updatedAt)
+    }
+
     func testFreshnessBucketsUseConfiguredThresholds() {
         let snapshot = BatterySnapshot(
             deviceID: "watch",

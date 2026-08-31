@@ -309,32 +309,23 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
             )
         }
 
-        let usbList = await listUDIDs(connection: .usb, commandSet: commandSet)
-        if usbList.timedOut {
-            let message = "idevice_id timed out while listing USB iPhones for enrollment"
+        async let usbListRead = listUDIDs(connection: .usb, commandSet: commandSet)
+        async let networkListRead = listUDIDs(connection: .network, commandSet: commandSet)
+        let (usbList, networkList) = await (usbListRead, networkListRead)
+
+        let listFailures = [usbList.failureMessage, networkList.failureMessage].compactMap { $0 }
+        if !usbList.isAvailable && !networkList.isAvailable {
+            let status: BatteryReadStatus = usbList.timedOut || networkList.timedOut
+                ? .timedOut
+                : .unavailable
+            let message = listFailures.joined(separator: "; ")
             return IPhoneLockdownDiscoveryReport(
                 devices: [],
-                status: .timedOut,
+                status: status,
                 message: message,
                 attempts: [
                     attempt(
-                        status: .timedOut,
-                        candidateCount: 0,
-                        message: message,
-                        now: now
-                    )
-                ]
-            )
-        }
-        guard usbList.result.exitStatus == 0 else {
-            let message = "idevice_id -l returned status \(usbList.result.exitStatus)"
-            return IPhoneLockdownDiscoveryReport(
-                devices: [],
-                status: .unavailable,
-                message: message,
-                attempts: [
-                    attempt(
-                        status: .unavailable,
+                        status: status,
                         candidateCount: 0,
                         message: message,
                         now: now
@@ -343,10 +334,18 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
             )
         }
 
+        let devices = mergedDevices(
+            usbUDIDs: usbList.isAvailable ? usbList.udids : [],
+            networkUDIDs: networkList.isAvailable ? networkList.udids : []
+        )
         var trustedDevices: [TrustedIPhone] = []
         var trustProofStatuses: [BatteryReadStatus] = []
-        for udid in usbList.udids {
-            let nameResult = await readDeviceName(udid: udid, connection: .usb, commandSet: commandSet)
+        for device in devices {
+            let nameResult = await readDeviceName(
+                udid: device.udid,
+                connection: device.connection,
+                commandSet: commandSet
+            )
             guard !nameResult.timedOut else {
                 trustProofStatuses.append(.timedOut)
                 continue
@@ -361,24 +360,28 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
                 continue
             }
             trustProofStatuses.append(.reported)
-            trustedDevices.append(TrustedIPhone(udid: udid, displayName: displayName, trustedAt: now))
+            trustedDevices.append(TrustedIPhone(udid: device.udid, displayName: displayName, trustedAt: now))
         }
 
         let status: BatteryReadStatus
-        let message: String
+        var message: String
         if trustedDevices.isEmpty,
-           !usbList.udids.isEmpty,
+           !devices.isEmpty,
            trustProofStatuses.contains(.timedOut) {
             status = .timedOut
-            message = "Timed out verifying USB iPhone trust. Unlock the iPhone, tap Trust, and reconnect by USB."
+            message = "Timed out verifying paired iPhone trust. Unlock the iPhone and keep it reachable by USB or Wi-Fi."
         } else if trustedDevices.isEmpty,
-                  !usbList.udids.isEmpty,
+                  !devices.isEmpty,
                   trustProofStatuses.contains(.unavailable) {
             status = .unavailable
-            message = "No trusted USB iPhone found. Unlock the iPhone, tap Trust, and reconnect by USB."
+            message = "No paired iPhone could be verified. Unlock the iPhone and keep it reachable by USB or Wi-Fi."
         } else {
             status = trustedDevices.isEmpty ? .noReport : .reported
-            message = "ideviceinfo verified \(trustedDevices.count) USB iPhones for enrollment"
+            let connectionLabel = networkList.udids.isEmpty ? "USB" : "paired"
+            message = "ideviceinfo verified \(trustedDevices.count) \(connectionLabel) iPhones for enrollment"
+        }
+        if !listFailures.isEmpty {
+            message += "; " + listFailures.joined(separator: "; ")
         }
         return IPhoneLockdownDiscoveryReport(
             devices: trustedDevices,

@@ -38,6 +38,7 @@ public struct BluetoothBatteryCandidate: Equatable, Sendable {
     public let connectionState: ConnectionState
     public let chargeState: ChargeState
     public let identityEvidence: BluetoothIdentityEvidence
+    public let alternateDeviceID: String?
 
     public init(
         deviceID: String,
@@ -47,7 +48,8 @@ public struct BluetoothBatteryCandidate: Equatable, Sendable {
         kindHint: DeviceKind? = nil,
         connectionState: ConnectionState = .connected,
         chargeState: ChargeState = .unknown,
-        identityEvidence: BluetoothIdentityEvidence = .normalizedName
+        identityEvidence: BluetoothIdentityEvidence = .normalizedName,
+        alternateDeviceID: String? = nil
     ) {
         self.deviceID = deviceID
         self.displayName = displayName
@@ -57,6 +59,7 @@ public struct BluetoothBatteryCandidate: Equatable, Sendable {
         self.connectionState = connectionState
         self.chargeState = chargeState
         self.identityEvidence = identityEvidence
+        self.alternateDeviceID = alternateDeviceID
     }
 }
 
