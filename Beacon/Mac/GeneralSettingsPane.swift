@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct GeneralSettingsPane: View {
@@ -8,6 +9,7 @@ struct GeneralSettingsPane: View {
     @State private var isShowingClearHistoryConfirmation = false
     @State private var isShowingResetConfirmation = false
     @State private var operationMessage: String?
+    @State private var operationIsError = false
 
     init(
         versionInfo: BeaconVersionInfo = .current(),
@@ -42,6 +44,7 @@ struct GeneralSettingsPane: View {
             titleVisibility: .visible
         ) {
             Button("Clear Battery History", role: .destructive) {
+                operationIsError = false
                 BatteryHistoryStore.clear()
                 operationMessage = BeaconL10n.string("Battery history cleared. New samples will appear after future refreshes.")
             }
@@ -55,6 +58,7 @@ struct GeneralSettingsPane: View {
             titleVisibility: .visible
         ) {
             Button("Reset Preferences", role: .destructive) {
+                operationIsError = false
                 _ = BeaconPreferencesResetter.resetAppPreferences()
                 onPreferencesReset()
                 operationMessage = BeaconL10n.string("Preferences reset. Battery history and Launch at Login were kept.")
@@ -65,6 +69,9 @@ struct GeneralSettingsPane: View {
         }
         .onAppear {
             launchAtLoginModel.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            launchAtLoginModel.refresh(clearError: false)
         }
     }
 
@@ -109,6 +116,7 @@ struct GeneralSettingsPane: View {
                 Text(launchAtLoginModel.title)
                     .font(DesignTokens.Typography.captionEmphasis)
                     .foregroundStyle(launchAtLoginStatusColor)
+                    .accessibilityIdentifier("general.launch-at-login.status")
                 Text(launchAtLoginModel.subtitle)
                     .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
@@ -116,11 +124,26 @@ struct GeneralSettingsPane: View {
                 Spacer(minLength: 0)
             }
 
-            if launchAtLoginModel.status == .requiresApproval {
-                Button("Open Login Items Settings") {
-                    BeaconGeneralSystemActions.openLoginItemsSettings()
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    loginRecoveryButtons
                 }
-                .controlSize(.small)
+                VStack(alignment: .leading) {
+                    loginRecoveryButtons
+                }
+            }
+            .controlSize(.small)
+
+            DisclosureGroup("Report") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(versionInfo.displayText)
+                    Text(Bundle.main.bundleIdentifier ?? "Unknown")
+                    Text(Bundle.main.bundleURL.path)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(DesignTokens.Typography.caption2)
+                .textSelection(.enabled)
+                .accessibilityIdentifier("general.launch-at-login.diagnostics")
             }
 
             if let errorMessage = launchAtLoginModel.errorMessage {
@@ -133,6 +156,16 @@ struct GeneralSettingsPane: View {
         }
         .padding(14)
         .beaconSettingsCardSurface()
+    }
+
+    @ViewBuilder
+    private var loginRecoveryButtons: some View {
+        Button("Refresh") { launchAtLoginModel.refresh() }
+            .accessibilityIdentifier("general.launch-at-login.refresh")
+        Button("Open Login Items Settings") {
+            BeaconGeneralSystemActions.openLoginItemsSettings()
+        }
+        .accessibilityIdentifier("general.launch-at-login.settings")
     }
 
     private var dataCard: some View {
@@ -182,9 +215,9 @@ struct GeneralSettingsPane: View {
             }
 
             if let operationMessage {
-                Label(operationMessage, systemImage: "checkmark.circle.fill")
+                Label(operationMessage, systemImage: operationIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.charging)
+                    .foregroundStyle(operationIsError ? DesignTokens.Palette.critical : DesignTokens.Palette.charging)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("general.operation-result")
             }
@@ -213,8 +246,15 @@ struct GeneralSettingsPane: View {
 
             Divider()
 
-            Label("Direct Download", systemImage: "shippingbox.fill")
-                .font(DesignTokens.Typography.captionEmphasis)
+            Link(destination: BeaconGeneralSystemActions.releasesURL) {
+                Label("Direct Download", systemImage: "shippingbox.fill")
+            }
+            .accessibilityIdentifier("general.releases")
+
+            Link(destination: BeaconGeneralSystemActions.supportURL) {
+                Label("Report", systemImage: "questionmark.circle")
+            }
+            .accessibilityIdentifier("general.support")
 
             Text("This build is distributed outside the Mac App Store.")
                 .font(DesignTokens.Typography.caption)
@@ -234,6 +274,11 @@ struct GeneralSettingsPane: View {
                 .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Link(destination: BeaconGeneralSystemActions.localDataURL) {
+                Label("Data and Preferences", systemImage: "info.circle")
+            }
+            .accessibilityIdentifier("general.local-data")
         }
         .padding(16)
         .beaconSettingsCardSurface()
@@ -259,9 +304,11 @@ struct GeneralSettingsPane: View {
                 csvData: BatteryHistoryStore.csvData()
             )
             if exported {
+                operationIsError = false
                 operationMessage = BeaconL10n.string("Battery history exported.")
             }
         } catch {
+            operationIsError = true
             operationMessage = BeaconL10n.format("Export failed: %@", error.localizedDescription)
         }
     }

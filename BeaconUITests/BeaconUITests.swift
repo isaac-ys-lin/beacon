@@ -8,6 +8,33 @@ import XCTest
 /// exercising the real Settings window and controls.
 final class BeaconUITests: XCTestCase {
     @MainActor
+    func testGeneralRecoveryAndSupportEntrypoints() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-open-settings", "-AppleLanguages", "(en)"]
+        app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons["General"].click()
+        let refresh = window.buttons["general.launch-at-login.refresh"]
+        XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.buttons["general.launch-at-login.settings"].exists)
+        refresh.click()
+        let status = window.staticTexts["general.launch-at-login.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertTrue(["Disabled", "Enabled", "Needs Approval", "Unavailable"].contains(status.value as? String ?? status.label))
+        for identifier in ["general.releases", "general.support", "general.local-data"] {
+            XCTAssertTrue(window.descendants(matching: .any).matching(identifier: identifier).firstMatch.exists)
+        }
+        let evidence = XCTAttachment(screenshot: window.screenshot())
+        evidence.name = "general-recovery-and-support"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+    }
+
+    @MainActor
     func testSettingsSmoke() {
         continueAfterFailure = false
         let app = XCUIApplication()

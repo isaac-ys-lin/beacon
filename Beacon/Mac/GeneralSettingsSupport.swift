@@ -82,9 +82,12 @@ final class LaunchAtLoginSettingsModel: ObservableObject {
         }
     }
 
-    func refresh() {
+    func refresh(clearError: Bool = true) {
+        let previousStatus = status
         status = service.status
-        errorMessage = nil
+        if clearError || status != previousStatus {
+            errorMessage = nil
+        }
     }
 
     func setEnabled(_ isEnabled: Bool) {
@@ -157,8 +160,11 @@ enum BatteryHistoryExportPanel {
 }
 
 enum BeaconGeneralSystemActions {
+    static let releasesURL = URL(string: "https://github.com/isaac-ys-lin/beacon/releases")!
+    static let supportURL = URL(string: "https://github.com/isaac-ys-lin/beacon/issues/new")!
+    static let localDataURL = URL(string: "https://github.com/isaac-ys-lin/beacon/blob/main/docs/local-data-and-support.md")!
+
     static func openLoginItemsSettings() {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") else { return }
-        NSWorkspace.shared.open(url)
+        SMAppService.openSystemSettingsLoginItems()
     }
 }

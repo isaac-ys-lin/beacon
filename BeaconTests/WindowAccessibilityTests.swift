@@ -4,6 +4,40 @@ import XCTest
 
 final class WindowAccessibilityTests: XCTestCase {
     @MainActor
+    func testLoginRecoveryRetainsFailureUntilSystemStateChanges() throws {
+        let service = WindowLoginServiceStub()
+        service.registrationError = NSError(domain: "BeaconTests", code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Registration refused"])
+        let model = LaunchAtLoginSettingsModel(service: service)
+        model.setEnabled(true)
+        XCTAssertFalse(model.isRequested)
+        let failure = try XCTUnwrap(model.errorMessage)
+
+        // Returning from System Settings alone is not proof of recovery.
+        model.refresh(clearError: false)
+        XCTAssertEqual(model.errorMessage, failure)
+        XCTAssertEqual(model.status, .notRegistered)
+
+        service.status = .enabled
+        model.refresh(clearError: false)
+        XCTAssertTrue(model.isRequested)
+        XCTAssertNil(model.errorMessage)
+    }
+
+    @MainActor
+    func testLoginRegistrationAcceptedWithoutStateChangeDoesNotEnableSwitch() {
+        let service = WindowLoginServiceStub()
+        let model = LaunchAtLoginSettingsModel(service: service)
+        model.setEnabled(true)
+        XCTAssertFalse(model.isRequested)
+        XCTAssertEqual(model.status, .notRegistered)
+        service.status = .requiresApproval
+        model.refresh()
+        XCTAssertEqual(model.status, .requiresApproval)
+        XCTAssertTrue(model.isRequested)
+    }
+
+    @MainActor
     func testHUDUsesNonactivatingPanelWithoutBecomingKey() throws {
         let defaults = UserDefaults.standard
         let enabledKey = BatteryHUDPreferences.showActionHUDKey
@@ -304,4 +338,13 @@ final class WindowAccessibilityTests: XCTestCase {
             defaults.removeObject(forKey: key)
         }
     }
+}
+
+private final class WindowLoginServiceStub: LaunchAtLoginServicing {
+    var status: LaunchAtLoginServiceStatus = .notRegistered
+    var registrationError: Error?
+    func register() throws {
+        if let registrationError { throw registrationError }
+    }
+    func unregister() throws { status = .notRegistered }
 }
