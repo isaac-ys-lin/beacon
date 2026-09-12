@@ -12,13 +12,13 @@ jobs:
         with:
           ref: codex/issue-2-setup-recovery
           fetch-depth: 0
-      - name: Apply authored changes and synchronize Xcode project
+      - name: Apply authored sources and synchronize Xcode project
         shell: bash
         run: |
           set -euo pipefail
           test "$(git branch --show-current)" = codex/issue-2-setup-recovery
-          git apply --check .beacon-agent-change.patch
-          git apply .beacon-agent-change.patch
+          git apply --check --exclude=.github/workflows/ci.yml .beacon-agent-change.patch
+          git apply --exclude=.github/workflows/ci.yml .beacon-agent-change.patch
           while read -r expected path; do
             actual="$(git hash-object "$path")"
             test "$actual" = "$expected" || { echo "Source mismatch: $path ($actual)"; exit 1; }
@@ -37,7 +37,7 @@ jobs:
           brew install xcodegen
           xcodegen generate
           git diff --check
-          rm .beacon-agent-change.patch .github/workflows/prepare-source.yml
-          git add -A
+          rm .beacon-agent-change.patch
+          git add Beacon BeaconTests BeaconUITests Beacon.xcodeproj .beacon-agent-change.patch
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(setup): complete first-run and permission recovery workflow (#2)'
           git push origin HEAD:refs/heads/codex/issue-2-setup-recovery
