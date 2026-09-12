@@ -1,0 +1,43 @@
+name: Prepare issue 2 source commit
+on:
+  push:
+    branches: [codex/issue-2-setup-recovery]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/issue-2-setup-recovery
+          fetch-depth: 0
+      - name: Apply authored changes and synchronize Xcode project
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = codex/issue-2-setup-recovery
+          git apply --check .beacon-agent-change.patch
+          git apply .beacon-agent-change.patch
+          while read -r expected path; do
+            actual="$(git hash-object "$path")"
+            test "$actual" = "$expected" || { echo "Source mismatch: $path ($actual)"; exit 1; }
+          done <<'EXPECTED'
+          3596546fb6c27479cd48e2c8bfcf0f6b642b854d .github/workflows/ci.yml
+          b93344562d49f622c3530067f1a6308d281d57b3 Beacon/Mac/BeaconMacApp.swift
+          b8f58f35ed8da5df011c5833d9da27009f44bcaa Beacon/Mac/BeaconSettingsView.swift
+          5e55be371a0da86a8cd927f5c523da0f6392a5c3 Beacon/Mac/BeaconStatusController.swift
+          365060016fea37bdec3cbd0212f404e9750fabc3 Beacon/Mac/DeviceSetupRecovery.swift
+          58421827f26f7cfbf6744ba8ab35646592dd1bdb Beacon/Mac/StatusMenuPanelController.swift
+          990d57c38d86341dea8fcb414eb6f6dc5c608fe2 Beacon/Mac/StatusMenuView.swift
+          0bf1ae434724d4cbe8d2ab50d2692e3b982d1c76 Beacon/Mac/zh-Hant-TW.lproj/Localizable.strings
+          ea7e5aec06096bb1650e157d232a2dfedf1566a5 BeaconTests/DeviceSetupRecoveryTests.swift
+          f8b80e5869635384c340e371152755522eb523e9 BeaconUITests/BeaconUITests.swift
+          EXPECTED
+          brew install xcodegen
+          xcodegen generate
+          git diff --check
+          rm .beacon-agent-change.patch .github/workflows/prepare-source.yml
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(setup): complete first-run and permission recovery workflow (#2)'
+          git push origin HEAD:refs/heads/codex/issue-2-setup-recovery
