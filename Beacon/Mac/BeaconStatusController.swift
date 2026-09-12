@@ -12,7 +12,7 @@ final class BeaconStatusController: NSObject {
     private let hudController = BeaconHUDController()
     private let desktopWidgetController = BeaconDesktopWidgetController()
     private let shortcutController = BeaconShortcutController()
-    private let bluetoothPowerStateObserver = BluetoothPowerStateObserver()
+    private let bluetoothPowerStateObserver: BluetoothPowerStateObserver?
     private let menuLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "menu-bar")
     private let quickActionLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "quick-actions")
     private var storeObserver: AnyCancellable?
@@ -28,7 +28,9 @@ final class BeaconStatusController: NSObject {
     private var outsideClickMonitor: Any?
 
     init(model: BeaconModel) {
+        // Preview fixtures must not create a real Bluetooth manager or prompt for hardware access.
         self.model = model
+        bluetoothPowerStateObserver = model.isUsingPreviewData ? nil : BluetoothPowerStateObserver()
         settingsWindowController = BeaconSettingsWindowController(model: model)
         super.init()
 
@@ -84,7 +86,7 @@ final class BeaconStatusController: NSObject {
             .sink { [weak self] events in
                 self?.hudController.show(event: events[0])
             }
-        bluetoothPowerStateCancellable = bluetoothPowerStateObserver.$state
+        bluetoothPowerStateCancellable = bluetoothPowerStateObserver?.$state
             .sink { [weak self] _ in
                 self?.updateStatusMenuContent()
                 self?.updateDesktopWidget()

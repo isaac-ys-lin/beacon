@@ -85,6 +85,7 @@ jobs:
         if: always()
         run: |
           if [[ -d "$RUNNER_TEMP/beacon-results/BeaconMacUI.xcresult" ]]; then
+            xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/beacon-results/BeaconMacUI.xcresult" > "$RUNNER_TEMP/beacon-results/BeaconMacUI.json"
             xcrun xcresulttool export attachments \
               --path "$RUNNER_TEMP/beacon-results/BeaconMacUI.xcresult" \
               --output-path "$RUNNER_TEMP/beacon-results/ui-attachments"
