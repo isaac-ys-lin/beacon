@@ -108,7 +108,7 @@
 "Open the dedicated Beacon settings window." = "打開 Beacon 設定視窗。";
 "Open the setup guide for pairing or connecting a supported device." = "打開支援裝置的配對或連接指南。";
 "Jump to macOS Bluetooth settings for pairing." = "前往 macOS 藍牙設定進行配對。";
-"Connect a visible disconnected paired device, prioritizing the lowest reported battery." = "連接可見且目前中斷的已配對裝置，優先選擇回報電量最低者。";
+"Connect a visible disconnected paired device, prioritizing the lowest reported battery." = "連接可見且目前中斷的已配對藍牙裝置，優先選擇回報電量最低者。";
 "Disconnect the visible connected Bluetooth device with the lowest battery." = "中斷可見且電量最低的已連接藍牙裝置。";
 "Excluded from this build by product scope." = "依產品範圍，此版本不包含這項功能。";
 
@@ -419,3 +419,17 @@
 "Beacon could not find or connect an eligible paired Bluetooth device." = "Beacon 找不到符合條件的已配對藍牙裝置，或無法連接。";
 "Beacon requested a disconnect for the lowest battery Bluetooth device." = "Beacon 已要求中斷電量最低的藍牙裝置。";
 "Beacon could not find or disconnect an eligible Bluetooth device." = "Beacon 找不到符合條件的藍牙裝置，或無法中斷連線。";
+
+/* Daily settings scope and preview provenance. */
+"All Devices" = "所有裝置";
+"These switches apply to every device. The default threshold is used only when a device has no custom threshold." = "這些開關適用於所有裝置；只有未自訂門檻的裝置才使用預設門檻。";
+"Use Default Threshold" = "使用預設門檻";
+"Resets only the low-battery threshold. The charged-alert choice is kept." = "只重設低電量門檻；充飽提醒的選擇會保留。";
+"Charged alerts also require Notify when charged to be enabled for the device." = "充飽提醒還需要為該裝置開啟「充飽時通知」。";
+"Illustration only. This does not send a notification." = "僅供示意，不會傳送通知。";
+"Low-battery alerts are off for all devices." = "所有裝置的低電量提醒均已關閉。";
+"Using the default low-battery threshold of %d%%." = "使用預設低電量門檻 %d%%。";
+"Sample Preview" = "範例預覽";
+"Latest Device Reports" = "最近一次裝置回報";
+"Sample devices illustrate the layout; they are not connected-device readings." = "範例裝置僅用來展示版面，不是已連接裝置的讀數。";
+"This preview uses the latest stored device reports, which may be out of date." = "此預覽使用最近一次儲存的裝置回報，資料可能已過期。";

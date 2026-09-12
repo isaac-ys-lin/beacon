@@ -80,6 +80,7 @@ struct BeaconSettingsView: View {
     @State private var selectedDeviceID: String?
     @State private var selectedPane: SettingsPane = .devices
     @State private var isShowingAddDeviceGuide = false
+    @State private var alertPreferencesRevision = 0
 
     init(
         snapshots: [DecoratedBatterySnapshot],
@@ -128,6 +129,7 @@ struct BeaconSettingsView: View {
     }
 
     var body: some View {
+        let _ = alertPreferencesRevision
         GeometryReader { proxy in
             HStack(alignment: .top, spacing: 0) {
                 settingsSidebar
@@ -161,6 +163,9 @@ struct BeaconSettingsView: View {
         .onAppear {
             reconcileSelectedDeviceSelection()
             onRefreshNotificationAuthorization()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
+            alertPreferencesRevision &+= 1
         }
         .sheet(isPresented: $isShowingAddDeviceGuide) {
             AddDeviceGuideView(
@@ -207,6 +212,8 @@ struct BeaconSettingsView: View {
                             )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings.pane.\(pane.id)")
+                    .accessibilityAddTraits(selectedPane == pane ? .isSelected : [])
                 }
             }
 
@@ -244,6 +251,7 @@ struct BeaconSettingsView: View {
                     Image(systemName: "plus")
                 }
                 .help("Set Up Device")
+                .accessibilityLabel("Set Up Device")
             }
 
             if selectedPane != .general {
@@ -259,6 +267,7 @@ struct BeaconSettingsView: View {
                 .disabled(isRefreshing)
                 .help(isRefreshing ? "Refreshing" : "Refresh")
                 .accessibilityIdentifier("settings.refresh")
+                .accessibilityLabel(isRefreshing ? "Refreshing" : "Refresh")
             }
         }
         .buttonStyle(.borderless)
@@ -332,6 +341,7 @@ struct BeaconSettingsView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 10) {
                     notificationCenterSettingsCard
+                    compactGlobalAlertCard
 
                     if let selectedDevice {
                         alertDetail(for: selectedDevice)
@@ -497,7 +507,6 @@ struct BeaconSettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             compactAlertHeader(for: row)
             compactDeviceAlertCard(for: row)
-            compactGlobalAlertCard
             compactAlertPreviewCard
         }
         .frame(maxWidth: 560, alignment: .topLeading)
@@ -552,7 +561,8 @@ struct BeaconSettingsView: View {
                 color: row.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.accent
             )
             .padding(.horizontal, 12)
-            .frame(height: 44)
+            .padding(.vertical, 8)
+            .frame(minHeight: 44)
 
             Divider()
                 .padding(.leading, 50)
@@ -565,6 +575,9 @@ struct BeaconSettingsView: View {
                 Slider(value: deviceThresholdBinding(for: row.id), in: 5...50, step: 5)
                     .controlSize(.small)
                     .disabled(row.isHidden || !lowBatteryAlertsEnabled)
+                    .accessibilityLabel("Low-battery threshold")
+                    .accessibilityValue("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
+                    .accessibilityIdentifier("alerts.device.threshold")
 
                 Text("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
                     .font(DesignTokens.Typography.percentSmall)
@@ -584,19 +597,22 @@ struct BeaconSettingsView: View {
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
+                    .accessibilityIdentifier("alerts.device.charged")
 
                 Spacer(minLength: 8)
 
-                Button("Use Global") {
+                Button("Use Default Threshold") {
                     LowBatteryNotifier.resetThreshold(forDeviceID: row.id)
                 }
                 .controlSize(.small)
+                .help("Resets only the low-battery threshold. The charged-alert choice is kept.")
+                .accessibilityIdentifier("alerts.device.use-default")
                 .disabled(row.isHidden || !LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id))
             }
             .font(DesignTokens.Typography.controlLabel)
             .padding(.horizontal, 12)
             .frame(height: 42)
-            .opacity(row.isHidden || !chargedBatteryAlertsEnabled ? 0.5 : 1)
+            .opacity(row.isHidden ? 0.5 : 1)
         }
         .beaconSettingsCardSurface()
     }
@@ -604,19 +620,21 @@ struct BeaconSettingsView: View {
     private var compactGlobalAlertCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             compactAlertTitleRow(
-                title: "Global Defaults",
-                subtitle: BeaconL10n.string("Used when a device has no override."),
+                title: "All Devices",
+                subtitle: BeaconL10n.string("These switches apply to every device. The default threshold is used only when a device has no custom threshold."),
                 systemImage: "slider.horizontal.3",
                 color: DesignTokens.Palette.secondaryText
             )
             .padding(.horizontal, 12)
-            .frame(height: 44)
+            .padding(.vertical, 8)
+            .frame(minHeight: 44)
 
             Divider()
                 .padding(.leading, 50)
 
             HStack(spacing: 10) {
                 Toggle("Low battery alerts", isOn: $lowBatteryAlertsEnabled)
+                    .accessibilityIdentifier("alerts.global.low")
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .onChange(of: lowBatteryAlertsEnabled) { _, isEnabled in
@@ -641,6 +659,9 @@ struct BeaconSettingsView: View {
                     .frame(width: 104, alignment: .leading)
 
                 Slider(value: lowBatteryThresholdBinding, in: 5...50, step: 5)
+                    .accessibilityLabel("Default threshold")
+                    .accessibilityValue("\(clampedLowBatteryThreshold)%")
+                    .accessibilityIdentifier("alerts.global.threshold")
                     .controlSize(.small)
                     .disabled(!lowBatteryAlertsEnabled)
             }
@@ -652,6 +673,7 @@ struct BeaconSettingsView: View {
                 .padding(.leading, 50)
 
             Toggle("Charged alerts", isOn: $chargedBatteryAlertsEnabled)
+                .accessibilityIdentifier("alerts.global.charged")
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .onChange(of: chargedBatteryAlertsEnabled) { _, isEnabled in
@@ -660,6 +682,13 @@ struct BeaconSettingsView: View {
                 .font(DesignTokens.Typography.controlLabel)
                 .padding(.horizontal, 12)
                 .frame(height: 40, alignment: .leading)
+
+            Text("Charged alerts also require Notify when charged to be enabled for the device.")
+                .font(DesignTokens.Typography.caption2)
+                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
         }
         .beaconSettingsCardSurface()
     }
@@ -669,17 +698,26 @@ struct BeaconSettingsView: View {
             Text("Preview")
                 .font(DesignTokens.Typography.captionEmphasis)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
+            Text("Illustration only. This does not send a notification.")
+                .font(DesignTokens.Typography.caption2)
+                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 10) {
                 SettingsAlertPreview(
                     title: "Low Battery",
-                    subtitle: BeaconL10n.format("At %d%%", clampedLowBatteryThreshold),
+                    subtitle: lowBatteryAlertsEnabled
+                        ? BeaconL10n.format("At %d%%", selectedDevice.map { LowBatteryNotifier.threshold(forDeviceID: $0.id) } ?? clampedLowBatteryThreshold)
+                        : BeaconL10n.string("Disabled"),
                     systemImage: "battery.25",
                     color: DesignTokens.Palette.critical
                 )
                 SettingsAlertPreview(
                     title: "Fully Charged",
-                    subtitle: BeaconL10n.format("At %d%%", 100),
+                    subtitle: chargedBatteryAlertsEnabled
+                        && (selectedDevice.map { LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: $0.id, displayName: $0.displayName) } ?? false)
+                        ? BeaconL10n.format("At %d%%", 100)
+                        : BeaconL10n.string("Disabled"),
                     systemImage: "battery.100",
                     color: DesignTokens.Palette.charging
                 )
@@ -712,7 +750,7 @@ struct BeaconSettingsView: View {
                 Text(subtitle)
                     .font(DesignTokens.Typography.caption2)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 0)
@@ -750,6 +788,7 @@ struct BeaconSettingsView: View {
     private var dashboardTab: some View {
         DashboardSettingsPane(
             snapshots: snapshots,
+            isPreviewingData: isPreviewingData,
             showMenuBarBattery: $showMenuBarBattery,
             showDesktopWidget: $showDesktopWidget,
             desktopWidgetStyleRawValue: $desktopWidgetStyleRawValue
@@ -804,27 +843,35 @@ struct BeaconSettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                SettingsDetailToggle(
-                    title: "Keep visible",
-                    subtitle: "Pinned devices stay at the top of the dashboard.",
-                    systemImage: "pin.fill",
-                    isOn: Binding(
-                        get: { row.isPinned },
-                        set: { setDisplayPreferences(displayPreferences.settingPinned($0, for: row.item)) }
-                    )
-                )
+                Toggle(isOn: Binding(
+                    get: { row.isPinned },
+                    set: { setDisplayPreferences(displayPreferences.settingPinned($0, for: row.item)) }
+                )) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label("Keep visible", systemImage: "pin.fill")
+                        Text("Pinned devices stay at the top of the dashboard.")
+                            .font(DesignTokens.Typography.caption2)
+                            .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    }
+                }
+                .toggleStyle(.switch)
+                .padding(12)
                 .disabled(row.isHidden)
                 .opacity(row.isHidden ? 0.45 : 1)
 
                 Divider()
                     .padding(.leading, 50)
 
-                SettingsDetailToggle(
-                    title: "Notify when charged",
-                    subtitle: "Best for devices that keep reporting while charging.",
-                    systemImage: "battery.100",
-                    isOn: deviceChargedAlertBinding(for: row)
-                )
+                Toggle(isOn: deviceChargedAlertBinding(for: row)) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label("Notify when charged", systemImage: "battery.100")
+                        Text("Best for devices that keep reporting while charging.")
+                            .font(DesignTokens.Typography.caption2)
+                            .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    }
+                }
+                .toggleStyle(.switch)
+                .padding(12)
                 .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
                 .opacity(row.isHidden || !chargedBatteryAlertsEnabled ? 0.45 : 1)
             }
@@ -850,11 +897,14 @@ struct BeaconSettingsView: View {
                     step: 5
                 )
                 .disabled(row.isHidden || !lowBatteryAlertsEnabled)
+                .accessibilityLabel("Low-battery threshold")
+                .accessibilityValue("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
 
                 HStack {
-                    Button("Use Global Default") {
+                    Button("Use Default Threshold") {
                         LowBatteryNotifier.resetThreshold(forDeviceID: row.id)
                     }
+                    .help("Resets only the low-battery threshold. The charged-alert choice is kept.")
                     .disabled(!LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id))
 
                     Spacer()
@@ -1163,13 +1213,16 @@ struct BeaconSettingsView: View {
     }
 
     private func deviceAlertSubtitle(for row: DeviceInspectorItem) -> String {
+        guard lowBatteryAlertsEnabled else {
+            return BeaconL10n.string("Low-battery alerts are off for all devices.")
+        }
         if LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id) {
             return BeaconL10n.format(
                 "Custom low-battery alert at %d%%.",
                 LowBatteryNotifier.threshold(forDeviceID: row.id)
             )
         }
-        return BeaconL10n.string("Using the global low-battery threshold.")
+        return BeaconL10n.format("Using the default low-battery threshold of %d%%.", clampedLowBatteryThreshold)
     }
 
 }

@@ -19,25 +19,18 @@ struct ActionHUDSettingsPane: View {
                 }
 
                 Section {
-                    ActionHUDEventToggle(
+                    eventToggle(
                         title: "Low battery",
                         subtitle: "Show when a device drops below its alert level.",
-                        systemImage: "battery.25",
-                        color: DesignTokens.Palette.critical,
-                        isOn: $showLowBatteryHUD
+                        isOn: $showLowBatteryHUD,
+                        identifier: "hud.settings.low-battery"
                     )
-                    .disabled(!showActionHUD)
-                    .opacity(showActionHUD ? 1 : 0.45)
-
-                    ActionHUDEventToggle(
+                    eventToggle(
                         title: "Finished charging",
                         subtitle: "Show when an opted-in device reaches full charge.",
-                        systemImage: "battery.100",
-                        color: DesignTokens.Palette.charging,
-                        isOn: $showChargedHUD
+                        isOn: $showChargedHUD,
+                        identifier: "hud.settings.charged"
                     )
-                    .disabled(!showActionHUD)
-                    .opacity(showActionHUD ? 1 : 0.45)
                 } header: {
                     Text("Events")
                 }
@@ -55,6 +48,8 @@ struct ActionHUDSettingsPane: View {
                     HStack(spacing: 10) {
                         Text("Dismiss after")
                         Slider(value: dismissDelayBinding, in: 2...10, step: 1)
+                            .accessibilityLabel("Dismiss after")
+                            .accessibilityValue(Text(BeaconL10n.format("%@ sec", String(Int(clampedDismissDelay)))))
                         Text(BeaconL10n.format("%@ sec", String(Int(clampedDismissDelay))))
                             .monospacedDigit()
                             .frame(width: 46, alignment: .trailing)
@@ -78,11 +73,10 @@ struct ActionHUDSettingsPane: View {
                 }
             }
             .formStyle(.grouped)
-            .frame(minWidth: 350, maxWidth: 350, maxHeight: .infinity, alignment: .topLeading)
-
-            previewPanel
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            ScrollView { previewPanel }.frame(width: 280)
         }
-        .frame(maxWidth: 650, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {
             if !autoDismissEnabled && !showDismissButton {
                 autoDismissEnabled = true
@@ -90,40 +84,53 @@ struct ActionHUDSettingsPane: View {
         }
     }
 
+    private func eventToggle(
+        title: LocalizedStringKey,
+        subtitle: LocalizedStringKey,
+        isOn: Binding<Bool>,
+        identifier: String
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(DesignTokens.Typography.captionEmphasis)
+                Text(subtitle)
+                    .font(DesignTokens.Typography.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .toggleStyle(.switch)
+        .accessibilityLabel(Text(title))
+        .accessibilityHint(Text(subtitle))
+        .accessibilityIdentifier(identifier)
+        .disabled(!showActionHUD)
+    }
+
     private var previewPanel: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Preview")
-                .font(DesignTokens.Typography.sectionTitle)
-
+            Text("Preview").font(DesignTokens.Typography.sectionTitle)
             VStack(spacing: 10) {
                 BatteryActionHUDView(
                     event: BatteryAlertEvent(
-                        kind: .lowBattery,
-                        deviceID: "settings-mouse",
-                        displayName: "Magic Mouse",
-                        percent: lowBatteryThreshold
+                        kind: .lowBattery, deviceID: "settings-mouse",
+                        displayName: "Magic Mouse", percent: lowBatteryThreshold
                     ),
                     showsDismissButton: showDismissButton
                 )
                 .scaleEffect(0.58)
-                .frame(width: 302, height: 54)
-
+                .frame(width: 248, height: 54)
                 BatteryActionHUDView(
                     event: BatteryAlertEvent(
-                        kind: .charged,
-                        deviceID: "settings-keyboard",
-                        displayName: "Magic Keyboard",
-                        percent: 100
+                        kind: .charged, deviceID: "settings-keyboard",
+                        displayName: "Magic Keyboard", percent: 100
                     ),
                     showsDismissButton: showDismissButton
                 )
                 .scaleEffect(0.58)
-                .frame(width: 302, height: 54)
+                .frame(width: 248, height: 54)
             }
             .opacity(showActionHUD ? 1 : 0.45)
-
             Divider()
-
             VStack(alignment: .leading, spacing: 7) {
                 hudStateRow(BeaconL10n.string("Low battery"), isOn: showLowBatteryHUD)
                 hudStateRow(BeaconL10n.string("Finished charging"), isOn: showChargedHUD)
@@ -135,7 +142,7 @@ struct ActionHUDSettingsPane: View {
             }
         }
         .padding(16)
-        .frame(width: 330, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .beaconSettingsCardSurface()
         .padding(.top, 18)
     }
@@ -162,5 +169,4 @@ struct ActionHUDSettingsPane: View {
             set: { dismissDelaySeconds = Swift.max(2, Swift.min(10, $0)) }
         )
     }
-
 }
