@@ -282,6 +282,7 @@ struct GeneralSettingsPane: View {
         }
         .padding(16)
         .beaconSettingsCardSurface()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("general.about")
     }
 
