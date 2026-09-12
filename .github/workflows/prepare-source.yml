@@ -1,0 +1,35 @@
+name: Apply verified setup corrections
+on:
+  push:
+    branches: [codex/issue-2-setup-recovery]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/issue-2-setup-recovery
+      - name: Correct recovered-row query and contradictory placeholder
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          changes = {
+              'BeaconUITests/BeaconUITests.swift': ('XCTAssertTrue(window.staticTexts["Magic Keyboard"].firstMatch.waitForExistence(timeout: 5))', 'XCTAssertTrue(window.descendants(matching: .any)["Magic Keyboard"].firstMatch.waitForExistence(timeout: 5))', 'aa57f2566982d601982891f818ad020fe195ae14'),
+              'Beacon/Mac/BeaconSettingsView.swift': ('                        } else {\n                            emptyDeviceDetail\n                        }', '                        } else if DeviceSetupRecoveryState.resolve(\n                            visibleCount: 0, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics\n                        ) == .empty {\n                            emptyDeviceDetail\n                        }', '5338e68b2f0ac95de07a2527e86ddbeb66e1a1f5')
+          }
+          for file, (old, new, expected) in changes.items():
+              p = Path(file)
+              s = p.read_text()
+              assert s.count(old) == 1, file
+              p.write_text(s.replace(old, new))
+              assert subprocess.check_output(['git', 'hash-object', file]).decode().strip() == expected, file
+          PY
+          git diff --check
+          git add Beacon/Mac/BeaconSettingsView.swift BeaconUITests/BeaconUITests.swift
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(setup): assert recovered rows and suppress misleading empty detail (#2)'
+          git push origin HEAD:refs/heads/codex/issue-2-setup-recovery
