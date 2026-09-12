@@ -1255,7 +1255,7 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(summary.reportedItemCount, 1)
         XCTAssertEqual(summary.lowestPercent, 12)
         XCTAssertEqual(summary.lowBatteryItemCount, 1)
-        XCTAssertEqual(summary.chargingItemCount, 1)
+        XCTAssertEqual(summary.chargingItemCount, 0, "A stale charging component is not evidence of current charging.")
         XCTAssertEqual(summary.staleItemCount, 1)
     }
 

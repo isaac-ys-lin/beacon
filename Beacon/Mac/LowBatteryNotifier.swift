@@ -404,6 +404,7 @@ enum LowBatteryNotifier {
     ) -> [BatteryAlertEvent] {
         let eligibleSnapshots = snapshots.compactMap { decorated -> BatterySnapshot? in
             guard decorated.freshness == .fresh,
+                  decorated.snapshot.readStatus == .reported,
                   decorated.snapshot.connectionState == .connected
             else {
                 return nil

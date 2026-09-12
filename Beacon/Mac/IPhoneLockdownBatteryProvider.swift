@@ -263,6 +263,7 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
             .filter { registry.isTrusted(udid: $0.udid) }
         var candidates: [BluetoothBatteryCandidate] = []
         var readStatuses: [BatteryReadStatus] = []
+        var targetedFailures: [BatteryProviderAttempt] = []
 
         for device in devices {
             let read = await readCandidate(
@@ -271,6 +272,13 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
                 commandSet: commandSet
             )
             readStatuses.append(read.status)
+            if read.status != .reported {
+                targetedFailures.append(BatteryProviderAttempt(
+                    provider: .ideviceInfo, status: read.status, candidateCount: 0,
+                    message: "Targeted iPhone battery read did not return a reading", attemptedAt: now,
+                    affectedDeviceIDs: ["trusted-iphone-\(device.udid)"]
+                ))
+            }
             if let candidate = read.candidate {
                 candidates.append(candidate)
             }
@@ -295,7 +303,7 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
                     message: message,
                     now: now
                 )
-            ]
+            ] + targetedFailures
         )
     }
 

@@ -62,7 +62,8 @@ public struct BluetoothDeviceScanner {
                             candidateCount: 0,
                             message: "Trusted iPhone provider returned no diagnostic",
                             attemptedAt: now
-                        )
+                        ),
+                        additionalAttempts: Array(report.attempts.dropFirst())
                     )
                 })
             }
@@ -108,10 +109,10 @@ public struct BluetoothDeviceScanner {
         }
         let merged = Self.mergingCandidates(orderedOutcomes.flatMap(\.candidates))
         let collapsed = Self.collapsingDuplicateIPhones(merged)
-        let attempts = orderedOutcomes.map(\.attempt)
-        let authoritativeProviders = Set(
-            attempts.filter { $0.status == .reported || $0.status == .noReport }.map(\.provider)
-        )
+        let attempts = orderedOutcomes.flatMap { [$0.attempt] + $0.additionalAttempts }
+        let authoritativeProviders = Set(orderedOutcomes.filter {
+            ($0.attempt.status == .reported || $0.attempt.status == .noReport) && $0.additionalAttempts.isEmpty
+        }.map { $0.attempt.provider })
         Self.logger.info("Battery provider refresh completed outcomes=\(attempts.count) candidates=\(collapsed.count)")
         return BluetoothCandidateScanReport(
             candidates: collapsed,
@@ -123,6 +124,11 @@ public struct BluetoothDeviceScanner {
     private struct BluetoothProviderOutcome: Sendable {
         let candidates: [BluetoothBatteryCandidate]
         let attempt: BatteryProviderAttempt
+        let additionalAttempts: [BatteryProviderAttempt]
+
+        init(candidates: [BluetoothBatteryCandidate], attempt: BatteryProviderAttempt, additionalAttempts: [BatteryProviderAttempt] = []) {
+            self.candidates = candidates; self.attempt = attempt; self.additionalAttempts = additionalAttempts
+        }
     }
 
     private enum BluetoothProviderCollectionEvent: Sendable {

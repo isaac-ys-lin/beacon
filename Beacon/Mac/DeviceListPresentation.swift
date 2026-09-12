@@ -15,6 +15,14 @@ public struct AirPodsComponent: Equatable, Sendable {
     public let freshness: Freshness
     public let connectionState: ConnectionState
     public let updatedAt: Date
+    public let readStatus: BatteryReadStatus
+
+    public init(slot: Slot, percent: Int?, chargeState: ChargeState, freshness: Freshness,
+                connectionState: ConnectionState, updatedAt: Date, readStatus: BatteryReadStatus? = nil) {
+        self.slot = slot; self.percent = percent; self.chargeState = chargeState
+        self.freshness = freshness; self.connectionState = connectionState; self.updatedAt = updatedAt
+        self.readStatus = readStatus ?? (percent == nil ? .noReport : .reported)
+    }
 }
 
 // MARK: - Device List Item
@@ -827,18 +835,18 @@ public func batteryOverviewSummary(
         for item in section.items {
             switch item {
             case .device(let decorated):
-                guard item.connectionState == .connected else { continue }
-                if let percent = decorated.snapshot.percent {
+                guard item.connectionState == .connected, decorated.snapshot.readStatus == .reported else { continue }
+                if let percent = decorated.snapshot.percent, (0...100).contains(percent) {
                     reportedItemCount += 1
                     lowestPercent = minPercent(lowestPercent, percent)
-                    if percent <= threshold,
+                    if decorated.freshness == .fresh, percent <= threshold,
                        decorated.snapshot.chargeState != .charging,
                        decorated.snapshot.chargeState != .full {
                         lowBatteryItemCount += 1
                     }
                 }
 
-                if decorated.snapshot.chargeState == .charging {
+                if decorated.freshness == .fresh, decorated.snapshot.chargeState == .charging {
                     chargingItemCount += 1
                 }
                 if decorated.freshness != .fresh {
@@ -847,7 +855,7 @@ public func batteryOverviewSummary(
 
             case .airPods(_, _, let components):
                 guard item.connectionState == .connected else { continue }
-                let activeComponents = activeAirPodsComponents(components)
+                let activeComponents = activeAirPodsComponents(components).filter { $0.readStatus == .reported && $0.connectionState == .connected }
                 let percents = activeComponents.compactMap(\.percent)
                 if let componentLowest = percents.min() {
                     reportedItemCount += 1
@@ -856,13 +864,13 @@ public func batteryOverviewSummary(
 
                 if activeComponents.contains(where: { component in
                     guard let percent = component.percent else { return false }
-                    return percent <= threshold
+                    return component.freshness == .fresh && (0...100).contains(percent) && percent <= threshold
                         && component.chargeState != .charging
                         && component.chargeState != .full
                 }) {
                     lowBatteryItemCount += 1
                 }
-                if activeComponents.contains(where: { $0.chargeState == .charging }) {
+                if activeComponents.contains(where: { $0.freshness == .fresh && $0.chargeState == .charging }) {
                     chargingItemCount += 1
                 }
                 if activeComponents.contains(where: { $0.freshness != .fresh }) {
@@ -891,8 +899,9 @@ public func batteryOverviewDevices(
         for item in section.items {
             switch item {
             case .device(let decorated):
-                guard item.connectionState == .connected,
-                      let percent = decorated.snapshot.percent
+                guard item.connectionState == .connected, decorated.snapshot.readStatus == .reported,
+                      decorated.freshness != .expired,
+                      let percent = decorated.snapshot.percent, (0...100).contains(percent)
                 else {
                     continue
                 }
@@ -912,7 +921,7 @@ public func batteryOverviewDevices(
 
             case .airPods(let name, let id, let components):
                 guard item.connectionState == .connected else { continue }
-                let activeComponents = activeAirPodsComponents(components)
+                let activeComponents = activeAirPodsComponents(components).filter { $0.readStatus == .reported && $0.connectionState == .connected }
                 let percents = activeComponents.compactMap(\.percent)
                 guard let lowestPercent = percents.min() else { continue }
                 let chargeState: ChargeState = activeComponents.contains { $0.chargeState == .charging || $0.chargeState == .full }
@@ -1058,7 +1067,8 @@ func aggregateAirPods(_ snapshots: [DecoratedBatterySnapshot]) -> [DeviceListIte
                         chargeState: decorated.snapshot.chargeState,
                         freshness: decorated.freshness,
                         connectionState: decorated.snapshot.connectionState,
-                        updatedAt: decorated.snapshot.updatedAt
+                        updatedAt: decorated.snapshot.updatedAt,
+                        readStatus: decorated.snapshot.readStatus
                     )
             }.sorted { slotOrder($0.slot) < slotOrder($1.slot) }
 

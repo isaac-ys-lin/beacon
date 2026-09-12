@@ -374,6 +374,7 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
     let updatedAt: Date
     let isPinned: Bool
     let airPodsComponents: [AirPodsComponent]
+    let reportState: DeviceBatteryTrust
 
     init(
         id: String,
@@ -386,7 +387,8 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
         provider: BatteryProvider = .bluetoothUnsupported,
         updatedAt: Date = .distantPast,
         isPinned: Bool = false,
-        airPodsComponents: [AirPodsComponent] = []
+        airPodsComponents: [AirPodsComponent] = [],
+        reportState: DeviceBatteryTrust? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -399,6 +401,7 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
         self.updatedAt = updatedAt
         self.isPinned = isPinned
         self.airPodsComponents = airPodsComponents
+        self.reportState = reportState ?? DeviceBatteryPresentation(percent: percent, freshness: freshness).state
     }
 
     init(_ device: BatteryOverviewDevice, isPinned: Bool = false) {
@@ -417,23 +420,24 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
     }
 
     init(item: DeviceListItem, isPinned: Bool = false) {
+        let presentation = DeviceBatteryPresentation(item: item)
         switch item {
         case .device(let decorated):
             self.init(
                 id: decorated.id,
                 displayName: decorated.snapshot.displayName,
                 kind: decorated.snapshot.kind,
-                percent: decorated.snapshot.percent,
+                percent: presentation.percent,
                 chargeState: decorated.snapshot.chargeState,
                 freshness: decorated.freshness,
                 source: decorated.snapshot.source,
                 provider: decorated.snapshot.provider,
                 updatedAt: decorated.snapshot.updatedAt,
-                isPinned: isPinned
+                isPinned: isPinned,
+                reportState: presentation.state
             )
         case .airPods(let name, let id, let components):
             let activeComponents = activeAirPodsComponents(components)
-            let percents = activeComponents.compactMap(\.percent)
             let chargeState: ChargeState
             if activeComponents.contains(where: { $0.chargeState == .charging }) {
                 chargeState = .charging
@@ -451,14 +455,15 @@ struct DashboardBatteryDevice: Identifiable, Equatable {
                 id: id,
                 displayName: name,
                 kind: .airPods,
-                percent: percents.min(),
+                percent: presentation.percent,
                 chargeState: chargeState,
                 freshness: freshness,
                 source: .coreBluetooth,
                 provider: .coreBluetoothBatteryService,
                 updatedAt: updatedAt,
                 isPinned: isPinned,
-                airPodsComponents: activeComponents
+                airPodsComponents: activeComponents,
+                reportState: presentation.state
             )
         }
     }
@@ -588,7 +593,7 @@ struct DashboardBatteryDeviceRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
-                    BeaconStatusDot(color: statusColor, isCharging: device.chargeState == .charging)
+                    BeaconStatusDot(color: statusColor, isCharging: device.reportState == .current && device.chargeState == .charging)
 
                     Text(device.displayName)
                         .font(DesignTokens.Typography.controlLabelEmphasis)
@@ -632,8 +637,8 @@ struct DashboardBatteryDeviceRow: View {
                     Text(statusText)
                         .font(DesignTokens.Typography.caption2)
                         .foregroundStyle(statusTextColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(width: statusWidth, alignment: .trailing)
                 }
             }
@@ -651,10 +656,11 @@ struct DashboardBatteryDeviceRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(device.displayName)
         .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier("device.row.\(device.id)")
     }
 
     private var isLow: Bool {
-        guard let percent = device.percent else { return false }
+        guard device.reportState == .current, let percent = device.percent else { return false }
         return percent <= lowBatteryThreshold
             && device.chargeState != .charging
             && device.chargeState != .full
@@ -665,6 +671,7 @@ struct DashboardBatteryDeviceRow: View {
     }
 
     private var statusColor: Color {
+        guard device.reportState == .current else { return DesignTokens.Palette.secondaryText }
         if isLow {
             guard let percent = device.percent else { return theme.statusLow }
             return percent <= 10 ? theme.statusCritical : theme.statusLow
@@ -677,6 +684,7 @@ struct DashboardBatteryDeviceRow: View {
     }
 
     private var statusTextColor: Color {
+        guard device.reportState == .current else { return DesignTokens.Palette.secondaryText }
         switch (isLow, device.chargeState, device.freshness) {
         case (true, _, _):
             return statusColor
@@ -697,6 +705,8 @@ struct DashboardBatteryDeviceRow: View {
     }
 
     private var iconBadge: DeviceIconBadge? {
+        if device.reportState == .disconnected { return .disconnected }
+        if device.reportState != .current { return .stale }
         if isLow { return .low }
         if device.chargeState == .charging || device.chargeState == .full {
             return .charging
@@ -706,14 +716,7 @@ struct DashboardBatteryDeviceRow: View {
     }
 
     private var statusText: String {
-        dashboardBatteryStatusText(
-            percent: device.percent,
-            chargeState: device.chargeState,
-            freshness: device.freshness,
-            isLow: isLow,
-            showsAirPodsComponents: showsAirPodsComponents,
-            updatedAt: device.updatedAt
-        )
+        device.reportState.title
     }
 
     private var accessibilityValue: String {
@@ -737,7 +740,8 @@ func dashboardBatteryAccessibilityValue(
     if device.kind == .airPods, !device.airPodsComponents.isEmpty {
         parts = device.airPodsComponents.map(airPodsComponentAccessibilityDescription)
     } else if let percent = device.percent {
-        parts = [BeaconL10n.format("%d percent", percent)]
+        parts = [device.reportState == .current || device.reportState == .partial
+            ? BeaconL10n.format("%d percent", percent) : BeaconL10n.format("Last known: %d%%", percent)]
     } else {
         parts = [BeaconL10n.string("No battery report")]
     }
@@ -764,13 +768,14 @@ private func airPodsComponentAccessibilityDescription(_ component: AirPodsCompon
         name = BeaconL10n.string("Right AirPod")
     }
 
+    let trust = DeviceBatteryPresentation(component: component)
     var parts = [name]
-    if let percent = component.percent {
+    if let percent = trust.percent {
         parts.append(BeaconL10n.format("%d percent", percent))
     } else {
         parts.append(BeaconL10n.string("no battery report"))
     }
-    switch component.chargeState {
+    switch trust.state == .current ? component.chargeState : .unknown {
     case .charging:
         parts.append(BeaconL10n.string("charging"))
     case .full:
@@ -786,6 +791,7 @@ private func airPodsComponentAccessibilityDescription(_ component: AirPodsCompon
     case .expired:
         parts.append(BeaconL10n.string("expired"))
     }
+    if ![.current, .stale, .expired].contains(trust.state) { parts.append(trust.state.title) }
     return parts.joined(separator: " ")
 }
 
@@ -818,14 +824,16 @@ private struct AirPodsDashboardComponentChip: View {
                 )
         )
         .accessibilityLabel(accessibilityLabel)
+        .help(airPodsComponentAccessibilityDescription(component))
     }
 
     private var percentText: String {
-        guard let percent = component.percent else { return "–" }
+        guard let percent = DeviceBatteryPresentation(component: component).percent else { return "–" }
         return "\(percent)%"
     }
 
     private var chipColor: Color {
+        guard DeviceBatteryPresentation(component: component).state == .current else { return DesignTokens.Palette.secondaryText }
         guard let percent = component.percent else { return DesignTokens.Palette.tertiaryText }
         if percent <= LowBatteryNotifier.threshold {
             return percent <= 10 ? theme.statusCritical : theme.statusLow

@@ -477,3 +477,12 @@
 "iPhone Tools Guide" = "iPhone 工具指南";
 "iPhone Setup" = "iPhone 設定";
 "Set Up" = "設定";
+"Latest report" = "最新回報";
+"Partial report" = "部分回報";
+"Read failed" = "讀取失敗";
+"Connection unconfirmed" = "連線尚未確認";
+"Reported minimum: %d%%" = "已回報的最低電量：%d%%";
+"Last known: %d%%" = "上次讀值：%d%%";
+"An affected device is no longer in the list." = "受影響的裝置已不在清單中。";
+"Affected devices could not be identified from this source result." = "此來源結果無法確認受影響的裝置。";
+"Refresh Diagnostics" = "更新診斷";

@@ -187,7 +187,8 @@ final class BeaconStatusController: NSObject {
 
         statusMenuPanelController.install(
             rootView: StatusMenuView(
-                snapshots: renderedStore.decoratedSnapshots,
+                snapshots: batterySnapshotsWithKnownFailures(renderedStore.decoratedSnapshots,
+                    diagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics),
                 isRefreshing: isRefreshing ?? model.isRefreshing,
                 isPreviewingData: model.isUsingPreviewData,
                 configuration: configuration,
@@ -256,6 +257,7 @@ final class BeaconStatusController: NSObject {
             supplementalHeight: (DeviceSetupRecoveryState.resolve(
                 visibleCount: dashboardItemCount, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
             ) == .ready ? 0 : 230) + (model.isUsingPreviewData ? 34 : 0)
+                + (refreshDiagnostics.attempts.contains { $0.status != .reported && $0.status != .noReport } ? 38 : 0)
         )
         return NSSize(width: size.width, height: size.height)
     }
@@ -271,7 +273,7 @@ final class BeaconStatusController: NSObject {
     private func updateDesktopWidget(store: BatterySnapshotStore? = nil) {
         let renderedStore = store ?? model.store
         desktopWidgetController.update(
-            snapshots: renderedStore.decoratedSnapshots,
+            snapshots: batterySnapshotsWithKnownFailures(renderedStore.decoratedSnapshots, diagnostics: model.latestRefreshDiagnostics),
             onOpenSettings: { [weak self] in
                 self?.showSettingsWindow(initialPane: .dashboard)
             }

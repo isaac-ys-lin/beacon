@@ -331,7 +331,9 @@ struct BeaconSettingsView: View {
                 onSetUp: { isShowingIPhoneSetup = false; isShowingAddDeviceGuide = true },
                 onRefresh: onRefresh
             )
-            RefreshHealthDisclosureView(diagnostics: refreshDiagnostics)
+            RefreshRecoveryView(diagnostics: refreshDiagnostics, snapshots: snapshots,
+                isRefreshing: isRefreshing,
+                onInspect: { selectedDeviceID = $0; showUnavailableDevices = true }, onRefresh: onRefresh)
 
             HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
                 deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
@@ -516,6 +518,7 @@ struct BeaconSettingsView: View {
                         ) {
                             selectedDeviceID = row.id
                         }
+                        .accessibilityIdentifier("settings.device.\(row.id)")
                     }
                 }
                 .padding(.vertical, 2)
@@ -866,6 +869,11 @@ struct BeaconSettingsView: View {
                 Spacer()
             }
 
+            DeviceCurrentStatsCard(
+                item: row.item,
+                historySamples: BatteryHistoryStore.samples(for: row.id)
+            )
+
             VStack(alignment: .leading, spacing: 0) {
                 Toggle(isOn: Binding(
                     get: { row.isPinned },
@@ -949,11 +957,6 @@ struct BeaconSettingsView: View {
                 )
             }
 
-            DeviceCurrentStatsCard(
-                item: row.item,
-                historySamples: BatteryHistoryStore.samples(for: row.id)
-            )
-
             if BluetoothDeviceControlSupport.canConnect(row.item) || BluetoothDeviceControlSupport.canDisconnect(row.item) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 10) {
@@ -1002,6 +1005,11 @@ struct BeaconSettingsView: View {
                 .padding(12)
                 .beaconSettingsCardSurface()
             }
+
+            DisclosureGroup("Refresh Diagnostics") {
+                RefreshHealthDisclosureView(diagnostics: refreshDiagnostics)
+            }
+            .font(.caption)
 
             HStack {
                 if row.isUserHidden {
@@ -1176,33 +1184,18 @@ struct BeaconSettingsView: View {
     }
 
     private func detailSubtitle(for row: DeviceInspectorItem) -> String {
-        if row.item.connectionState == .disconnected {
-            return BeaconL10n.string("Paired, currently disconnected")
-        }
-        if !hasBatteryReport(row.item) {
-            return BeaconL10n.string("Connected, waiting for battery report")
-        }
-        if row.isHidden {
-            return BeaconL10n.string("Hidden from the menu bar dashboard")
-        }
-        if row.isPinned {
-            return BeaconL10n.string("Pinned to the top of the dashboard")
-        }
-        return BeaconL10n.string("Visible in the menu bar dashboard")
+        DeviceBatteryPresentation(item: row.item).state.title
     }
 
     private func detailIconBadge(for row: DeviceInspectorItem) -> DeviceIconBadge? {
-        if row.item.connectionState == .disconnected { return .disconnected }
-        if !hasBatteryReport(row.item) { return .stale }
-        return nil
+        let state = DeviceBatteryPresentation(item: row.item).state
+        if state == .disconnected { return .disconnected }
+        return state == .current ? nil : .stale
     }
 
     private func detailIconColor(for row: DeviceInspectorItem) -> Color {
-        if row.item.connectionState == .disconnected { return DesignTokens.Palette.secondaryText }
-        if !hasBatteryReport(row.item) { return DesignTokens.Palette.stale }
-        if row.isHidden { return DesignTokens.Palette.secondaryText }
-        if row.kind == .keyboard { return Color.primary.opacity(0.58) }
-        return DesignTokens.Palette.accent
+        DeviceBatteryPresentation(item: row.item).state == .current
+            ? DesignTokens.Palette.accent : DesignTokens.Palette.secondaryText
     }
 
     private func hasBatteryReport(_ item: DeviceListItem) -> Bool {

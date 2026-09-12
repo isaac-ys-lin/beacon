@@ -285,4 +285,72 @@ final class BeaconUITests: XCTestCase {
         XCTAssertTrue(check.isEnabled)
     }
 
+    @MainActor
+    func testStaleAndDisconnectedReportsAgreeBetweenMenuAndInspector() {
+        verifyReport(scenario: "stale", expected: "Stale", hasPercent: true)
+        verifyReport(scenario: "disconnected", expected: "Disconnected", hasPercent: true)
+    }
+
+    @MainActor
+    func testMissingAndDeniedReportsNeverInventBatteryValues() {
+        verifyReport(scenario: "missing", expected: "No report", hasPercent: false)
+        verifyReport(scenario: "permission", expected: "Permission needed", hasPercent: false)
+    }
+
+    @MainActor
+    private func verifyReport(scenario: String, expected: String, hasPercent: Bool) {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-open-status-menu", "-AppleLanguages", "(en)"]
+        app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
+        app.launchEnvironment["BEACON_REPORT_SCENARIO"] = scenario
+        app.launch()
+        defer { app.terminate() }
+        let menu = app.windows["Beacon Status Menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        let row = menu.descendants(matching: .any)["device.row.report-test"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(String(describing: row.value ?? "").localizedCaseInsensitiveContains(expected), row.debugDescription)
+        if !hasPercent { XCTAssertFalse(String(describing: row.value ?? "").contains("40")) }
+        let menuEvidence = XCTAttachment(screenshot: menu.screenshot())
+        menuEvidence.name = "report-menu-\(scenario)"
+        menuEvidence.lifetime = .keepAlways
+        add(menuEvidence)
+        row.rightClick()
+        let options = app.menuItems["Options"]
+        XCTAssertTrue(options.waitForExistence(timeout: 5))
+        options.click()
+        let settings = app.windows["Beacon Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        let state = settings.staticTexts["device.report.state"]
+        XCTAssertTrue(state.waitForExistence(timeout: 5))
+        XCTAssertEqual(state.label, expected)
+        let detailEvidence = XCTAttachment(screenshot: settings.screenshot())
+        detailEvidence.name = "report-inspector-\(scenario)"
+        detailEvidence.lifetime = .keepAlways
+        add(detailEvidence)
+    }
+
+    @MainActor
+    func testKnownRefreshFailureSelectsCorrectSameNamedDevice() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-open-settings", "-AppleLanguages", "(en)"]
+        app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
+        app.launchEnvironment["BEACON_REPORT_SCENARIO"] = "known-failure"
+        app.launch()
+        defer { app.terminate() }
+        let settings = app.windows["Beacon Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10))
+        let disclosure = settings.disclosureTriangles["refresh.recovery"]
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+        disclosure.click()
+        let affected = settings.buttons["refresh.inspect.report-other"]
+        XCTAssertTrue(affected.waitForExistence(timeout: 5))
+        affected.click()
+        XCTAssertEqual(settings.staticTexts["device.report.state"].label, "Read failed")
+        settings.buttons["settings.device.report-test"].click()
+        XCTAssertEqual(settings.staticTexts["device.report.state"].label, "Latest report")
+    }
+
 }

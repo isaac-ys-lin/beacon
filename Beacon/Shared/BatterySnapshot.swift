@@ -219,19 +219,22 @@ public struct BatteryProviderAttempt: Codable, Equatable, Sendable {
     public let candidateCount: Int
     public let message: String
     public let attemptedAt: Date
+    public let affectedDeviceIDs: [String]?
 
     public init(
         provider: BatteryProvider,
         status: BatteryReadStatus,
         candidateCount: Int,
         message: String,
-        attemptedAt: Date
+        attemptedAt: Date,
+        affectedDeviceIDs: [String]? = nil
     ) {
         self.provider = provider
         self.status = status
         self.candidateCount = candidateCount
         self.message = message
         self.attemptedAt = attemptedAt
+        self.affectedDeviceIDs = affectedDeviceIDs
     }
 }
 

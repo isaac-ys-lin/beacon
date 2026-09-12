@@ -126,6 +126,17 @@ struct StatusMenuView: View {
                     onRefresh: onRefresh
                 ).padding(.horizontal, 14).padding(.vertical, 8)
             }
+            if refreshDiagnostics.attempts.contains(where: { $0.status != .reported && $0.status != .noReport }) {
+                Button {
+                    let affectedID = refreshDiagnostics.attempts.flatMap { $0.affectedDeviceIDs ?? [] }.first
+                    onOpenSettings(.devices, affectedID)
+                } label: {
+                    Label("Refresh needs attention", systemImage: "exclamationmark.triangle")
+                }
+                .buttonStyle(.borderless).font(.caption)
+                .accessibilityIdentifier("status.refresh-problems")
+                .padding(.horizontal, 14).padding(.vertical, 8)
+            }
             if !sections.isEmpty {
                 nativeDeviceList
             }
