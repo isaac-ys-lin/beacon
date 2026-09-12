@@ -433,3 +433,15 @@
 "Latest Device Reports" = "最近一次裝置回報";
 "Sample devices illustrate the layout; they are not connected-device readings." = "範例裝置僅用來展示版面，不是已連接裝置的讀數。";
 "This preview uses the latest stored device reports, which may be out of date." = "此預覽使用最近一次儲存的裝置回報，資料可能已過期。";
+"Checking for devices" = "正在檢查裝置";
+"No visible devices yet" = "目前沒有可見的裝置";
+"Bluetooth access needs attention" = "需要確認藍牙存取權限";
+"Device check could not finish" = "未能完成裝置檢查";
+"Beacon is checking local device reports. You can open the setup guide while it checks." = "Beacon 正在檢查本機裝置回報。檢查期間也可以開啟設定指南。";
+"Set up a device, or open Devices in Settings to restore a hidden device. Then check again." = "請設定裝置，或到設定的「裝置」頁還原隱藏的裝置，再重新檢查。";
+"Beacon uses Bluetooth access to read accessory status. In System Settings, open Privacy & Security > Bluetooth and allow Beacon, then check again. A managed Mac may require administrator help." = "Beacon 需要藍牙存取權限才能讀取配件狀態。請在「系統設定」>「隱私權與安全性」>「藍牙」允許 Beacon，再重新檢查。受管理的 Mac 可能需要管理員協助。";
+"A local device source did not respond. This does not mean there are no devices. Keep your devices awake and check again." = "本機裝置來源沒有回應，不代表沒有裝置。請讓裝置保持喚醒，再重新檢查。";
+"Privacy & Security" = "隱私權與安全性";
+"Check Again" = "重新檢查";
+"Done" = "完成";
+"Bluetooth access lets Beacon read accessory status. If access was denied, allow Beacon in System Settings > Privacy & Security > Bluetooth, then check again." = "藍牙存取權限讓 Beacon 讀取配件狀態。若曾拒絕權限，請到「系統設定」>「隱私權與安全性」>「藍牙」允許 Beacon，再重新檢查。";

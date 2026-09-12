@@ -39,7 +39,8 @@ enum StatusMenuSizing {
 
     static func preferredContentSize(
         dashboardItemCount: Int,
-        visibleScreenHeight: CGFloat
+        visibleScreenHeight: CGFloat,
+        supplementalHeight: CGFloat = 0
     ) -> CGSize {
         let panelVerticalPadding: CGFloat = 28
         let headerHeight: CGFloat = 58
@@ -52,7 +53,7 @@ enum StatusMenuSizing {
             : listVerticalPadding + CGFloat(dashboardItemCount) * rowHeight + rowSpacing
         let desiredHeight = panelVerticalPadding
             + headerHeight
-            + contentHeight
+            + contentHeight + supplementalHeight
         let minimumHeight: CGFloat
         if dashboardItemCount == 0 {
             minimumHeight = panelVerticalPadding + headerHeight
@@ -71,6 +72,8 @@ struct StatusMenuView: View {
     let isRefreshing: Bool
     let isPreviewingData: Bool
     let configuration: StatusWindowConfiguration
+    let refreshDiagnostics: BatteryRefreshDiagnostics
+    let onSetUpDevice: (() -> Void)?
     let onRefresh: () -> Void
     let onOpenSettings: (SettingsPane, String?) -> Void
 
@@ -84,6 +87,8 @@ struct StatusMenuView: View {
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
         configuration: StatusWindowConfiguration = .load(),
+        refreshDiagnostics: BatteryRefreshDiagnostics = BatteryRefreshDiagnostics(),
+        onSetUpDevice: (() -> Void)? = nil,
         onRefresh: @escaping () -> Void,
         onOpenSettings: @escaping (SettingsPane, String?) -> Void = { _, _ in },
         initialDisplayPreferences: DeviceDisplayPreferences = .load()
@@ -92,6 +97,8 @@ struct StatusMenuView: View {
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
         self.configuration = configuration
+        self.refreshDiagnostics = refreshDiagnostics
+        self.onSetUpDevice = onSetUpDevice
         self.onRefresh = onRefresh
         self.onOpenSettings = onOpenSettings
         _displayPreferences = State(initialValue: initialDisplayPreferences)
@@ -109,6 +116,16 @@ struct StatusMenuView: View {
                 nativePreviewNotice
             }
 
+            let recovery = DeviceSetupRecoveryState.resolve(
+                visibleCount: visibleItemCount, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
+            )
+            if recovery != .ready {
+                DeviceSetupRecoveryCard(
+                    state: recovery, isRefreshing: isRefreshing,
+                    onSetUp: { if let onSetUpDevice { onSetUpDevice() } else { onOpenSettings(.devices, nil) } },
+                    onRefresh: onRefresh
+                ).padding(.horizontal, 14).padding(.vertical, 8)
+            }
             if !sections.isEmpty {
                 nativeDeviceList
             }

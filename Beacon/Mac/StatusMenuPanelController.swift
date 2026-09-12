@@ -30,6 +30,9 @@ final class StatusMenuPanelController {
             applyRoundedMask(to: hostingController.view)
             applyRoundedMask(to: panel?.contentView)
             panel?.setContentSize(contentSize)
+            #if DEBUG
+            uiTestWindow?.setContentSize(contentSize)
+            #endif
             return
         }
 
