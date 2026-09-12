@@ -1,0 +1,49 @@
+name: Prepare trustworthy battery reports
+on:
+  push:
+    branches: [codex/issue-4-report-trust]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/issue-4-report-trust
+      - name: Apply authored report changes and synchronize project
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = codex/issue-4-report-trust
+          gzip -dc .beacon-agent-change.patch.gz > /tmp/beacon-report.patch
+          git apply --check /tmp/beacon-report.patch
+          git apply /tmp/beacon-report.patch
+          while read -r expected path; do
+            test "$(git hash-object "$path")" = "$expected" || { echo "Source mismatch: $path"; exit 1; }
+          done <<'EXPECTED'
+          159c664940901e1bd4da8a52303d01c3af0c899f Beacon/Mac/BeaconMacApp.swift
+          3aa4a35d29732aa67ade905b7a64a04914350233 Beacon/Mac/BeaconSettingsSupportViews.swift
+          3aa93920b75001e38b742cb8c12cf0762e074e35 Beacon/Mac/BeaconSettingsView.swift
+          34ab3c6f074187dc57b2ce99df9342f737cae27f Beacon/Mac/BeaconSettingsWindowController.swift
+          4595b46e57e0ba59969999fd1fe3797139765269 Beacon/Mac/BeaconStatusController.swift
+          b4b5e0e16f8399dac6ccbe432093b19fabb081bc Beacon/Mac/BluetoothDeviceScanner.swift
+          f63d4f343e240226152c5acdec27a74faf235cc3 Beacon/Mac/DeviceBatteryRow.swift
+          04e312071c2d1ccef3c51807f9f4967f82b5c558 Beacon/Mac/DeviceListPresentation.swift
+          b2e97102674c593dbe8a45485228c4b8fc8092c6 Beacon/Mac/IPhoneLockdownBatteryProvider.swift
+          eab37ee047fae46f5bb78186c3ac13ea0690aa11 Beacon/Mac/LowBatteryNotifier.swift
+          6ab1f34f55af6debf1a0ebc1897173025ee6e5ba Beacon/Mac/StatusMenuView.swift
+          89722c9428db4e4c7645b748a1c403a060ef6c8c Beacon/Mac/zh-Hant-TW.lproj/Localizable.strings
+          007a1a4b108d5b7c4991d021d7e6b6e204654ca6 Beacon/Shared/BatterySnapshot.swift
+          41589f9eb54bda39596c42417797ed0b2c55c371 BeaconTests/DeviceListPresentationTests.swift
+          597f0632007160378299a8df1a959025b527e5ba BeaconUITests/BeaconUITests.swift
+          4d8323be015f29b4415a9abe3607b2780452929f Beacon/Mac/DeviceBatteryTrust.swift
+          41228b91065014c66397310f88edca24c7b5201c BeaconTests/DeviceBatteryTrustTests.swift
+          EXPECTED
+          brew install xcodegen
+          xcodegen generate
+          git diff --check
+          rm .beacon-agent-change.patch.gz
+          git add Beacon BeaconTests BeaconUITests Beacon.xcodeproj .beacon-agent-change.patch.gz
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(reports): unify battery trust, targeted recovery and alert freshness (#4)'
+          git push origin HEAD:refs/heads/codex/issue-4-report-trust
