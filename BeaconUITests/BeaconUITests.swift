@@ -129,7 +129,7 @@ final class BeaconUITests: XCTestCase {
             default:
                 let provenance = window.staticTexts["dashboard.preview.provenance"]
                 XCTAssertTrue(provenance.waitForExistence(timeout: 5))
-                XCTAssertEqual(provenance.label, isChinese ? "範例預覽" : "Sample Preview")
+                XCTAssertEqual(provenance.value as? String ?? provenance.label, isChinese ? "範例預覽" : "Sample Preview")
             }
             let attachment = XCTAttachment(screenshot: window.screenshot())
             attachment.name = "daily-settings-\(language)-\(theme)-\(pane)"

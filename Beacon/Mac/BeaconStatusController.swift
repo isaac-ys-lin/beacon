@@ -30,7 +30,8 @@ final class BeaconStatusController: NSObject {
     init(model: BeaconModel) {
         // Preview fixtures must not create a real Bluetooth manager or prompt for hardware access.
         self.model = model
-        bluetoothPowerStateObserver = model.isUsingPreviewData ? nil : BluetoothPowerStateObserver()
+        let isHostedUnitTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        bluetoothPowerStateObserver = model.isUsingPreviewData || isHostedUnitTest ? nil : BluetoothPowerStateObserver()
         settingsWindowController = BeaconSettingsWindowController(model: model)
         super.init()
 
