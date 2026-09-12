@@ -1,0 +1,397 @@
+diff --git a/Beacon/Mac/BeaconMacApp.swift b/Beacon/Mac/BeaconMacApp.swift
+index b933445..43da14e 100644
+--- a/Beacon/Mac/BeaconMacApp.swift
++++ b/Beacon/Mac/BeaconMacApp.swift
+@@ -316,4 +316,11 @@ final class BeaconModel: ObservableObject {
+     private let usesPreviewData: Bool
+     private let setupPreviewScenario: String?
++    private let iPhonePreviewScenario: String?
++    private var iPhoneEnrollmentInFlight = false
++
++    var iPhonePreviewTools: IPhoneToolAvailability? {
++        guard usesPreviewData else { return nil }
++        return IPhoneToolAvailability(missingCommands: iPhonePreviewScenario == "missing" ? ["idevice_id", "ideviceinfo"] : [])
++    }
+     private var previewRecoveryRequested = false
+     private let bluetoothReportReader: (@Sendable () async -> BluetoothBatteryReadReport?)?
+@@ -329,4 +336,5 @@ final class BeaconModel: ObservableObject {
+         #if DEBUG
+         usesPreviewData = environment["BEACON_PREVIEW_DATA"] == "1"
++        iPhonePreviewScenario = usesPreviewData ? environment["BEACON_IPHONE_SCENARIO"] : nil
+         let scenario = environment["BEACON_SETUP_SCENARIO"]
+         setupPreviewScenario = usesPreviewData && ["empty", "denied", "failed", "checking"].contains(scenario ?? "") ? scenario : nil
+@@ -334,4 +342,5 @@ final class BeaconModel: ObservableObject {
+         usesPreviewData = false
+         setupPreviewScenario = nil
++        iPhonePreviewScenario = nil
+         #endif
+         self.bluetoothReportReader = bluetoothReportReader
+@@ -436,4 +445,27 @@ final class BeaconModel: ObservableObject {
+ 
+     func trustConnectedIPhones() async {
++        guard !iPhoneEnrollmentInFlight else { return }
++        iPhoneEnrollmentInFlight = true
++        defer { iPhoneEnrollmentInFlight = false }
++        if usesPreviewData {
++            let now = Date()
++            let status: BatteryReadStatus = iPhonePreviewScenario == "missing" ? .commandMissing
++                : iPhonePreviewScenario == "trust" ? .unauthorized
++                : ["ready", "noBattery"].contains(iPhonePreviewScenario ?? "") ? .reported : .noReport
++            let phones = status == .reported ? [TrustedIPhone(udid: "ui-iphone", displayName: "UI Test iPhone", trustedAt: now)] : []
++            trustedIPhoneEnrollmentResult = IPhoneLockdownDiscoveryReport(
++                devices: phones, status: status, message: "UI fixture, not a physical iPhone",
++                attempts: [BatteryProviderAttempt(provider: .ideviceInfo, status: status, candidateCount: phones.count, message: "UI fixture", attemptedAt: now)]
++            )
++            // No persistent enrollment, trust changes, helper execution, or history writes in fixtures.
++            trustedIPhoneRegistry = TrustedIPhoneRegistry(devices: phones)
++            if iPhonePreviewScenario == "ready" {
++                var next = store
++                next.merge([BatterySnapshot(deviceID: "trusted-iphone-ui-iphone", displayName: "UI Test iPhone", kind: .iPhone,
++                    percent: 87, chargeState: .charging, source: .ideviceInfo, updatedAt: now)])
++                store = next
++            }
++            return
++        }
+         let report = await IPhoneLockdownBatteryProvider.discoverUSBTrustedDevices()
+         trustedIPhoneEnrollmentResult = report
+diff --git a/Beacon/Mac/BeaconSettingsSupportViews.swift b/Beacon/Mac/BeaconSettingsSupportViews.swift
+index 02e6e55..5e900ea 100644
+--- a/Beacon/Mac/BeaconSettingsSupportViews.swift
++++ b/Beacon/Mac/BeaconSettingsSupportViews.swift
+@@ -64,4 +64,5 @@ struct AddDeviceGuideView: View {
+                 .buttonStyle(.borderless)
+                 .help("Close")
++                .accessibilityLabel("Close")
+             }
+ 
+@@ -87,7 +88,8 @@ struct AddDeviceGuideView: View {
+                     subtitle: "Connect by USB, unlock, trust this Mac, then add it here.",
+                     systemImage: resolveSymbol("iphone", fallback: "mobilephone"),
+-                    actionTitle: "Trust",
++                    actionTitle: "Set Up",
+                     action: onTrustConnectedIPhone
+                 )
++                .accessibilityIdentifier("setup.iphone")
+             }
+ 
+diff --git a/Beacon/Mac/BeaconSettingsView.swift b/Beacon/Mac/BeaconSettingsView.swift
+index 5338e68..ff4592d 100644
+--- a/Beacon/Mac/BeaconSettingsView.swift
++++ b/Beacon/Mac/BeaconSettingsView.swift
+@@ -57,5 +57,6 @@ struct BeaconSettingsView: View {
+     let onOpenNotificationSettings: () -> Void
+     let onSendTestNotification: () -> Void
+-    let onTrustConnectedIPhone: () -> Void
++    let onTrustConnectedIPhone: () async -> Void
++    let iPhonePreviewTools: IPhoneToolAvailability?
+     let onForgetTrustedIPhone: (String) -> Void
+     let onQuit: () -> Void
+@@ -81,4 +82,5 @@ struct BeaconSettingsView: View {
+     @State private var selectedPane: SettingsPane = .devices
+     @State private var isShowingAddDeviceGuide = false
++    @State private var isShowingIPhoneSetup = false
+     @State private var alertPreferencesRevision = 0
+ 
+@@ -99,5 +101,6 @@ struct BeaconSettingsView: View {
+         onOpenNotificationSettings: @escaping () -> Void = {},
+         onSendTestNotification: @escaping () -> Void = {},
+-        onTrustConnectedIPhone: @escaping () -> Void = {},
++        onTrustConnectedIPhone: @escaping () async -> Void = {},
++        iPhonePreviewTools: IPhoneToolAvailability? = nil,
+         onForgetTrustedIPhone: @escaping (String) -> Void = { _ in },
+         onQuit: @escaping () -> Void = {},
+@@ -122,4 +125,5 @@ struct BeaconSettingsView: View {
+         self.onSendTestNotification = onSendTestNotification
+         self.onTrustConnectedIPhone = onTrustConnectedIPhone
++        self.iPhonePreviewTools = iPhonePreviewTools
+         self.onForgetTrustedIPhone = onForgetTrustedIPhone
+         self.onQuit = onQuit
+@@ -169,11 +173,22 @@ struct BeaconSettingsView: View {
+         }
+         .sheet(isPresented: $isShowingAddDeviceGuide) {
+-            DeviceSetupGuide(
+-                enrollmentResult: trustedIPhoneEnrollmentResult,
+-                onOpenBluetoothSettings: onOpenBluetoothSettings,
+-                onTrustConnectedIPhone: onTrustConnectedIPhone,
+-                onRefresh: onRefresh,
+-                onDismiss: { isShowingAddDeviceGuide = false }
+-            )
++            if isShowingIPhoneSetup {
++                IPhoneSetupView(
++                    snapshots: snapshots, trustedIPhones: trustedIPhones,
++                    enrollmentResult: trustedIPhoneEnrollmentResult, diagnostics: refreshDiagnostics,
++                    previewTools: iPhonePreviewTools, isPreviewingData: isPreviewingData,
++                    onCheck: onTrustConnectedIPhone, onForget: onForgetTrustedIPhone,
++                    onBack: { isShowingIPhoneSetup = false },
++                    onDismiss: { isShowingAddDeviceGuide = false }
++                )
++            } else {
++                DeviceSetupGuide(
++                    enrollmentResult: nil,
++                    onOpenBluetoothSettings: onOpenBluetoothSettings,
++                    onTrustConnectedIPhone: { isShowingIPhoneSetup = true },
++                    onRefresh: onRefresh,
++                    onDismiss: { isShowingAddDeviceGuide = false }
++                )
++            }
+         }
+     }
+@@ -248,5 +263,11 @@ struct BeaconSettingsView: View {
+ 
+             if selectedPane == .devices {
++                Button("iPhone Setup") {
++                    isShowingIPhoneSetup = true
++                    isShowingAddDeviceGuide = true
++                }
++                .accessibilityIdentifier("settings.iphone-setup")
+                 Button {
++                    isShowingIPhoneSetup = false
+                     isShowingAddDeviceGuide = true
+                 } label: {
+@@ -307,5 +328,5 @@ struct BeaconSettingsView: View {
+                 state: .resolve(visibleCount: displayedDeviceRows.count, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics),
+                 isRefreshing: isRefreshing,
+-                onSetUp: { isShowingAddDeviceGuide = true },
++                onSetUp: { isShowingIPhoneSetup = false; isShowingAddDeviceGuide = true },
+                 onRefresh: onRefresh
+             )
+@@ -317,12 +338,4 @@ struct BeaconSettingsView: View {
+                 ScrollView(showsIndicators: false) {
+                     VStack(alignment: .leading, spacing: 14) {
+-                        TrustedIPhoneSettingsCard(
+-                            latestRefreshDiagnostics: refreshDiagnostics,
+-                            trustedIPhones: trustedIPhones,
+-                            enrollmentResult: trustedIPhoneEnrollmentResult,
+-                            onTrustConnectedIPhone: onTrustConnectedIPhone,
+-                            onForgetTrustedIPhone: onForgetTrustedIPhone
+-                        )
+-
+                         if let selectedDevice {
+                             deviceDetail(for: selectedDevice)
+diff --git a/Beacon/Mac/BeaconSettingsWindowController.swift b/Beacon/Mac/BeaconSettingsWindowController.swift
+index b88435e..01499bb 100644
+--- a/Beacon/Mac/BeaconSettingsWindowController.swift
++++ b/Beacon/Mac/BeaconSettingsWindowController.swift
+@@ -49,4 +49,6 @@ final class BeaconSettingsWindowController {
+         refreshDiagnostics: BatteryRefreshDiagnostics? = nil,
+         notificationAuthorizationState: NotificationCenterAuthorizationState? = nil,
++        trustedIPhones: [TrustedIPhone]? = nil,
++        enrollmentResult: IPhoneLockdownDiscoveryReport? = nil,
+         rebuildHostingController: Bool = false
+     ) {
+@@ -58,6 +60,6 @@ final class BeaconSettingsWindowController {
+             isPreviewingData: model.isUsingPreviewData,
+             refreshDiagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics,
+-            trustedIPhones: model.trustedIPhoneRegistry.devices,
+-            trustedIPhoneEnrollmentResult: model.trustedIPhoneEnrollmentResult,
++            trustedIPhones: trustedIPhones ?? model.trustedIPhoneRegistry.devices,
++            trustedIPhoneEnrollmentResult: enrollmentResult ?? model.trustedIPhoneEnrollmentResult,
+             notificationAuthorizationState: notificationAuthorizationState ?? model.notificationAuthorizationState,
+             latestNotificationDeliveryResult: model.latestNotificationDeliveryResult,
+@@ -84,6 +86,7 @@ final class BeaconSettingsWindowController {
+             },
+             onTrustConnectedIPhone: { [weak model] in
+-                Task { await model?.trustConnectedIPhones() }
++                await model?.trustConnectedIPhones()
+             },
++            iPhonePreviewTools: model.iPhonePreviewTools,
+             onForgetTrustedIPhone: { [weak model] udid in
+                 model?.forgetTrustedIPhone(udid: udid)
+diff --git a/Beacon/Mac/BeaconStatusController.swift b/Beacon/Mac/BeaconStatusController.swift
+index 5e55be3..37f9667 100644
+--- a/Beacon/Mac/BeaconStatusController.swift
++++ b/Beacon/Mac/BeaconStatusController.swift
+@@ -74,12 +74,12 @@ final class BeaconStatusController: NSObject {
+             self?.settingsWindowController.updateContent()
+         }
+-        trustedIPhoneRegistryObserver = model.$trustedIPhoneRegistry.sink { [weak self] _ in
++        trustedIPhoneRegistryObserver = model.$trustedIPhoneRegistry.sink { [weak self] registry in
+             self?.updateStatusMenuContent()
+-            self?.settingsWindowController.updateContent()
++            self?.settingsWindowController.updateContent(trustedIPhones: registry.devices)
+             self?.updateDesktopWidget()
+         }
+-        trustedIPhoneEnrollmentObserver = model.$trustedIPhoneEnrollmentResult.sink { [weak self] _ in
++        trustedIPhoneEnrollmentObserver = model.$trustedIPhoneEnrollmentResult.sink { [weak self] report in
+             self?.updateStatusMenuContent()
+-            self?.settingsWindowController.updateContent()
++            self?.settingsWindowController.updateContent(enrollmentResult: report)
+             self?.updateDesktopWidget()
+         }
+diff --git a/Beacon/Mac/IPhoneLockdownBatteryProvider.swift b/Beacon/Mac/IPhoneLockdownBatteryProvider.swift
+index 0207f1f..06a98d0 100644
+--- a/Beacon/Mac/IPhoneLockdownBatteryProvider.swift
++++ b/Beacon/Mac/IPhoneLockdownBatteryProvider.swift
+@@ -114,8 +114,16 @@ public struct IPhoneLockdownCommandLocator {
+     }
+ 
++    public var missingCommandNames: [String] {
++        ["idevice_id", "ideviceinfo"].filter { executableURL(named: $0) == nil }
++    }
++
+     private func executableURL(named commandName: String) -> URL? {
+         searchPaths
+             .map { URL(fileURLWithPath: $0).appendingPathComponent(commandName) }
+-            .first { fileManager.isExecutableFile(atPath: $0.path) }
++            .first {
++                var isDirectory: ObjCBool = false
++                return fileManager.fileExists(atPath: $0.path, isDirectory: &isDirectory)
++                    && !isDirectory.boolValue && fileManager.isExecutableFile(atPath: $0.path)
++            }
+     }
+ }
+@@ -352,5 +360,5 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
+             }
+             guard nameResult.exitStatus == 0 else {
+-                trustProofStatuses.append(.unavailable)
++                trustProofStatuses.append(IPhoneLockdownFailureStatus.classify(nameResult))
+                 continue
+             }
+@@ -371,4 +379,7 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
+             status = .timedOut
+             message = "Timed out verifying paired iPhone trust. Unlock the iPhone and keep it reachable by USB or Wi-Fi."
++        } else if trustedDevices.isEmpty, trustProofStatuses.contains(.unauthorized) {
++            status = .unauthorized
++            message = "The iPhone is locked or its trust confirmation is required."
+         } else if trustedDevices.isEmpty,
+                   !devices.isEmpty,
+@@ -469,5 +480,5 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
+         }
+         guard batteryResult.exitStatus == 0 else {
+-            return (nil, .unavailable)
++            return (nil, IPhoneLockdownFailureStatus.classify(batteryResult))
+         }
+         guard let reading = Self.parseBatteryReading(
+@@ -548,4 +559,5 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
+             return .timedOut
+         }
++        if readStatuses.contains(.unauthorized) { return .unauthorized }
+         if readStatuses.contains(.unavailable) {
+             return .unavailable
+@@ -621,2 +633,19 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
+     }
+ }
++
++/// libimobiledevice 1.4.0 reports lockdown errors as text plus the numeric code.
++/// Classify only documented access/trust errors; an arbitrary nonzero exit is not a denial.
++enum IPhoneLockdownFailureStatus {
++    static func classify(_ result: IPhoneLockdownCommandResult) -> BatteryReadStatus {
++        if result.timedOut { return .timedOut }
++        let text = (result.errorOutput + " " + result.output).lowercased()
++        guard text.contains("lockdownd") else { return .unavailable }
++        let accessCodes = [-17, -18, -19, -21, -29]
++        for code in accessCodes {
++            if text.contains("(\(code))") || text.range(of: "error code\\s+\(code)(?![0-9])", options: .regularExpression) != nil {
++                return .unauthorized
++            }
++        }
++        return .unavailable
++    }
++}
+diff --git a/Beacon/Mac/zh-Hant-TW.lproj/Localizable.strings b/Beacon/Mac/zh-Hant-TW.lproj/Localizable.strings
+index 0bf1ae4..d19c897 100644
+--- a/Beacon/Mac/zh-Hant-TW.lproj/Localizable.strings
++++ b/Beacon/Mac/zh-Hant-TW.lproj/Localizable.strings
+@@ -446,2 +446,34 @@
+ "Done" = "完成";
+ "Bluetooth access lets Beacon read accessory status. If access was denied, allow Beacon in System Settings > Privacy & Security > Bluetooth, then check again." = "藍牙存取權限讓 Beacon 讀取配件狀態。若曾拒絕權限，請到「系統設定」>「隱私權與安全性」>「藍牙」允許 Beacon，再重新檢查。";
++"Install the iPhone tools first" = "請先安裝 iPhone 工具";
++"Ready to check your iPhone" = "可以開始檢查 iPhone";
++"No reachable iPhone detected" = "未偵測到可連接的 iPhone";
++"Unlock your iPhone and review trust" = "請解鎖 iPhone 並確認信任";
++"Checking iPhone access and battery" = "正在檢查 iPhone 存取權與電量";
++"iPhone access could not be verified" = "無法確認 iPhone 存取權";
++"The iPhone check timed out" = "iPhone 檢查逾時";
++"Added, but no new battery report" = "已加入，但尚無新的電量回報";
++"New iPhone battery report received" = "已收到新的 iPhone 電量回報";
++"iPhone and iPad Setup" = "iPhone 與 iPad 設定";
++"Connect by USB, unlock the iPhone or iPad, and review Trust This Computer on the device. Previously trusted Wi-Fi devices may also be reachable. Beacon does not change your Wi-Fi sync settings." = "請以 USB 連接並解鎖 iPhone 或 iPad，再於裝置上確認「信任這部電腦」。先前已信任的 Wi-Fi 裝置也可能可連接；Beacon 不會變更 Wi-Fi 同步設定。";
++"A device being added is not proof that a battery value was read. Only new reports from this check appear below." = "加入裝置不代表已讀到電量。下方只顯示這次檢查取得的新回報。";
++"Check Access and Read Battery" = "檢查存取權並讀取電量";
++"Beacon could not access the iPhone. Unlock it, review the trust prompt, and check again. Do not reset existing pairing records." = "Beacon 無法存取 iPhone。請解鎖、確認信任提示，再重新檢查；不要重設既有配對紀錄。";
++"Keep the iPhone awake and reachable, then retry. The result does not establish whether trust or the connection caused the failure." = "請讓 iPhone 保持喚醒且可連接，再重試。目前結果尚無法判定是信任或連線造成失敗。";
++"Devices Added to Beacon" = "已加入 Beacon 的裝置";
++"Remove from Beacon" = "從 Beacon 移除";
++"New battery reading: %d%%" = "新電量讀數：%d%%";
++"No new battery reading from this check." = "這次檢查尚未取得新的電量讀數。";
++"Device identifier" = "裝置識別碼";
++"Technical Details" = "技術詳細資料";
++"Back to Device Setup" = "返回裝置設定";
++"Recheck Tools" = "重新檢查工具";
++"Remove this device from Beacon?" = "要從 Beacon 移除此裝置嗎？";
++"This only removes Beacon's enrollment. macOS pairing and trust are not changed." = "只會移除 Beacon 的登錄，不會變更 macOS 的配對與信任。";
++"iPhone battery reads require the external libimobiledevice tools. Mac and Bluetooth accessory features do not require them." = "讀取 iPhone 電量需要外部 libimobiledevice 工具；Mac 與藍牙配件功能不需要這些工具。";
++"Missing tools: %@" = "缺少工具：%@";
++"Install Homebrew using its official guide, then run this command in Terminal. Beacon does not install software automatically." = "請依官方指南安裝 Homebrew，再於「終端機」執行此指令。Beacon 不會自動安裝軟體。";
++"Homebrew Guide" = "Homebrew 指南";
++"iPhone Tools Guide" = "iPhone 工具指南";
++"iPhone Setup" = "iPhone 設定";
++"Set Up" = "設定";
+diff --git a/BeaconUITests/BeaconUITests.swift b/BeaconUITests/BeaconUITests.swift
+index aa57f25..e5dec69 100644
+--- a/BeaconUITests/BeaconUITests.swift
++++ b/BeaconUITests/BeaconUITests.swift
+@@ -226,3 +226,63 @@ final class BeaconUITests: XCTestCase {
+     }
+ 
++    @MainActor
++    func testIPhoneMissingToolsStopsBeforeEnrollment() {
++        continueAfterFailure = false
++        let app = setupApp(scenario: "empty")
++        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "missing"
++        app.launch()
++        defer { app.terminate() }
++        let window = app.windows["Beacon Settings"]
++        XCTAssertTrue(window.waitForExistence(timeout: 10))
++        window.buttons["settings.iphone-setup"].click()
++        XCTAssertTrue(app.staticTexts["iphone.setup.state.toolsMissing"].waitForExistence(timeout: 5))
++        XCTAssertTrue(app.staticTexts["iphone.setup.missing-tools"].label.contains("ideviceinfo"))
++        XCTAssertFalse(app.buttons["iphone.setup.check"].exists)
++        app.buttons["iphone.setup.recheck-tools"].click()
++        XCTAssertFalse(app.buttons["iphone.setup.check"].exists)
++        app.typeKey(.escape, modifierFlags: [])
++        XCTAssertTrue(window.waitForExistence(timeout: 5))
++    }
++
++    @MainActor
++    func testIPhoneSetupConfirmsANewReadingRatherThanEnrollmentOnly() {
++        continueAfterFailure = false
++        let app = setupApp(scenario: "empty")
++        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "ready"
++        app.launch()
++        defer { app.terminate() }
++        let window = app.windows["Beacon Settings"]
++        XCTAssertTrue(window.waitForExistence(timeout: 10))
++        window.buttons["settings.iphone-setup"].click()
++        let check = app.buttons["iphone.setup.check"]
++        XCTAssertTrue(check.waitForExistence(timeout: 5))
++        check.click()
++        XCTAssertTrue(app.staticTexts["iphone.setup.state.reported"].waitForExistence(timeout: 5))
++        XCTAssertTrue(app.staticTexts["iphone.setup.reading"].label.contains("87%"))
++        let evidence = XCTAttachment(screenshot: app.screenshot())
++        evidence.name = "iphone-new-reading-fixture-not-hardware"
++        evidence.lifetime = .keepAlways
++        add(evidence)
++        app.buttons["iphone.setup.done"].click()
++        XCTAssertTrue(window.descendants(matching: .any)["UI Test iPhone"].firstMatch.waitForExistence(timeout: 5))
++    }
++
++    @MainActor
++    func testIPhoneEnrollmentWithoutReadingDoesNotReportBatterySuccess() {
++        continueAfterFailure = false
++        let app = setupApp(scenario: "empty")
++        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "noBattery"
++        app.launch()
++        defer { app.terminate() }
++        let window = app.windows["Beacon Settings"]
++        XCTAssertTrue(window.waitForExistence(timeout: 10))
++        window.buttons["settings.iphone-setup"].click()
++        let check = app.buttons["iphone.setup.check"]
++        XCTAssertTrue(check.waitForExistence(timeout: 5))
++        check.click()
++        XCTAssertTrue(app.staticTexts["iphone.setup.state.noBattery"].waitForExistence(timeout: 5))
++        XCTAssertFalse(app.staticTexts["iphone.setup.reading"].exists)
++        XCTAssertTrue(check.isEnabled)
++    }
++
+ }
