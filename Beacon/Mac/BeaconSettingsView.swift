@@ -134,6 +134,7 @@ struct BeaconSettingsView: View {
 
     var body: some View {
         let _ = alertPreferencesRevision
+        let _ = isShowingIPhoneSetup
         GeometryReader { proxy in
             HStack(alignment: .top, spacing: 0) {
                 settingsSidebar
