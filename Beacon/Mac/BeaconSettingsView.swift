@@ -326,7 +326,9 @@ struct BeaconSettingsView: View {
 
                         if let selectedDevice {
                             deviceDetail(for: selectedDevice)
-                        } else {
+                        } else if DeviceSetupRecoveryState.resolve(
+                            visibleCount: 0, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
+                        ) == .empty {
                             emptyDeviceDetail
                         }
                     }
