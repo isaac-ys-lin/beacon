@@ -206,6 +206,7 @@ struct BeaconSettingsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10)
                             .frame(height: 30)
+                            .contentShape(Rectangle())
                             .background(
                                 RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
                                     .fill(selectedPane == pane ? NativeMacStyle.rowSelection : Color.clear)
