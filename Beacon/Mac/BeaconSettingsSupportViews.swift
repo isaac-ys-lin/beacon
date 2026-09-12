@@ -63,6 +63,7 @@ struct AddDeviceGuideView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Close")
+                .accessibilityLabel("Close")
             }
 
             VStack(spacing: 8) {
@@ -86,9 +87,10 @@ struct AddDeviceGuideView: View {
                     title: "iPhone or iPad",
                     subtitle: "Connect by USB, unlock, trust this Mac, then add it here.",
                     systemImage: resolveSymbol("iphone", fallback: "mobilephone"),
-                    actionTitle: "Trust",
+                    actionTitle: "Set Up",
                     action: onTrustConnectedIPhone
                 )
+                .accessibilityIdentifier("setup.iphone")
             }
 
             if let trustedIPhoneEnrollmentResult {

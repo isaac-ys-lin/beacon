@@ -225,4 +225,64 @@ final class BeaconUITests: XCTestCase {
         return app
     }
 
+    @MainActor
+    func testIPhoneMissingToolsStopsBeforeEnrollment() {
+        continueAfterFailure = false
+        let app = setupApp(scenario: "empty")
+        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "missing"
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons["settings.iphone-setup"].click()
+        XCTAssertTrue(app.staticTexts["iphone.setup.state.toolsMissing"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iphone.setup.missing-tools"].label.contains("ideviceinfo"))
+        XCTAssertFalse(app.buttons["iphone.setup.check"].exists)
+        app.buttons["iphone.setup.recheck-tools"].click()
+        XCTAssertFalse(app.buttons["iphone.setup.check"].exists)
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testIPhoneSetupConfirmsANewReadingRatherThanEnrollmentOnly() {
+        continueAfterFailure = false
+        let app = setupApp(scenario: "empty")
+        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "ready"
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons["settings.iphone-setup"].click()
+        let check = app.buttons["iphone.setup.check"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        check.click()
+        XCTAssertTrue(app.staticTexts["iphone.setup.state.reported"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iphone.setup.reading"].label.contains("87%"))
+        let evidence = XCTAttachment(screenshot: app.screenshot())
+        evidence.name = "iphone-new-reading-fixture-not-hardware"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        app.buttons["iphone.setup.done"].click()
+        XCTAssertTrue(window.descendants(matching: .any)["UI Test iPhone"].firstMatch.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testIPhoneEnrollmentWithoutReadingDoesNotReportBatterySuccess() {
+        continueAfterFailure = false
+        let app = setupApp(scenario: "empty")
+        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "noBattery"
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons["settings.iphone-setup"].click()
+        let check = app.buttons["iphone.setup.check"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        check.click()
+        XCTAssertTrue(app.staticTexts["iphone.setup.state.noBattery"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["iphone.setup.reading"].exists)
+        XCTAssertTrue(check.isEnabled)
+    }
+
 }

@@ -56,7 +56,8 @@ struct BeaconSettingsView: View {
     let onRequestNotificationPermission: () -> Void
     let onOpenNotificationSettings: () -> Void
     let onSendTestNotification: () -> Void
-    let onTrustConnectedIPhone: () -> Void
+    let onTrustConnectedIPhone: () async -> Void
+    let iPhonePreviewTools: IPhoneToolAvailability?
     let onForgetTrustedIPhone: (String) -> Void
     let onQuit: () -> Void
 
@@ -80,6 +81,7 @@ struct BeaconSettingsView: View {
     @State private var selectedDeviceID: String?
     @State private var selectedPane: SettingsPane = .devices
     @State private var isShowingAddDeviceGuide = false
+    @State private var isShowingIPhoneSetup = false
     @State private var alertPreferencesRevision = 0
 
     init(
@@ -98,7 +100,8 @@ struct BeaconSettingsView: View {
         onRequestNotificationPermission: @escaping () -> Void = {},
         onOpenNotificationSettings: @escaping () -> Void = {},
         onSendTestNotification: @escaping () -> Void = {},
-        onTrustConnectedIPhone: @escaping () -> Void = {},
+        onTrustConnectedIPhone: @escaping () async -> Void = {},
+        iPhonePreviewTools: IPhoneToolAvailability? = nil,
         onForgetTrustedIPhone: @escaping (String) -> Void = { _ in },
         onQuit: @escaping () -> Void = {},
         initialPane: SettingsPane = .devices,
@@ -121,6 +124,7 @@ struct BeaconSettingsView: View {
         self.onOpenNotificationSettings = onOpenNotificationSettings
         self.onSendTestNotification = onSendTestNotification
         self.onTrustConnectedIPhone = onTrustConnectedIPhone
+        self.iPhonePreviewTools = iPhonePreviewTools
         self.onForgetTrustedIPhone = onForgetTrustedIPhone
         self.onQuit = onQuit
         _selectedPane = State(initialValue: initialPane)
@@ -168,13 +172,24 @@ struct BeaconSettingsView: View {
             alertPreferencesRevision &+= 1
         }
         .sheet(isPresented: $isShowingAddDeviceGuide) {
-            DeviceSetupGuide(
-                enrollmentResult: trustedIPhoneEnrollmentResult,
-                onOpenBluetoothSettings: onOpenBluetoothSettings,
-                onTrustConnectedIPhone: onTrustConnectedIPhone,
-                onRefresh: onRefresh,
-                onDismiss: { isShowingAddDeviceGuide = false }
-            )
+            if isShowingIPhoneSetup {
+                IPhoneSetupView(
+                    snapshots: snapshots, trustedIPhones: trustedIPhones,
+                    enrollmentResult: trustedIPhoneEnrollmentResult, diagnostics: refreshDiagnostics,
+                    previewTools: iPhonePreviewTools, isPreviewingData: isPreviewingData,
+                    onCheck: onTrustConnectedIPhone, onForget: onForgetTrustedIPhone,
+                    onBack: { isShowingIPhoneSetup = false },
+                    onDismiss: { isShowingAddDeviceGuide = false }
+                )
+            } else {
+                DeviceSetupGuide(
+                    enrollmentResult: nil,
+                    onOpenBluetoothSettings: onOpenBluetoothSettings,
+                    onTrustConnectedIPhone: { isShowingIPhoneSetup = true },
+                    onRefresh: onRefresh,
+                    onDismiss: { isShowingAddDeviceGuide = false }
+                )
+            }
         }
     }
 
@@ -247,7 +262,13 @@ struct BeaconSettingsView: View {
             Spacer()
 
             if selectedPane == .devices {
+                Button("iPhone Setup") {
+                    isShowingIPhoneSetup = true
+                    isShowingAddDeviceGuide = true
+                }
+                .accessibilityIdentifier("settings.iphone-setup")
                 Button {
+                    isShowingIPhoneSetup = false
                     isShowingAddDeviceGuide = true
                 } label: {
                     Image(systemName: "plus")
@@ -306,7 +327,7 @@ struct BeaconSettingsView: View {
             DeviceSetupRecoveryCard(
                 state: .resolve(visibleCount: displayedDeviceRows.count, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics),
                 isRefreshing: isRefreshing,
-                onSetUp: { isShowingAddDeviceGuide = true },
+                onSetUp: { isShowingIPhoneSetup = false; isShowingAddDeviceGuide = true },
                 onRefresh: onRefresh
             )
             RefreshHealthDisclosureView(diagnostics: refreshDiagnostics)
@@ -316,14 +337,6 @@ struct BeaconSettingsView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 14) {
-                        TrustedIPhoneSettingsCard(
-                            latestRefreshDiagnostics: refreshDiagnostics,
-                            trustedIPhones: trustedIPhones,
-                            enrollmentResult: trustedIPhoneEnrollmentResult,
-                            onTrustConnectedIPhone: onTrustConnectedIPhone,
-                            onForgetTrustedIPhone: onForgetTrustedIPhone
-                        )
-
                         if let selectedDevice {
                             deviceDetail(for: selectedDevice)
                         } else if DeviceSetupRecoveryState.resolve(
