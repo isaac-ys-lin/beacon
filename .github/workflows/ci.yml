@@ -17,6 +17,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Capture verification inputs
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/beacon-results"
+          git rev-parse HEAD > "$RUNNER_TEMP/beacon-results/tested-commit.txt"
+          git archive HEAD -o "$RUNNER_TEMP/beacon-results/tested-source.tar"
+          { sw_vers; xcodebuild -version; } > "$RUNNER_TEMP/beacon-results/environment.txt"
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
