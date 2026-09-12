@@ -6,7 +6,10 @@ struct QuickActionsSettingsPane: View {
     var body: some View {
         HStack(alignment: .top, spacing: 18) {
             shortcutsForm
-            statusPanel
+            ScrollView {
+                statusPanel
+            }
+            .frame(width: 252)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -16,14 +19,8 @@ struct QuickActionsSettingsPane: View {
             Section {
                 AutomationShortcutsBanner()
 
-                ForEach(BeaconQuickAction.allCases) { action in
-                    QuickActionSettingsRow(
-                        action: action,
-                        isEnabled: Binding(
-                            get: { preferences.isEnabled(action) },
-                            set: { setQuickActionEnabled($0, for: action) }
-                        )
-                    )
+                ForEach(quickActionSettingsSummary(for: preferences).supportedActions) { action in
+                    actionSetting(for: action)
                 }
             } header: {
                 Text("Keyboard Shortcuts")
@@ -32,8 +29,35 @@ struct QuickActionsSettingsPane: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 372, alignment: .topLeading)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func actionSetting(for action: BeaconQuickAction) -> some View {
+        Toggle(isOn: Binding(
+            get: { preferences.isEnabled(action) },
+            set: { setQuickActionEnabled($0, for: action) }
+        )) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(action.title)
+                    .font(DesignTokens.Typography.captionEmphasis)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(action.subtitle)
+                    .font(DesignTokens.Typography.caption2)
+                    .foregroundStyle(DesignTokens.Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let shortcut = action.shortcut {
+                    Text(shortcut.displayText)
+                        .font(DesignTokens.Typography.caption2Emphasis)
+                        .monospaced()
+                        .foregroundStyle(DesignTokens.Palette.accent)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .toggleStyle(.switch)
+        .accessibilityLabel(Text(action.title))
+        .accessibilityHint(Text(action.subtitle))
+        .accessibilityIdentifier("quickActions.\(action.id)")
     }
 
     private var statusPanel: some View {
@@ -77,12 +101,6 @@ struct QuickActionsSettingsPane: View {
                     systemImage: "bolt.circle.fill",
                     color: DesignTokens.Palette.accent
                 )
-                summaryMetricRow(
-                    "Excluded",
-                    value: "\(summary.unsupportedActions.count)",
-                    systemImage: "minus.circle.fill",
-                    color: DesignTokens.Palette.secondaryText
-                )
             }
 
             Divider()
@@ -96,17 +114,8 @@ struct QuickActionsSettingsPane: View {
                         .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 } else {
-                    ForEach(Array(summary.enabledSupportedActions.prefix(4)), id: \.id) { action in
+                    ForEach(summary.enabledSupportedActions) { action in
                         actionChip(for: action)
-                    }
-
-                    if summary.enabledSupportedActions.count > 4 {
-                        Text(BeaconL10n.format(
-                            "+%@ more",
-                            String(summary.enabledSupportedActions.count - 4)
-                        ))
-                            .font(DesignTokens.Typography.caption)
-                            .foregroundStyle(DesignTokens.Palette.secondaryText)
                     }
                 }
             }
@@ -116,11 +125,10 @@ struct QuickActionsSettingsPane: View {
             VStack(alignment: .leading, spacing: 7) {
                 statusRow("Core actions available", isActive: true)
                 statusRow("macOS Shortcuts supported", isActive: true)
-                statusRow("Cross-Mac transfer excluded", isActive: false)
             }
         }
         .padding(16)
-        .frame(width: 278, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .beaconSettingsCardSurface()
         .padding(.top, 18)
     }
@@ -157,10 +165,11 @@ struct QuickActionsSettingsPane: View {
                 .font(.system(size: 10, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(DesignTokens.Palette.accent)
+                .accessibilityHidden(true)
             Text(action.title)
                 .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Palette.text)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 9)
