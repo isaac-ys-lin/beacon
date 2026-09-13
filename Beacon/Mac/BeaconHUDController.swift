@@ -8,20 +8,42 @@ final class BeaconHUDController {
     private var window: NSWindow?
     private var dismissTask: Task<Void, Never>?
     private var presentationID = 0
+    private var queue = BeaconHUDQueue()
+    private let defaults: UserDefaults
+    private var isUITestPresentation = false
+    var onReviewOperation: ((String) -> Void)?
+
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 
     #if DEBUG
     var debugWindow: NSPanel? { window as? NSPanel }
+    var debugCurrentEvent: BeaconHUDEvent? { queue.current?.event }
+    func debugDismiss() { dismiss() }
     #endif
 
     func show(event: BatteryAlertEvent) {
-        guard BatteryHUDPreferences.isEnabled(for: event.kind) else { return }
-        present(
-            event: event,
-            showsDismissButton: BatteryHUDPreferences.showsDismissButton(),
-            autoDismissDelay: BatteryHUDPreferences.isAutoDismissEnabled()
-                ? BatteryHUDPreferences.dismissDelaySeconds()
-                : nil
-        )
+        guard BatteryHUDPreferences.isEnabled(for: event.kind, defaults: defaults) else { return }
+        enqueue(.battery(event))
+    }
+
+    func show(operation: BluetoothConnectionOperation) {
+        guard BatteryHUDPreferences.isEnabled(defaults: defaults) else { return }
+        enqueue(.connection(operation))
+    }
+
+    func refreshPreferences() {
+        if !BatteryHUDPreferences.isEnabled(defaults: defaults) && !isUITestPresentation {
+            queue = BeaconHUDQueue()
+            hideWindow()
+        } else if queue.current != nil {
+            renderCurrent()
+        }
+    }
+
+    private func enqueue(_ event: BeaconHUDEvent) {
+        let previous = queue.current
+        queue.submit(event)
+        if previous != queue.current { renderCurrent() }
     }
 
     #if DEBUG
@@ -30,8 +52,11 @@ final class BeaconHUDController {
     func showForUITesting(event: BatteryAlertEvent) {
         // UI automation can spend several seconds establishing its accessibility
         // session after launch, especially on hosted macOS runners.
-        present(event: event, showsDismissButton: true, autoDismissDelay: 6)
+        isUITestPresentation = true
+        enqueue(.battery(event))
     }
+
+    func prepareOperationUITesting() { isUITestPresentation = true }
 
     func exposeWindowToAccessibilityForUITesting() {
         guard let window else { return }
@@ -40,31 +65,34 @@ final class BeaconHUDController {
         window.title = BeaconL10n.string("Beacon HUD Preview")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.setContentSize(Self.hudSize)
+        window.setContentSize(contentSize)
         window.makeKeyAndOrderFront(nil)
     }
     #endif
 
-    private func present(
-        event: BatteryAlertEvent,
-        showsDismissButton: Bool,
-        autoDismissDelay: Double?
-    ) {
-        let percent = event.percent ?? -1
-        logger.info("HUD shown kind=\(event.kind.telemetryName, privacy: .public) percent=\(percent, privacy: .private)")
-        presentationID += 1
+    private var contentSize: NSSize {
+        NSSize(width: 520, height: queue.current?.event.operation == nil ? 92 : 150)
+    }
 
+    private func renderCurrent() {
+        guard let entry = queue.current else { hideWindow(); return }
+        presentationID += 1
         let window = existingOrNewWindow()
-        let hostingController = NSHostingController(
-            rootView: BatteryActionHUDView(
-                event: event,
-                showsDismissButton: showsDismissButton,
-                onDismiss: { [weak self] in
-                    self?.dismiss()
-                }
-            )
-        )
-        hostingController.view.frame = NSRect(origin: .zero, size: Self.hudSize)
+        let showsDismiss = isUITestPresentation || BatteryHUDPreferences.showsDismissButton(defaults: defaults)
+        let view: AnyView
+        switch entry.event {
+        case let .battery(event):
+            logger.info("Battery reminder presented")
+            view = AnyView(BatteryActionHUDView(event: event, showsDismissButton: showsDismiss,
+                onDismiss: { [weak self] in self?.dismiss() }))
+        case let .connection(operation):
+            logger.info("Connection operation presented phase=\(operation.phase.rawValue, privacy: .public)")
+            view = AnyView(ConnectionActionHUDView(operation: operation, showsDismissButton: showsDismiss,
+                onDismiss: { [weak self] in self?.dismiss() },
+                onReview: { [weak self] in self?.onReviewOperation?(operation.deviceID) }))
+        }
+        let hostingController = NSHostingController(rootView: view)
+        hostingController.view.frame = NSRect(origin: .zero, size: contentSize)
         window.contentViewController = hostingController
         applyRoundedTransparentMask(to: hostingController.view)
         applyRoundedTransparentMask(to: window.contentView)
@@ -80,7 +108,13 @@ final class BeaconHUDController {
             }
         }
 
-        scheduleAutoDismiss(for: window, delay: autoDismissDelay)
+        // Progress lasts until the bounded operation completes. Every terminal result
+        // receives its own full configured interval, even after queued battery events.
+        let delay: Double? = entry.event.operation?.phase.isInProgress == true ? nil
+            : isUITestPresentation ? 6
+            : BatteryHUDPreferences.isAutoDismissEnabled(defaults: defaults)
+                ? BatteryHUDPreferences.dismissDelaySeconds(defaults: defaults) : nil
+        scheduleAutoDismiss(for: window, delay: delay)
     }
 
     private func scheduleAutoDismiss(for window: NSWindow, delay: Double?) {
@@ -90,16 +124,21 @@ final class BeaconHUDController {
             return
         }
 
+        let scheduledPresentationID = presentationID
         dismissTask = Task { [weak self, weak window] in
-            try? await Task.sleep(for: .seconds(delay))
-            await MainActor.run {
-                guard let self, let window, window == self.window else { return }
-                self.dismiss()
-            }
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            guard !Task.isCancelled, let self, let window, window == self.window,
+                  scheduledPresentationID == self.presentationID else { return }
+            self.dismiss()
         }
     }
 
     private func dismiss() {
+        queue.dismiss()
+        if queue.current != nil { renderCurrent() } else { hideWindow() }
+    }
+
+    private func hideWindow() {
         guard let window else { return }
         dismissTask?.cancel()
         dismissTask = nil
@@ -156,8 +195,6 @@ final class BeaconHUDController {
         return window
     }
 
-    private static let hudSize = NSSize(width: 520, height: 92)
-
     private func applyRoundedTransparentMask(to view: NSView?) {
         guard let view else { return }
         view.wantsLayer = true
@@ -171,7 +208,7 @@ final class BeaconHUDController {
 
     private func position(_ window: NSWindow) {
         let frame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let size = Self.hudSize
+        let size = contentSize
         let origin = NSPoint(
             x: frame.midX - size.width / 2,
             y: frame.maxY - size.height - 42

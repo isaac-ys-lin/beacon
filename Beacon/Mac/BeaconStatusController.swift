@@ -15,6 +15,8 @@ final class BeaconStatusController: NSObject {
     private let bluetoothPowerStateObserver: BluetoothPowerStateObserver?
     private let menuLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "menu-bar")
     private let quickActionLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "quick-actions")
+    private var operationObserver: AnyCancellable?
+    private var lastHUDOperations: [String: BluetoothConnectionOperation] = [:]
     private var connectionObserver: AnyCancellable?
     private var storeObserver: AnyCancellable?
     private var refreshStateObserver: AnyCancellable?
@@ -51,6 +53,17 @@ final class BeaconStatusController: NSObject {
             button.toolTip = "Beacon"
         }
 
+        hudController.onReviewOperation = { [weak self] deviceID in
+            self?.showSettingsWindow(initialPane: .devices, selectedDeviceID: deviceID)
+        }
+        operationObserver = model.connections.$operations.sink { [weak self] operations in
+            guard let self else { return }
+            for operation in operations.values.sorted(by: { $0.address < $1.address }) {
+                guard self.lastHUDOperations[operation.address] != operation else { continue }
+                self.lastHUDOperations[operation.address] = operation
+                self.hudController.show(operation: operation)
+            }
+        }
         connectionObserver = model.connections.objectWillChange.sink { [weak self] in
             // @Published sends before storing its new value. Read after that emission completes.
             Task { @MainActor in self?.updateStatusMenuContent() }
@@ -93,7 +106,7 @@ final class BeaconStatusController: NSObject {
         alertEventsObserver = model.$latestAlertEvents
             .filter { !$0.isEmpty }
             .sink { [weak self] events in
-                self?.hudController.show(event: events[0])
+                for event in events { self?.hudController.show(event: event) }
             }
         bluetoothPowerStateCancellable = bluetoothPowerStateObserver?.$state
             .sink { [weak self] _ in
@@ -145,6 +158,17 @@ final class BeaconStatusController: NSObject {
     }
 
     func showHUDForUITesting() {
+        if ProcessInfo.processInfo.environment["BEACON_HUD_SCENARIO"] == "connection-events" {
+            hudController.prepareOperationUITesting()
+            model.connections.perform(.connect, deviceID: "bluetooth-aa-bb-cc-dd-ee-02", displayName: "Test Headphones")
+            hudController.exposeWindowToAccessibilityForUITesting()
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(800))
+                self?.hudController.showForUITesting(event: BatteryAlertEvent(kind: .lowBattery,
+                    deviceID: "ui-test-device", displayName: "Queued Keyboard", percent: 12))
+            }
+            return
+        }
         hudController.showForUITesting(
             event: BatteryAlertEvent(
                 kind: .lowBattery,
@@ -275,6 +299,7 @@ final class BeaconStatusController: NSObject {
     }
 
     private func handlePreferencesChanged() {
+        hudController.refreshPreferences()
         model.refreshNotificationAuthorizationStatus()
         updateStatusButton()
         updateStatusMenuContent()
