@@ -55,7 +55,8 @@ final class BeaconSettingsWindowController {
         guard let window else { return }
         let renderedStore = store ?? model.store
         let rootView = BeaconSettingsView(
-            snapshots: renderedStore.decoratedSnapshots,
+            snapshots: batterySnapshotsWithKnownFailures(renderedStore.decoratedSnapshots,
+                diagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics),
             isRefreshing: isRefreshing ?? model.isRefreshing,
             isPreviewingData: model.isUsingPreviewData,
             refreshDiagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics,

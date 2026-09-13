@@ -88,7 +88,7 @@ enum BeaconShortcutSnapshotFormatter {
         lowBatteryThreshold: Int = LowBatteryNotifier.threshold
     ) -> BeaconShortcutSummary {
         let reported = snapshots
-            .filter { $0.freshness != .expired }
+            .filter { $0.freshness == .fresh && $0.snapshot.readStatus == .reported && $0.snapshot.connectionState == .connected }
             .compactMap { lineItem(for: $0) }
 
         let sortedByBattery = reported.sorted { lhs, rhs in

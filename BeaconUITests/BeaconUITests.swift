@@ -213,7 +213,11 @@ final class BeaconUITests: XCTestCase {
         window.buttons["setup.retry"].click()
         let recovered = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: notice)
         XCTAssertEqual(XCTWaiter.wait(for: [recovered], timeout: 5), .completed)
-        XCTAssertTrue(window.descendants(matching: .any)["Magic Keyboard"].firstMatch.waitForExistence(timeout: 5))
+        let recoveredDevice = window.descendants(matching: .any)[
+            statusMenu ? "device.row.preview-keyboard" : "settings.device.preview-keyboard"
+        ].firstMatch
+        XCTAssertTrue(recoveredDevice.waitForExistence(timeout: 5))
+        XCTAssertTrue(recoveredDevice.label.contains("Magic Keyboard"))
     }
 
     @MainActor
@@ -289,6 +293,111 @@ final class BeaconUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["iphone.setup.state.noBattery"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["iphone.setup.reading"].exists)
         XCTAssertTrue(check.isEnabled)
+    }
+
+    @MainActor
+    func testStaleAndDisconnectedReportsAgreeBetweenMenuAndInspector() throws {
+        try verifyReport(scenario: "stale", expected: "Stale", hasPercent: true)
+        try verifyReport(scenario: "disconnected", expected: "Disconnected", hasPercent: true)
+    }
+
+    @MainActor
+    func testMissingAndDeniedReportsNeverInventBatteryValues() throws {
+        try verifyReport(scenario: "missing", expected: "No report", hasPercent: false)
+        try verifyReport(scenario: "permission", expected: "Permission needed", hasPercent: false)
+    }
+
+    @MainActor
+    private func verifyReport(scenario: String, expected: String, hasPercent: Bool) throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-open-status-menu", "-AppleLanguages", "(en)"]
+        app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
+        app.launchEnvironment["BEACON_REPORT_SCENARIO"] = scenario
+        app.launch()
+        defer { app.terminate() }
+        let menu = app.windows["Beacon Status Menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        let row = menu.descendants(matching: .any)["device.row.report-test"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        let menuEvidence = XCTAttachment(screenshot: menu.screenshot())
+        menuEvidence.name = "report-menu-\(scenario)"
+        menuEvidence.lifetime = .keepAlways
+        add(menuEvidence)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "report-menu-\(scenario)-hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        let rowSnapshot = try recordIPhoneSetupEvidence(app, text: row, name: "report-menu-\(scenario)-attributes")
+        let rowValue = rowSnapshot.label
+        XCTAssertTrue(rowValue.localizedCaseInsensitiveContains(expected), row.debugDescription)
+        if hasPercent {
+            XCTAssertTrue(rowValue.contains("Last known: 40%"), rowValue)
+        } else {
+            XCTAssertFalse(rowValue.contains("40"), rowValue)
+            XCTAssertTrue(rowValue.contains("No battery report"), rowValue)
+        }
+        row.rightClick()
+        let options = app.menuItems["Options"]
+        XCTAssertTrue(options.waitForExistence(timeout: 5))
+        options.click()
+        let settings = app.windows["Beacon Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        let state = settings.staticTexts["device.report.state"]
+        XCTAssertTrue(state.waitForExistence(timeout: 5))
+        let detailEvidence = XCTAttachment(screenshot: settings.screenshot())
+        detailEvidence.name = "report-inspector-\(scenario)"
+        detailEvidence.lifetime = .keepAlways
+        add(detailEvidence)
+        XCTAssertEqual(try state.snapshot().value as? String, expected)
+    }
+
+    @MainActor
+    func testKnownRefreshFailureSelectsCorrectSameNamedDevice() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-open-settings", "-AppleLanguages", "(en)"]
+        app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
+        app.launchEnvironment["BEACON_REPORT_SCENARIO"] = "known-failure"
+        app.launch()
+        defer { app.terminate() }
+        let settings = app.windows["Beacon Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10))
+        let disclosure = settings.disclosureTriangles.matching(NSPredicate(format: "label BEGINSWITH %@", "Refresh needs attention")).firstMatch
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+        disclosure.click()
+        let affected = settings.buttons["refresh.inspect.report-other"]
+        XCTAssertTrue(affected.waitForExistence(timeout: 5))
+        affected.click()
+        let failedState = settings.staticTexts["device.report.state"]
+        XCTAssertTrue(failedState.waitForExistence(timeout: 5))
+        let failedSnapshot = try recordIPhoneSetupEvidence(app, text: failedState, name: "report-known-impact")
+        XCTAssertEqual(failedSnapshot.value as? String, "Read failed")
+        settings.buttons["settings.device.report-test"].click()
+        XCTAssertEqual(try settings.staticTexts["device.report.state"].snapshot().value as? String, "Latest report")
+    }
+
+    @MainActor
+    func testUnknownRefreshFailureDoesNotGuessAnAffectedDevice() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-open-settings", "-AppleLanguages", "(en)"]
+        app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
+        app.launchEnvironment["BEACON_REPORT_SCENARIO"] = "unknown-failure"
+        app.launch()
+        defer { app.terminate() }
+        let settings = app.windows["Beacon Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10))
+        let disclosure = settings.disclosureTriangles.matching(NSPredicate(format: "label BEGINSWITH %@", "Refresh needs attention")).firstMatch
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+        disclosure.click()
+        let impact = settings.staticTexts["refresh.impact-unknown"]
+        XCTAssertTrue(impact.waitForExistence(timeout: 5))
+        let evidence = try recordIPhoneSetupEvidence(app, text: impact, name: "report-unknown-impact")
+        XCTAssertEqual(evidence.value as? String, "Affected devices could not be identified from this source result.")
+        XCTAssertFalse(settings.buttons["refresh.inspect.report-test"].exists)
+        settings.buttons["settings.device.report-test"].click()
+        XCTAssertEqual(try settings.staticTexts["device.report.state"].snapshot().value as? String, "Latest report")
     }
 
     /// Keep the actual text attributes and screen before an assertion can stop

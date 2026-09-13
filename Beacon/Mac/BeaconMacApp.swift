@@ -142,7 +142,7 @@ enum BeaconSystemSettingsActions {
 enum MenuBarBatteryFormatter {
     static func menuBarText(for snapshots: [DecoratedBatterySnapshot]) -> String? {
         let percents = snapshots.compactMap { decorated -> Int? in
-            guard decorated.freshness != .expired else { return nil }
+            guard decorated.freshness == .fresh, decorated.snapshot.readStatus == .reported else { return nil }
             guard decorated.snapshot.connectionState == .connected else { return nil }
             return decorated.snapshot.percent
         }
@@ -316,6 +316,7 @@ final class BeaconModel: ObservableObject {
     private let usesPreviewData: Bool
     private let setupPreviewScenario: String?
     private let iPhonePreviewScenario: String?
+    private let reportPreviewScenario: String?
     private var iPhoneEnrollmentInFlight = false
 
     var iPhonePreviewTools: IPhoneToolAvailability? {
@@ -336,12 +337,14 @@ final class BeaconModel: ObservableObject {
         #if DEBUG
         usesPreviewData = environment["BEACON_PREVIEW_DATA"] == "1"
         iPhonePreviewScenario = usesPreviewData ? environment["BEACON_IPHONE_SCENARIO"] : nil
+        reportPreviewScenario = usesPreviewData ? environment["BEACON_REPORT_SCENARIO"] : nil
         let scenario = environment["BEACON_SETUP_SCENARIO"]
         setupPreviewScenario = usesPreviewData && ["empty", "denied", "failed", "checking"].contains(scenario ?? "") ? scenario : nil
         #else
         usesPreviewData = false
         setupPreviewScenario = nil
         iPhonePreviewScenario = nil
+        reportPreviewScenario = nil
         #endif
         self.bluetoothReportReader = bluetoothReportReader
     }
@@ -433,7 +436,8 @@ final class BeaconModel: ObservableObject {
         store = nextStore
         logger.info("Visible external snapshots: \(nextStore.externalBatterySnapshots.count)")
         latestAlertEvents = LowBatteryNotifier.notifyIfNeeded(
-            for: nextStore.decoratedExternalBatterySnapshots,
+            for: batterySnapshotsWithKnownFailures(nextStore.decoratedExternalBatterySnapshots,
+                diagnostics: latestRefreshDiagnostics),
             deliveryHandler: { [weak self] result in
                 Task { @MainActor [weak self] in
                     self?.setLatestNotificationDeliveryResult(result)
@@ -537,6 +541,37 @@ final class BeaconModel: ObservableObject {
                     message: "UI fixture, not a hardware observation", attemptedAt: now
                 )], refreshedAt: now, snapshotCount: 0
             )
+            store = nextStore
+            return
+        }
+        if let scenario = reportPreviewScenario {
+            let status: BatteryReadStatus = scenario == "permission" ? .unauthorized : scenario == "missing" ? .noReport : .reported
+            if scenario == "disconnected" {
+                nextStore.merge(["left", "right"].map { slot in
+                    BatterySnapshot(deviceID: "report-test-\(slot)", displayName: "Report Fixture \(slot)", kind: .airPods,
+                        percent: 40, chargeState: .charging, connectionState: .disconnected,
+                        source: .systemProfiler, updatedAt: now)
+                })
+            } else {
+                nextStore.merge([BatterySnapshot(deviceID: "report-test", displayName: "Report Fixture", kind: .keyboard,
+                    percent: scenario == "missing" ? nil : 40, chargeState: .charging, source: .coreBluetooth,
+                    readStatus: status, identityStrength: .strong,
+                    updatedAt: scenario == "stale" ? now.addingTimeInterval(-700) : now)])
+            }
+            var attempts = [BatteryProviderAttempt(provider: .coreBluetoothBatteryService, status: status,
+                candidateCount: 1, message: "In-memory report fixture", attemptedAt: now)]
+            if scenario == "known-failure" {
+                nextStore.merge([BatterySnapshot(deviceID: "report-other", displayName: "Report Fixture", kind: .keyboard,
+                    percent: 55, chargeState: .unplugged, source: .coreBluetooth, identityStrength: .strong, updatedAt: now)])
+                attempts.append(BatteryProviderAttempt(provider: .coreBluetoothBatteryService, status: .timedOut,
+                    candidateCount: 0, message: "Targeted fixture failure", attemptedAt: now,
+                    affectedDeviceIDs: ["report-other"]))
+            }
+            if scenario == "unknown-failure" {
+                attempts.append(BatteryProviderAttempt(provider: .systemProfiler, status: .timedOut,
+                    candidateCount: 0, message: "Unknown impact fixture", attemptedAt: now))
+            }
+            latestRefreshDiagnostics = .init(attempts: attempts, refreshedAt: now, snapshotCount: nextStore.snapshots.count)
             store = nextStore
             return
         }

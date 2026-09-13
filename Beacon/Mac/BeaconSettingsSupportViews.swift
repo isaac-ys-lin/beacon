@@ -357,7 +357,7 @@ struct RefreshHealthDisclosureView: View {
 
         DisclosureGroup(isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(presentation.attempts) { attempt in
+                ForEach(Array(presentation.attempts.enumerated()), id: \.offset) { _, attempt in
                     RefreshHealthAttemptRow(attempt: attempt)
                 }
 
@@ -920,6 +920,8 @@ struct DeviceCurrentStatsCard: View {
     let item: DeviceListItem
     let historySamples: [BatteryHistorySample]
 
+    private var presentation: DeviceBatteryPresentation { .init(item: item) }
+
     private var historySummary: BatteryHistorySummary? {
         BatteryHistoryStore.summary(for: historySamples)
     }
@@ -930,9 +932,10 @@ struct DeviceCurrentStatsCard: View {
                 Label("Current Stats", systemImage: "chart.bar.xaxis")
                     .font(DesignTokens.Typography.captionEmphasis)
                 Spacer()
-                Text(connectionText)
+                Text(presentation.state.title)
+                    .accessibilityIdentifier("device.report.state")
                     .font(DesignTokens.Typography.caption2Emphasis)
-                    .foregroundStyle(connectionColor)
+                    .foregroundStyle(reportColor)
                     .padding(.horizontal, 7)
                     .frame(height: 20)
                     .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
@@ -967,15 +970,6 @@ struct DeviceCurrentStatsCard: View {
                 Divider().padding(.leading, 40)
 
                 SettingsInfoRow(
-                    title: "Source",
-                    value: sourceText,
-                    systemImage: BeaconSymbols.bluetooth,
-                    color: DesignTokens.Palette.accent
-                )
-
-                Divider().padding(.leading, 40)
-
-                SettingsInfoRow(
                     title: "Updated",
                     value: updatedText,
                     systemImage: "clock",
@@ -983,6 +977,13 @@ struct DeviceCurrentStatsCard: View {
                 )
             }
             .background(settingsGroupBackground)
+
+            DisclosureGroup("Technical Details") {
+                Text(sourceText).font(.caption)
+                Text(item.id).font(.caption.monospaced()).textSelection(.enabled)
+            }
+            .font(.caption)
+            .accessibilityIdentifier("device.report.diagnostics")
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -1019,21 +1020,10 @@ struct DeviceCurrentStatsCard: View {
             )
     }
 
-    private var batteryText: String {
-        switch item {
-        case .device(let decorated):
-            return decorated.snapshot.percent.map { "\($0)%" }
-                ?? BeaconL10n.string("No report")
-        case .airPods(_, _, let components):
-            let percents = components.compactMap(\.percent)
-            guard let lowest = percents.min() else {
-                return BeaconL10n.string("No report")
-            }
-            return BeaconL10n.format("%d%% low", lowest)
-        }
-    }
+    private var batteryText: String { presentation.valueText }
 
     private var batteryIcon: String {
+        guard presentation.state == .current else { return "battery.100" }
         switch item {
         case .device(let decorated):
             if decorated.snapshot.chargeState == .charging { return "battery.100.bolt" }
@@ -1044,6 +1034,7 @@ struct DeviceCurrentStatsCard: View {
     }
 
     private var batteryColor: Color {
+        guard presentation.state == .current else { return DesignTokens.Palette.secondaryText }
         switch item {
         case .device(let decorated):
             guard let percent = decorated.snapshot.percent else { return DesignTokens.Palette.secondaryText }
@@ -1076,67 +1067,41 @@ struct DeviceCurrentStatsCard: View {
         }
     }
 
-    private var reportText: String {
-        BeaconL10n.string(reportKey)
-    }
-
-    private var reportKey: String {
-        switch item {
-        case .device(let decorated):
-            guard decorated.snapshot.percent != nil else { return "No report" }
-            switch decorated.freshness {
-            case .fresh: return "Reporting"
-            case .stale: return "Stale"
-            case .expired: return "Expired"
-            }
-        case .airPods(_, _, let components):
-            guard components.contains(where: { $0.percent != nil }) else { return "No report" }
-            if components.contains(where: { $0.freshness == .expired }) { return "Expired" }
-            if components.contains(where: { $0.freshness == .stale }) { return "Stale" }
-            return "Reporting"
-        }
-    }
+    private var reportText: String { presentation.state.title }
+    private var reportKey: String { presentation.state == .current ? "Reporting" : presentation.state.title }
 
     private var reportIcon: String {
-        switch reportKey {
-        case "Reporting": return "checkmark.circle.fill"
-        case "No report": return "minus.circle"
-        case "Stale", "Expired": return "clock.badge.exclamationmark"
-        default: return "clock"
+        switch presentation.state {
+        case .current: return "checkmark.circle.fill"
+        case .permission, .unavailable: return "exclamationmark.triangle"
+        case .noReport: return "minus.circle"
+        default: return "clock.badge.exclamationmark"
         }
     }
 
     private var reportColor: Color {
-        switch reportKey {
-        case "Reporting": return DesignTokens.Palette.charging
-        case "Stale", "Expired": return DesignTokens.Palette.stale
-        default: return DesignTokens.Palette.secondaryText
-        }
+        presentation.state == .current ? DesignTokens.Palette.charging : DesignTokens.Palette.secondaryText
     }
 
     private var connectionText: String {
-        BeaconL10n.string(item.connectionState == .disconnected ? "Disconnected" : "Connected")
+        switch item.connectionState {
+        case .connected: return BeaconL10n.string("Connected")
+        case .disconnected: return BeaconL10n.string("Disconnected")
+        case .unknown: return BeaconL10n.string("Connection unconfirmed")
+        }
     }
 
     private var connectionColor: Color {
-        item.connectionState == .disconnected ? DesignTokens.Palette.stale : DesignTokens.Palette.charging
+        item.connectionState == .connected ? DesignTokens.Palette.charging : DesignTokens.Palette.secondaryText
     }
 
     private var connectionIcon: String {
-        item.connectionState == .disconnected ? "xmark.circle" : "link.circle.fill"
+        item.connectionState == .connected ? "link.circle.fill" : "questionmark.circle"
     }
 
     private var updatedText: String {
-        switch item {
-        case .device(let decorated):
-            let interval = abs(decorated.snapshot.updatedAt.timeIntervalSinceNow)
-            if interval < 60 { return BeaconL10n.string("Now") }
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .abbreviated
-            return formatter.localizedString(for: decorated.snapshot.updatedAt, relativeTo: Date())
-        case .airPods:
-            return BeaconL10n.string("Grouped")
-        }
+        guard presentation.updatedAt != .distantPast else { return BeaconL10n.string("No report") }
+        return batteryRelativeAgeText(updatedAt: presentation.updatedAt)
     }
 
     private var updatedColor: Color {

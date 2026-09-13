@@ -126,6 +126,17 @@ struct StatusMenuView: View {
                     onRefresh: onRefresh
                 ).padding(.horizontal, 14).padding(.vertical, 8)
             }
+            if refreshDiagnostics.attempts.contains(where: { $0.status != .reported && $0.status != .noReport }) {
+                Button {
+                    let affectedID = refreshDiagnostics.attempts.flatMap { $0.affectedDeviceIDs ?? [] }.first
+                    onOpenSettings(.devices, affectedID)
+                } label: {
+                    Label("Refresh needs attention", systemImage: "exclamationmark.triangle")
+                }
+                .buttonStyle(.borderless).font(.caption)
+                .accessibilityIdentifier("status.refresh-problems")
+                .padding(.horizontal, 14).padding(.vertical, 8)
+            }
             if !sections.isEmpty {
                 nativeDeviceList
             }
@@ -228,6 +239,13 @@ struct StatusMenuView: View {
                     .contextMenu {
                         deviceContextMenu(for: item, displayName: item.displayName)
                     }
+                    // The context-menu wrapper is the exposed AX element on macOS.
+                    // This wrapper exposes AXLabel, but not AXValue.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(item.displayName + ", " + dashboardBatteryAccessibilityValue(
+                        for: DashboardBatteryDevice(item: item, isPinned: displayPreferences.isPinned(item)),
+                        statusText: DeviceBatteryPresentation(item: item).state.title))
+                    .accessibilityIdentifier("device.row.\(item.id)")
                 }
             }
             .padding(.horizontal, 14)
