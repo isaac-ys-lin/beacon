@@ -37,6 +37,7 @@
 		757D87D1560E861C813D43C5 /* BatterySnapshotStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2247AA89FCDB5CCFE789F0 /* BatterySnapshotStoreTests.swift */; };
 		7E3CEC990A4772ABF8100885 /* DeviceBatteryTrustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3E16E2DE10D105C3CDE6674 /* DeviceBatteryTrustTests.swift */; };
 		8540ABD640CC9B8D80D4B464 /* BeaconL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68BEB1F38357D1CDC872DC54 /* BeaconL10n.swift */; };
+		8A782392099E2A7214E62F9C /* ReleaseScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92AE24E798F5F1CF9167C69 /* ReleaseScriptTests.swift */; };
 		8E288E3C8B3231E85EB0FB63 /* ActionHUDSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 712158D8A1D5055A40B71EED /* ActionHUDSettingsPane.swift */; };
 		90C86638B6DB19B0BD9151C8 /* IPhoneSetupFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87CDE16BB6D6039D7E26591B /* IPhoneSetupFlowTests.swift */; };
 		958B6EBECAF850ECB91FDB24 /* TrustedIPhoneRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C5DC048F9ABEE693CA436C /* TrustedIPhoneRegistry.swift */; };
@@ -123,6 +124,7 @@
 		D6628EF4A0FE3A1028C2E7DE /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		DA14437C753C2C72E7DCF4AA /* BeaconHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconHUDView.swift; sourceTree = "<group>"; };
 		DEB9CA5465A44CD5B1DA6498 /* GeneralSettingsSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsSupport.swift; sourceTree = "<group>"; };
+		E92AE24E798F5F1CF9167C69 /* ReleaseScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseScriptTests.swift; sourceTree = "<group>"; };
 		EE8F6FDFC7313A2021A7F2FE /* BatteryProviderRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryProviderRunner.swift; sourceTree = "<group>"; };
 		F2BCDB369A305BF624FE3452 /* GeneralSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsPane.swift; sourceTree = "<group>"; };
 		F3E16E2DE10D105C3CDE6674 /* DeviceBatteryTrustTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceBatteryTrustTests.swift; sourceTree = "<group>"; };
@@ -227,6 +229,7 @@
 				09072DC8AEC7AFB316789352 /* DeviceSetupRecoveryTests.swift */,
 				87CDE16BB6D6039D7E26591B /* IPhoneSetupFlowTests.swift */,
 				1272E76938E13DEC819BAD84 /* LowBatteryNotifierFreshnessTests.swift */,
+				E92AE24E798F5F1CF9167C69 /* ReleaseScriptTests.swift */,
 				6D65C05E03CC6517BB8EA7C4 /* WindowAccessibilityTests.swift */,
 			);
 			path = BeaconTests;
@@ -359,6 +362,7 @@
 				B98D3CEA1F5C4AE335C4900B /* DeviceSetupRecoveryTests.swift in Sources */,
 				90C86638B6DB19B0BD9151C8 /* IPhoneSetupFlowTests.swift in Sources */,
 				243543D8D019ED698C45C488 /* LowBatteryNotifierFreshnessTests.swift in Sources */,
+				8A782392099E2A7214E62F9C /* ReleaseScriptTests.swift in Sources */,
 				376F8A2AA3589AA8668FA2C4 /* WindowAccessibilityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
