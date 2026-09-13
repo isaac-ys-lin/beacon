@@ -56,14 +56,16 @@ final class AcceptanceSurfaceUITests: XCTestCase {
         export.click()
         let save = savePanel.buttons["OKButton"]
         XCTAssertTrue(save.waitForExistence(timeout: 5))
-        // Exercise the standard save panel's Go to Folder UI, not an injected output URL.
+        // Exercise the standard save panel's Go to Folder sheet, not an injected output URL.
         app.typeKey("g", modifierFlags: [.command, .shift])
-        let go = savePanel.buttons["Go"].firstMatch
-        XCTAssertTrue(go.waitForExistence(timeout: 5))
+        let goToFolder = app.sheets["GoToWindow"]
+        XCTAssertTrue(goToFolder.waitForExistence(timeout: 5))
+        let path = goToFolder.textFields["PathTextField"]
+        XCTAssertTrue(path.waitForExistence(timeout: 5))
         app.typeKey("a", modifierFlags: .command)
         app.typeText(directory.path)
-        go.click()
-        absent(go)
+        app.typeKey(.return, modifierFlags: [])
+        absent(goToFolder)
         XCTAssertTrue(save.isEnabled)
         save.click()
         absent(save)
