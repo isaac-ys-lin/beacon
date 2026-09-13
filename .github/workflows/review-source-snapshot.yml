@@ -1,0 +1,41 @@
+name: Review source snapshot
+on:
+  push:
+    branches: [codex/beacon-review-source-snapshot-20260913]
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Capture repository objects and current acceptance context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/beacon-review"
+          mkdir -p "$out/context"
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+          git bundle create "$out/beacon.bundle" --all
+          git show-ref > "$out/refs.txt"
+          for n in $(seq 1 13); do
+            gh api "repos/$GITHUB_REPOSITORY/issues/$n" > "$out/context/issue-$n.json"
+            gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$n/comments?per_page=100" > "$out/context/issue-$n-comments.json"
+            if ! gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$n/dependencies/blocked_by?per_page=100" > "$out/context/issue-$n-dependencies.json" 2> "$out/context/issue-$n-dependencies-error.txt"; then
+              rm -f "$out/context/issue-$n-dependencies.json"
+            fi
+          done
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=all&per_page=100" > "$out/context/pulls.json"
+          sha256sum "$out/beacon.bundle" > "$out/bundle.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: beacon-review-source
+          path: ${{ runner.temp }}/beacon-review
+          retention-days: 3
+          if-no-files-found: error
