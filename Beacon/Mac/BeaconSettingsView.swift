@@ -41,6 +41,7 @@ private enum SettingsDetailLayout {
 }
 
 struct BeaconSettingsView: View {
+    @ObservedObject var connections: BluetoothConnectionController
     let snapshots: [DecoratedBatterySnapshot]
     let isRefreshing: Bool
     let isPreviewingData: Bool
@@ -86,6 +87,7 @@ struct BeaconSettingsView: View {
 
     init(
         snapshots: [DecoratedBatterySnapshot],
+        connections: BluetoothConnectionController = BluetoothConnectionController(),
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
         refreshDiagnostics: BatteryRefreshDiagnostics = BatteryRefreshDiagnostics(),
@@ -109,6 +111,7 @@ struct BeaconSettingsView: View {
         initiallyShowingAddDeviceGuide: Bool = false
     ) {
         self.snapshots = snapshots
+        self.connections = connections
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
         self.refreshDiagnostics = refreshDiagnostics
@@ -869,6 +872,11 @@ struct BeaconSettingsView: View {
                 Spacer()
             }
 
+            if BluetoothDeviceControlSupport.normalizedAddress(from: row.id) != nil {
+                BluetoothConnectionControls(item: row.item, controller: connections)
+                    .beaconSettingsCardSurface()
+            }
+
             DeviceCurrentStatsCard(
                 item: row.item,
                 historySamples: BatteryHistoryStore.samples(for: row.id)
@@ -957,55 +965,6 @@ struct BeaconSettingsView: View {
                 )
             }
 
-            if BluetoothDeviceControlSupport.canConnect(row.item) || BluetoothDeviceControlSupport.canDisconnect(row.item) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 10) {
-                        BluetoothLogoMark(size: 32)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Bluetooth Controls")
-                                .font(DesignTokens.Typography.captionEmphasis)
-                            Text("Beacon can request a connection change only for paired Bluetooth devices whose address macOS exposes.")
-                                .font(DesignTokens.Typography.caption2)
-                                .foregroundStyle(DesignTokens.Palette.secondaryText)
-                        }
-                    }
-
-                    HStack {
-                        if BluetoothDeviceControlSupport.canConnect(row.item) {
-                            Button {
-                                _ = BluetoothDeviceController.connect(deviceID: row.id)
-                                onRefresh()
-                            } label: {
-                                Label("Connect Device", systemImage: BeaconSymbols.bluetooth)
-                            }
-                        }
-
-                        if BluetoothDeviceControlSupport.canDisconnect(row.item) {
-                            Button(role: .destructive) {
-                                _ = BluetoothDeviceController.disconnect(deviceID: row.id)
-                                onRefresh()
-                            } label: {
-                                Label("Disconnect Device", systemImage: "bolt.horizontal.circle")
-                            }
-                        }
-
-                        Button {
-                            onOpenBluetoothSettings()
-                        } label: {
-                            HStack(spacing: 6) {
-                                BluetoothLogoMark(size: 16)
-                                Text("Bluetooth Settings")
-                            }
-                        }
-
-                        Spacer()
-                    }
-                }
-                .padding(12)
-                .beaconSettingsCardSurface()
-            }
-
             DisclosureGroup("Refresh Diagnostics") {
                 RefreshHealthDisclosureView(diagnostics: refreshDiagnostics)
             }
@@ -1047,7 +1006,9 @@ struct BeaconSettingsView: View {
     }
 
     private var deviceRows: [DeviceInspectorItem] {
-        deviceInspectorItems(snapshots, preferences: displayPreferences)
+        let presented = connections.snapshots(including: snapshots)
+        return deviceInspectorItems(presented, preferences: displayPreferences,
+            pairedDeviceIDs: connections.pairedPresentationIDs(in: presented))
     }
 
     private var displayedDeviceRows: [DeviceInspectorItem] {

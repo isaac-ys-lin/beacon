@@ -15,6 +15,7 @@ final class BeaconStatusController: NSObject {
     private let bluetoothPowerStateObserver: BluetoothPowerStateObserver?
     private let menuLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "menu-bar")
     private let quickActionLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "quick-actions")
+    private var connectionObserver: AnyCancellable?
     private var storeObserver: AnyCancellable?
     private var refreshStateObserver: AnyCancellable?
     private var refreshDiagnosticsObserver: AnyCancellable?
@@ -50,6 +51,10 @@ final class BeaconStatusController: NSObject {
             button.toolTip = "Beacon"
         }
 
+        connectionObserver = model.connections.objectWillChange.sink { [weak self] in
+            // @Published sends before storing its new value. Read after that emission completes.
+            Task { @MainActor in self?.updateStatusMenuContent() }
+        }
         storeObserver = model.$store.sink { [weak self] store in
             self?.updateStatusButton(store: store)
             self?.updateStatusMenuContent(store: store)
@@ -192,6 +197,7 @@ final class BeaconStatusController: NSObject {
             rootView: StatusMenuView(
                 snapshots: batterySnapshotsWithKnownFailures(renderedStore.decoratedSnapshots,
                     diagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics),
+                connections: model.connections,
                 isRefreshing: isRefreshing ?? model.isRefreshing,
                 isPreviewingData: model.isUsingPreviewData,
                 configuration: configuration,
@@ -246,9 +252,10 @@ final class BeaconStatusController: NSObject {
         let defaults = UserDefaults.standard
         let preferences = DeviceDisplayPreferences.load(from: defaults)
         let renderedStore = store ?? model.store
+        let presented = model.connections.snapshots(including: renderedStore.decoratedSnapshots)
         let sections = statusMenuDeviceSections(
-            renderedStore.decoratedSnapshots,
-            preferences: preferences
+            presented, preferences: preferences,
+            pairedDeviceIDs: model.connections.pairedPresentationIDs(in: presented)
         )
         let dashboardItemCount = sections.reduce(0) { partial, section in
             partial + section.items.count
@@ -261,6 +268,8 @@ final class BeaconStatusController: NSObject {
                 visibleCount: dashboardItemCount, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
             ) == .ready ? 0 : 230) + (model.isUsingPreviewData ? 34 : 0)
                 + (refreshDiagnostics.attempts.contains { $0.status != .reported && $0.status != .noReport } ? 38 : 0)
+                + CGFloat(model.connections.pairedDevices.count) * 48
+                + CGFloat(model.connections.operations.count) * 92
         )
         return NSSize(width: size.width, height: size.height)
     }
@@ -329,29 +338,24 @@ final class BeaconStatusController: NSObject {
     }
 
     private func performDeviceControlQuickAction(_ action: DeviceControlQuickAction) -> Bool {
+        model.connections.refreshPairedDevices()
         guard let target = deviceControlTarget(
             for: action,
-            snapshots: model.store.decoratedSnapshots,
+            snapshots: model.connections.snapshots(including: model.store.decoratedSnapshots).filter {
+                model.connections.device(for: $0.id) != nil
+            },
             preferences: DeviceDisplayPreferences.load()
         ) else {
             return false
         }
 
-        switch target.action {
-        case .connect:
-            if BluetoothDeviceController.connect(deviceID: target.item.id) {
-                Task { await model.refresh() }
-                return true
-            }
-        case .disconnect:
-            if BluetoothDeviceController.disconnect(deviceID: target.item.id) {
-                Task { await model.refresh() }
-                return true
-            }
-        default:
-            return false
-        }
-        return false
+        guard target.action == .connect || target.action == .disconnect else { return false }
+        let accepted = model.connections.perform(target.action == .connect ? .connect : .disconnect,
+            deviceID: target.item.id, displayName: target.item.displayName)
+        // The existing shortcut contract says "requested", not "connected". Keep the result
+        // discoverable in the same overview until the operation HUD is wired separately.
+        if let button = statusItem.button { showStatusMenu(relativeTo: button) }
+        return accepted
     }
 
     private func updateStatusButton(

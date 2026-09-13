@@ -10,6 +10,7 @@ final class StatusMenuPanelController {
     #endif
     var onRequestClose: (() -> Void)?
     private var escapeKeyMonitor: Any?
+    private var anchor: (buttonFrame: NSRect, visibleFrame: NSRect)?
     private var contentSize: NSSize = StatusMenuSizing.preferredContentSize(
         dashboardItemCount: 0,
         visibleScreenHeight: 900
@@ -33,6 +34,8 @@ final class StatusMenuPanelController {
             #if DEBUG
             uiTestWindow?.setContentSize(contentSize)
             #endif
+            // Growing operation results must remain above the Dock and on screen.
+            repositionWindows()
             return
         }
 
@@ -73,14 +76,20 @@ final class StatusMenuPanelController {
         let buttonFrame = window.convertToScreen(sender.convert(sender.bounds, to: nil))
         let screen = window.screen ?? NSScreen.main
         let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
-        let frame = StatusMenuPanelPositioning.frame(
-            contentSize: contentSize,
-            buttonFrame: buttonFrame,
-            visibleFrame: visibleFrame
-        )
-        panel.setFrame(frame, display: true)
+        anchor = (buttonFrame, visibleFrame)
+        repositionWindows()
         panel.orderFrontRegardless()
         startEscapeKeyMonitor()
+    }
+
+    private func repositionWindows() {
+        guard let anchor else { return }
+        let frame = StatusMenuPanelPositioning.frame(contentSize: contentSize,
+            buttonFrame: anchor.buttonFrame, visibleFrame: anchor.visibleFrame)
+        panel?.setFrame(frame, display: true)
+        #if DEBUG
+        uiTestWindow?.setFrame(frame, display: true)
+        #endif
     }
 
     func close() {

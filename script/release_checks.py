@@ -109,6 +109,8 @@ def check_signature(path: Path, team: str, *, app: bool = True) -> dict:
         entitlements = plistlib.loads(entitlement_data)
         if not isinstance(entitlements, dict) or entitlements.get("com.apple.security.get-task-allow", False):
             raise VerificationError("Release entitlements allow debugging or are invalid")
+        if entitlements.get("com.apple.security.app-sandbox", False):
+            raise VerificationError("App Sandbox blocks the required iPhone battery subprocess")
         info = plistlib.loads((path / "Contents/Info.plist").read_bytes())
         if not isinstance(info, dict):
             raise VerificationError("Release bundle metadata is not a dictionary")

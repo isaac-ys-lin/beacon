@@ -299,6 +299,7 @@ enum BeaconMenuBarMetrics {
 
 @MainActor
 final class BeaconModel: ObservableObject {
+    let connections: BluetoothConnectionController
     @Published private(set) var store = BatterySnapshotStore()
     @Published private(set) var isRefreshing = false
     @Published private(set) var latestAlertEvents: [BatteryAlertEvent] = []
@@ -346,6 +347,18 @@ final class BeaconModel: ObservableObject {
         iPhonePreviewScenario = nil
         reportPreviewScenario = nil
         #endif
+        if usesPreviewData {
+            #if DEBUG
+            connections = environment["BEACON_CONNECTION_SCENARIO"].map(BluetoothConnectionController.preview)
+                ?? BluetoothConnectionController()
+            #else
+            connections = BluetoothConnectionController()
+            #endif
+        } else if environment["XCTestConfigurationFilePath"] != nil || bluetoothReportReader != nil {
+            connections = BluetoothConnectionController()
+        } else {
+            connections = BluetoothConnectionController(client: .live())
+        }
         self.bluetoothReportReader = bluetoothReportReader
     }
 
@@ -355,6 +368,7 @@ final class BeaconModel: ObservableObject {
             logger.info("Battery refresh loop skipped under XCTest")
             return
         }
+        connections.refreshPairedDevices()
         if usesPreviewData {
             logger.info("Battery refresh loop using preview data")
             seedPreviewData()
@@ -378,6 +392,7 @@ final class BeaconModel: ObservableObject {
     func refresh(userInitiated: Bool = true) async {
         guard !refreshInFlight else { return }
         refreshInFlight = true
+        connections.refreshPairedDevices()
         if userInitiated { isRefreshing = true }
         logger.info("Battery refresh started userInitiated=\(userInitiated, privacy: .public)")
         defer {
