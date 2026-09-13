@@ -1000,38 +1000,6 @@ public struct BluetoothDeviceScanner {
     }
 }
 
-enum BluetoothDeviceController {
-    @discardableResult
-    static func connect(deviceID: String) -> Bool {
-        guard let address = BluetoothDeviceControlSupport.normalizedAddress(from: deviceID),
-              let device = IOBluetoothDevice(addressString: address)
-        else {
-            return false
-        }
-
-        if device.isConnected() {
-            return true
-        }
-
-        return device.openConnection() == kIOReturnSuccess
-    }
-
-    @discardableResult
-    static func disconnect(deviceID: String) -> Bool {
-        guard let address = BluetoothDeviceControlSupport.normalizedAddress(from: deviceID),
-              let device = IOBluetoothDevice(addressString: address)
-        else {
-            return false
-        }
-
-        if !device.isConnected() {
-            return true
-        }
-
-        return device.closeConnection() == kIOReturnSuccess
-    }
-}
-
 private extension String {
     var normalizedDeviceName: String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

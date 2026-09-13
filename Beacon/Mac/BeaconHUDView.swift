@@ -118,6 +118,8 @@ struct BatteryActionHUDView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Dismiss")
+                .accessibilityLabel("Dismiss")
+                .accessibilityIdentifier("hud.dismiss")
             }
         }
         .padding(.horizontal, 18)

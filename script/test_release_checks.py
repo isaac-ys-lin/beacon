@@ -123,6 +123,8 @@ class ReleaseChecksTests(unittest.TestCase):
         with patch.object(checks, "run", side_effect=self.fake_run):
             self.entitlements["com.apple.security.get-task-allow"] = True
             with self.assertRaises(checks.VerificationError): checks.check_signature(app, TEAM)
+            self.entitlements = {"com.apple.security.app-sandbox": True}
+            with self.assertRaises(checks.VerificationError): checks.check_signature(app, TEAM)
             self.entitlements = {}
             info_path = app / "Contents/Info.plist"
             info = plistlib.loads(info_path.read_bytes()); del info["BeaconSourceCommit"]

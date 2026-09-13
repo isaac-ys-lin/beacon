@@ -68,6 +68,7 @@ enum StatusMenuSizing {
 // MARK: - StatusMenuView
 
 struct StatusMenuView: View {
+    @ObservedObject var connections: BluetoothConnectionController
     let snapshots: [DecoratedBatterySnapshot]
     let isRefreshing: Bool
     let isPreviewingData: Bool
@@ -84,6 +85,7 @@ struct StatusMenuView: View {
 
     init(
         snapshots: [DecoratedBatterySnapshot],
+        connections: BluetoothConnectionController = BluetoothConnectionController(),
         isRefreshing: Bool = false,
         isPreviewingData: Bool = false,
         configuration: StatusWindowConfiguration = .load(),
@@ -94,6 +96,7 @@ struct StatusMenuView: View {
         initialDisplayPreferences: DeviceDisplayPreferences = .load()
     ) {
         self.snapshots = snapshots
+        self.connections = connections
         self.isRefreshing = isRefreshing
         self.isPreviewingData = isPreviewingData
         self.configuration = configuration
@@ -246,6 +249,10 @@ struct StatusMenuView: View {
                         for: DashboardBatteryDevice(item: item, isPinned: displayPreferences.isPinned(item)),
                         statusText: DeviceBatteryPresentation(item: item).state.title))
                     .accessibilityIdentifier("device.row.\(item.id)")
+                    if connections.device(for: item.id) != nil || connections.operation(for: item.id) != nil {
+                        BluetoothConnectionControls(item: item, controller: connections, compact: true)
+                            .padding(.horizontal, 10).padding(.bottom, 8)
+                    }
                 }
             }
             .padding(.horizontal, 14)
@@ -257,7 +264,9 @@ struct StatusMenuView: View {
     // MARK: - Computed sections
 
     private var sections: [DeviceSection] {
-        statusMenuDeviceSections(snapshots, preferences: displayPreferences)
+        let presented = connections.snapshots(including: snapshots)
+        return statusMenuDeviceSections(presented, preferences: displayPreferences,
+            pairedDeviceIDs: connections.pairedPresentationIDs(in: presented))
     }
 
     private var nativeItems: [DeviceListItem] {
@@ -293,15 +302,13 @@ struct StatusMenuView: View {
         case .refresh:
             onRefresh()
         case .connect:
-            _ = BluetoothDeviceController.connect(deviceID: item.id)
-            onRefresh()
+            connections.perform(.connect, deviceID: item.id, displayName: item.displayName)
         case .pin, .unpin:
             setDisplayPreferences(displayPreferences.togglingPin(for: item))
         case .remove:
             setDisplayPreferences(displayPreferences.hiding(item))
         case .disconnect:
-            _ = BluetoothDeviceController.disconnect(deviceID: item.id)
-            onRefresh()
+            connections.perform(.disconnect, deviceID: item.id, displayName: item.displayName)
         }
     }
 
@@ -322,7 +329,8 @@ struct StatusMenuView: View {
             } label: {
                 Label(action.title(for: displayName), systemImage: BeaconSymbols.resolved(action.systemImage))
             }
-            .disabled(!action.isEnabled(for: item))
+            .disabled(!action.isEnabled(for: item) || ((action == .connect || action == .disconnect)
+                && (connections.device(for: item.id) == nil || connections.operation(for: item.id)?.phase.isInProgress == true)))
         }
     }
 
