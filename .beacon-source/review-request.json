@@ -1,1 +1,1 @@
-{"base":"f4a2e86fc6820fbb3849f10ccff6461a78a3a472","target":"codex/issue-12-regression-evidence","message":"test(acceptance): exercise native export, desktop windows and six-pane settings (#12)","payload":".beacon-source/issue12-review"}
+{"base":"48725b4fe703340d315c002735f756420366be72","target":"codex/issue-8-operation-hud","message":"feat(hud): queue verified connection outcomes without losing battery events (#8)","payload":".beacon-source/issue8-review"}
