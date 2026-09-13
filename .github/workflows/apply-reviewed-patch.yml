@@ -1,0 +1,84 @@
+name: Prepare reviewed implementation branch
+on:
+  push:
+    branches: [codex/beacon-review-source-snapshot-20260913]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: macos-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install existing project generator
+        run: brew install xcodegen
+      - name: Prepare isolated feature commit
+        env:
+          OUTPUT_DIR: ${{ runner.temp }}/beacon-prepared
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, re, shutil, subprocess, zlib
+          root = pathlib.Path.cwd()
+          out = pathlib.Path(os.environ['OUTPUT_DIR']); out.mkdir()
+          request = json.loads((root / '.beacon-source/review-request.json').read_text())
+          allowed = {'codex/issue-5-verified-headphone-connections', 'codex/issue-8-operation-hud', 'codex/issue-12-regression-evidence', 'codex/issue-13-release-verification'}
+          assert request['target'] in allowed
+          assert re.fullmatch('[0-9a-f]{40}', request['base'])
+          payload = (root / request['payload']).resolve()
+          assert payload.is_relative_to(root / '.beacon-source')
+          shutil.copytree(payload, out / 'payload')
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          remote = git('ls-remote', '--heads', 'origin', 'refs/heads/' + request['target'])
+          if remote:
+              assert request.get('expected_head') == remote.split()[0], 'Existing branch changed or update not authorized'
+              assert request['base'] == request['expected_head'], 'Updates must be fast-forward from the verified head'
+          else:
+              assert not request.get('expected_head'), 'Expected branch missing'
+          git('fetch', 'origin', request['base'])
+          recovered = b''
+          if request.get('recover_issue5'):
+              source = '583150cdd01d0d0897255858cc836bc824ed3406'
+              git('fetch', 'origin', source)
+              encoded = ''.join(git('show', source + ':.beacon-source/issue5.part' + str(i)) for i in (1, 2))
+              partial = zlib.decompressobj(31).decompress(base64.b64decode(encoded))
+              recovered = partial[:partial.index(b'diff --git a/Beacon/Mac/zh-Hant-TW.lproj/')]
+              assert hashlib.sha256(recovered).hexdigest() == '99a5f220fd3a24ae782c52618136e46380d76a2a8df1d234a9fcd2bc41a5eb1a'
+          git('switch', '--detach', request['base'])
+          if recovered:
+              path = out / 'recovered.patch'; path.write_bytes(recovered)
+              git('apply', '--check', '--index', str(path))
+              git('apply', '--index', str(path))
+              assert git('write-tree') == 'f27f3af5a1c5a97a1f90e6cb7b4610cc0a2dd200'
+          overlays = out / 'payload/files'
+          if overlays.exists():
+              for source in overlays.rglob('*'):
+                  if source.is_file():
+                      relative = source.relative_to(overlays)
+                      assert relative.parts[0] in {'Beacon', 'BeaconTests', 'BeaconUITests', 'docs', 'script'}
+                      target = root / relative; target.parent.mkdir(parents=True, exist_ok=True)
+                      shutil.copy2(source, target)
+          modify = out / 'payload/modify.py'
+          if modify.exists():
+              subprocess.run(['python3', str(modify)], check=True)
+          subprocess.run(['xcodegen', 'generate', '--spec', 'project.yml'], check=True)
+          git('add', 'Beacon', 'BeaconTests', 'BeaconUITests', 'Beacon.xcodeproj', 'docs', 'script')
+          changed = git('diff', '--cached', '--name-only').splitlines()
+          assert changed and all(not p.startswith(('.github/', '.beacon-source/')) for p in changed)
+          git('diff', '--cached', '--check')
+          git('-c', 'user.name=github-actions[bot]', '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com', 'commit', '-m', request['message'])
+          git('bundle', 'create', str(out / 'source.bundle'), 'HEAD')
+          metadata = {'branch': request['target'], 'head': git('rev-parse', 'HEAD'), 'tree': git('rev-parse', 'HEAD^{tree}')}
+          (out / 'prepared.json').write_text(json.dumps(metadata, indent=2))
+          git('push', 'origin', 'HEAD:refs/heads/' + request['target'])
+          print((out / 'prepared.json').read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: beacon-prepared-source
+          path: ${{ runner.temp }}/beacon-prepared
+          retention-days: 3
+          if-no-files-found: error
