@@ -359,9 +359,14 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let settings = app.windows["Beacon Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10))
-        let disclosure = settings.disclosureTriangles["refresh.recovery"]
+        // A container identifier propagates over the content's device IDs on macOS.
+        // Locate the native disclosure by its user-facing label instead.
+        let disclosure = settings.disclosureTriangles.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Refresh needs attention")
+        ).firstMatch
         XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
         disclosure.click()
+        XCTAssertEqual(String(describing: try XCTUnwrap(disclosure.snapshot().value)), "1")
         let affected = settings.buttons["refresh.inspect.report-other"]
         XCTAssertTrue(affected.waitForExistence(timeout: 5))
         affected.click()
@@ -384,9 +389,14 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let settings = app.windows["Beacon Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10))
-        let disclosure = settings.disclosureTriangles["refresh.recovery"]
+        // A container identifier propagates over the content's device IDs on macOS.
+        // Locate the native disclosure by its user-facing label instead.
+        let disclosure = settings.disclosureTriangles.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Refresh needs attention")
+        ).firstMatch
         XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
         disclosure.click()
+        XCTAssertEqual(String(describing: try XCTUnwrap(disclosure.snapshot().value)), "1")
         let impact = settings.staticTexts["refresh.impact-unknown"]
         XCTAssertTrue(impact.waitForExistence(timeout: 5))
         let evidence = try recordIPhoneSetupEvidence(app, text: impact, name: "report-unknown-impact")
