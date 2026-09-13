@@ -48,6 +48,8 @@ final class BeaconSettingsWindowController {
         isRefreshing: Bool? = nil,
         refreshDiagnostics: BatteryRefreshDiagnostics? = nil,
         notificationAuthorizationState: NotificationCenterAuthorizationState? = nil,
+        trustedIPhones: [TrustedIPhone]? = nil,
+        enrollmentResult: IPhoneLockdownDiscoveryReport? = nil,
         rebuildHostingController: Bool = false
     ) {
         guard let window else { return }
@@ -57,8 +59,8 @@ final class BeaconSettingsWindowController {
             isRefreshing: isRefreshing ?? model.isRefreshing,
             isPreviewingData: model.isUsingPreviewData,
             refreshDiagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics,
-            trustedIPhones: model.trustedIPhoneRegistry.devices,
-            trustedIPhoneEnrollmentResult: model.trustedIPhoneEnrollmentResult,
+            trustedIPhones: trustedIPhones ?? model.trustedIPhoneRegistry.devices,
+            trustedIPhoneEnrollmentResult: enrollmentResult ?? model.trustedIPhoneEnrollmentResult,
             notificationAuthorizationState: notificationAuthorizationState ?? model.notificationAuthorizationState,
             latestNotificationDeliveryResult: model.latestNotificationDeliveryResult,
             onRefresh: { [weak model] in
@@ -83,8 +85,9 @@ final class BeaconSettingsWindowController {
                 model?.sendTestNotification()
             },
             onTrustConnectedIPhone: { [weak model] in
-                Task { await model?.trustConnectedIPhones() }
+                await model?.trustConnectedIPhones()
             },
+            iPhonePreviewTools: model.iPhonePreviewTools,
             onForgetTrustedIPhone: { [weak model] udid in
                 model?.forgetTrustedIPhone(udid: udid)
             },

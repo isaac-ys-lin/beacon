@@ -113,10 +113,18 @@ public struct IPhoneLockdownCommandLocator {
         return IPhoneLockdownCommandSet(ideviceIDURL: ideviceIDURL, ideviceInfoURL: ideviceInfoURL)
     }
 
+    public var missingCommandNames: [String] {
+        ["idevice_id", "ideviceinfo"].filter { executableURL(named: $0) == nil }
+    }
+
     private func executableURL(named commandName: String) -> URL? {
         searchPaths
             .map { URL(fileURLWithPath: $0).appendingPathComponent(commandName) }
-            .first { fileManager.isExecutableFile(atPath: $0.path) }
+            .first {
+                var isDirectory: ObjCBool = false
+                return fileManager.fileExists(atPath: $0.path, isDirectory: &isDirectory)
+                    && !isDirectory.boolValue && fileManager.isExecutableFile(atPath: $0.path)
+            }
     }
 }
 
@@ -351,7 +359,7 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
                 continue
             }
             guard nameResult.exitStatus == 0 else {
-                trustProofStatuses.append(.unavailable)
+                trustProofStatuses.append(IPhoneLockdownFailureStatus.classify(nameResult))
                 continue
             }
             let displayName = nameResult.output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -370,6 +378,9 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
            trustProofStatuses.contains(.timedOut) {
             status = .timedOut
             message = "Timed out verifying paired iPhone trust. Unlock the iPhone and keep it reachable by USB or Wi-Fi."
+        } else if trustedDevices.isEmpty, trustProofStatuses.contains(.unauthorized) {
+            status = .unauthorized
+            message = "The iPhone is locked or its trust confirmation is required."
         } else if trustedDevices.isEmpty,
                   !devices.isEmpty,
                   trustProofStatuses.contains(.unavailable) {
@@ -468,7 +479,7 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
             return (nil, .timedOut)
         }
         guard batteryResult.exitStatus == 0 else {
-            return (nil, .unavailable)
+            return (nil, IPhoneLockdownFailureStatus.classify(batteryResult))
         }
         guard let reading = Self.parseBatteryReading(
                 batteryResult.output,
@@ -547,6 +558,7 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
         if readStatuses.contains(.timedOut) {
             return .timedOut
         }
+        if readStatuses.contains(.unauthorized) { return .unauthorized }
         if readStatuses.contains(.unavailable) {
             return .unavailable
         }
@@ -618,5 +630,22 @@ public struct IPhoneLockdownBatteryProvider: Sendable {
         case "false", "no", "0": return false
         default: return nil
         }
+    }
+}
+
+/// libimobiledevice 1.4.0 reports lockdown errors as text plus the numeric code.
+/// Classify only documented access/trust errors; an arbitrary nonzero exit is not a denial.
+enum IPhoneLockdownFailureStatus {
+    static func classify(_ result: IPhoneLockdownCommandResult) -> BatteryReadStatus {
+        if result.timedOut { return .timedOut }
+        let text = (result.errorOutput + " " + result.output).lowercased()
+        guard text.contains("lockdownd") else { return .unavailable }
+        let accessCodes = [-17, -18, -19, -21, -29]
+        for code in accessCodes {
+            if text.contains("(\(code))") || text.range(of: "error code\\s+\(code)(?![0-9])", options: .regularExpression) != nil {
+                return .unauthorized
+            }
+        }
+        return .unavailable
     }
 }

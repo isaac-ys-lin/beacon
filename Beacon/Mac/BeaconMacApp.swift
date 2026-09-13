@@ -315,6 +315,13 @@ final class BeaconModel: ObservableObject {
     private var refreshInFlight = false
     private let usesPreviewData: Bool
     private let setupPreviewScenario: String?
+    private let iPhonePreviewScenario: String?
+    private var iPhoneEnrollmentInFlight = false
+
+    var iPhonePreviewTools: IPhoneToolAvailability? {
+        guard usesPreviewData else { return nil }
+        return IPhoneToolAvailability(missingCommands: iPhonePreviewScenario == "missing" ? ["idevice_id", "ideviceinfo"] : [])
+    }
     private var previewRecoveryRequested = false
     private let bluetoothReportReader: (@Sendable () async -> BluetoothBatteryReadReport?)?
 
@@ -328,11 +335,13 @@ final class BeaconModel: ObservableObject {
     ) {
         #if DEBUG
         usesPreviewData = environment["BEACON_PREVIEW_DATA"] == "1"
+        iPhonePreviewScenario = usesPreviewData ? environment["BEACON_IPHONE_SCENARIO"] : nil
         let scenario = environment["BEACON_SETUP_SCENARIO"]
         setupPreviewScenario = usesPreviewData && ["empty", "denied", "failed", "checking"].contains(scenario ?? "") ? scenario : nil
         #else
         usesPreviewData = false
         setupPreviewScenario = nil
+        iPhonePreviewScenario = nil
         #endif
         self.bluetoothReportReader = bluetoothReportReader
     }
@@ -435,6 +444,29 @@ final class BeaconModel: ObservableObject {
     }
 
     func trustConnectedIPhones() async {
+        guard !iPhoneEnrollmentInFlight else { return }
+        iPhoneEnrollmentInFlight = true
+        defer { iPhoneEnrollmentInFlight = false }
+        if usesPreviewData {
+            let now = Date()
+            let status: BatteryReadStatus = iPhonePreviewScenario == "missing" ? .commandMissing
+                : iPhonePreviewScenario == "trust" ? .unauthorized
+                : ["ready", "noBattery"].contains(iPhonePreviewScenario ?? "") ? .reported : .noReport
+            let phones = status == .reported ? [TrustedIPhone(udid: "ui-iphone", displayName: "UI Test iPhone", trustedAt: now)] : []
+            trustedIPhoneEnrollmentResult = IPhoneLockdownDiscoveryReport(
+                devices: phones, status: status, message: "UI fixture, not a physical iPhone",
+                attempts: [BatteryProviderAttempt(provider: .ideviceInfo, status: status, candidateCount: phones.count, message: "UI fixture", attemptedAt: now)]
+            )
+            // No persistent enrollment, trust changes, helper execution, or history writes in fixtures.
+            trustedIPhoneRegistry = TrustedIPhoneRegistry(devices: phones)
+            if iPhonePreviewScenario == "ready" {
+                var next = store
+                next.merge([BatterySnapshot(deviceID: "trusted-iphone-ui-iphone", displayName: "UI Test iPhone", kind: .iPhone,
+                    percent: 87, chargeState: .charging, source: .ideviceInfo, updatedAt: now)])
+                store = next
+            }
+            return
+        }
         let report = await IPhoneLockdownBatteryProvider.discoverUSBTrustedDevices()
         trustedIPhoneEnrollmentResult = report
         guard !report.devices.isEmpty else { return }

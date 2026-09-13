@@ -73,14 +73,14 @@ final class BeaconStatusController: NSObject {
         notificationDeliveryObserver = model.$latestNotificationDeliveryResult.sink { [weak self] _ in
             self?.settingsWindowController.updateContent()
         }
-        trustedIPhoneRegistryObserver = model.$trustedIPhoneRegistry.sink { [weak self] _ in
+        trustedIPhoneRegistryObserver = model.$trustedIPhoneRegistry.sink { [weak self] registry in
             self?.updateStatusMenuContent()
-            self?.settingsWindowController.updateContent()
+            self?.settingsWindowController.updateContent(trustedIPhones: registry.devices)
             self?.updateDesktopWidget()
         }
-        trustedIPhoneEnrollmentObserver = model.$trustedIPhoneEnrollmentResult.sink { [weak self] _ in
+        trustedIPhoneEnrollmentObserver = model.$trustedIPhoneEnrollmentResult.sink { [weak self] report in
             self?.updateStatusMenuContent()
-            self?.settingsWindowController.updateContent()
+            self?.settingsWindowController.updateContent(enrollmentResult: report)
             self?.updateDesktopWidget()
         }
         alertEventsObserver = model.$latestAlertEvents

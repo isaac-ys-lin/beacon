@@ -225,4 +225,93 @@ final class BeaconUITests: XCTestCase {
         return app
     }
 
+    @MainActor
+    func testIPhoneMissingToolsStopsBeforeEnrollment() throws {
+        continueAfterFailure = false
+        let app = setupApp(scenario: "empty")
+        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "missing"
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons["settings.iphone-setup"].click()
+        XCTAssertTrue(app.staticTexts["iphone.setup.state.toolsMissing"].waitForExistence(timeout: 5))
+        let missingTools = app.staticTexts["iphone.setup.missing-tools"]
+        XCTAssertTrue(missingTools.waitForExistence(timeout: 5))
+        let missingToolsSnapshot = try recordIPhoneSetupEvidence(
+            app, text: missingTools, name: "iphone-missing-tools-fixture-not-hardware"
+        )
+        XCTAssertEqual(missingToolsSnapshot.value as? String, "Missing tools: idevice_id, ideviceinfo")
+        XCTAssertFalse(app.buttons["iphone.setup.check"].exists)
+        app.buttons["iphone.setup.recheck-tools"].click()
+        XCTAssertFalse(app.buttons["iphone.setup.check"].exists)
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testIPhoneSetupConfirmsANewReadingRatherThanEnrollmentOnly() throws {
+        continueAfterFailure = false
+        let app = setupApp(scenario: "empty")
+        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "ready"
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons["settings.iphone-setup"].click()
+        let check = app.buttons["iphone.setup.check"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        check.click()
+        XCTAssertTrue(app.staticTexts["iphone.setup.state.reported"].waitForExistence(timeout: 5))
+        let reading = app.staticTexts["iphone.setup.reading"]
+        XCTAssertTrue(reading.waitForExistence(timeout: 5))
+        let readingSnapshot = try recordIPhoneSetupEvidence(
+            app, text: reading, name: "iphone-new-reading-fixture-not-hardware"
+        )
+        XCTAssertEqual(readingSnapshot.value as? String, "New battery reading: 87%")
+        app.buttons["iphone.setup.done"].click()
+        XCTAssertTrue(window.descendants(matching: .any)["UI Test iPhone"].firstMatch.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testIPhoneEnrollmentWithoutReadingDoesNotReportBatterySuccess() {
+        continueAfterFailure = false
+        let app = setupApp(scenario: "empty")
+        app.launchEnvironment["BEACON_IPHONE_SCENARIO"] = "noBattery"
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons["settings.iphone-setup"].click()
+        let check = app.buttons["iphone.setup.check"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        check.click()
+        XCTAssertTrue(app.staticTexts["iphone.setup.state.noBattery"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["iphone.setup.reading"].exists)
+        XCTAssertTrue(check.isEnabled)
+    }
+
+    /// Keep the actual text attributes and screen before an assertion can stop
+    /// the test. macOS static text exposes its content through AXValue, not AXLabel.
+    @MainActor
+    private func recordIPhoneSetupEvidence(
+        _ app: XCUIApplication,
+        text: XCUIElement,
+        name: String
+    ) throws -> XCUIElementSnapshot {
+        let snapshot = try text.snapshot()
+        let attributes = XCTAttachment(string: """
+            identifier: \(snapshot.identifier)
+            label: \(snapshot.label)
+            value: \(String(describing: snapshot.value))
+            """)
+        attributes.name = "\(name)-text-attributes"
+        attributes.lifetime = .keepAlways
+        add(attributes)
+        let screen = XCTAttachment(screenshot: app.screenshot())
+        screen.name = name
+        screen.lifetime = .keepAlways
+        add(screen)
+        return snapshot
+    }
 }
