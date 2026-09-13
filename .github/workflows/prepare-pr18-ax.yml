@@ -1,0 +1,91 @@
+name: Prepare PR18 accessibility repair
+on:
+  push:
+    branches: [codex/prepare-pr18-ax-repair]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 953041ecad9a2a5ce98ef577a07c1e26d971918c
+      - name: Apply exact authored patch and publish verified source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^{tree})" = 4becc7ff1d9934a406bda587de2ba0bda69b4c0b
+          cat > /tmp/pr18.patch <<'PATCH'
+          diff --git a/Beacon/Mac/DeviceBatteryTrust.swift b/Beacon/Mac/DeviceBatteryTrust.swift
+          index 1af30bc..a13a790 100644
+          --- a/Beacon/Mac/DeviceBatteryTrust.swift
+          +++ b/Beacon/Mac/DeviceBatteryTrust.swift
+          @@ -154,7 +154,6 @@ struct RefreshRecoveryView: View {
+                           .contentShape(Rectangle())
+                           .onTapGesture { isExpanded.toggle() }
+                       }
+          -            .accessibilityIdentifier("refresh.recovery")
+                       .padding(10).beaconSettingsCardSurface()
+                   }
+               }
+          diff --git a/Beacon/Mac/StatusMenuView.swift b/Beacon/Mac/StatusMenuView.swift
+          index 237036b..4377884 100644
+          --- a/Beacon/Mac/StatusMenuView.swift
+          +++ b/Beacon/Mac/StatusMenuView.swift
+          @@ -242,6 +242,7 @@ struct StatusMenuView: View {
+                               // The context-menu wrapper is the exposed AX element on macOS.
+                               // Carry the row's report value on that outer element as well.
+                               .accessibilityElement(children: .ignore)
+          +                    .accessibilityAddTraits(.isStaticText)
+                               .accessibilityLabel(item.displayName)
+                               .accessibilityValue(dashboardBatteryAccessibilityValue(
+                                   for: DashboardBatteryDevice(item: item, isPinned: displayPreferences.isPinned(item)),
+          diff --git a/BeaconUITests/BeaconUITests.swift b/BeaconUITests/BeaconUITests.swift
+          index c81cd2c..9466ce6 100644
+          --- a/BeaconUITests/BeaconUITests.swift
+          +++ b/BeaconUITests/BeaconUITests.swift
+          @@ -359,9 +359,14 @@ final class BeaconUITests: XCTestCase {
+                   defer { app.terminate() }
+                   let settings = app.windows["Beacon Settings"]
+                   XCTAssertTrue(settings.waitForExistence(timeout: 10))
+          -        let disclosure = settings.disclosureTriangles["refresh.recovery"]
+          +        // A container identifier propagates over the content's device IDs on macOS.
+          +        // Locate the native disclosure by its user-facing label instead.
+          +        let disclosure = settings.disclosureTriangles.matching(
+          +            NSPredicate(format: "label BEGINSWITH %@", "Refresh needs attention")
+          +        ).firstMatch
+                   XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+                   disclosure.click()
+          +        XCTAssertEqual(String(describing: try XCTUnwrap(disclosure.snapshot().value)), "1")
+                   let affected = settings.buttons["refresh.inspect.report-other"]
+                   XCTAssertTrue(affected.waitForExistence(timeout: 5))
+                   affected.click()
+          @@ -384,9 +389,14 @@ final class BeaconUITests: XCTestCase {
+                   defer { app.terminate() }
+                   let settings = app.windows["Beacon Settings"]
+                   XCTAssertTrue(settings.waitForExistence(timeout: 10))
+          -        let disclosure = settings.disclosureTriangles["refresh.recovery"]
+          +        // A container identifier propagates over the content's device IDs on macOS.
+          +        // Locate the native disclosure by its user-facing label instead.
+          +        let disclosure = settings.disclosureTriangles.matching(
+          +            NSPredicate(format: "label BEGINSWITH %@", "Refresh needs attention")
+          +        ).firstMatch
+                   XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+                   disclosure.click()
+          +        XCTAssertEqual(String(describing: try XCTUnwrap(disclosure.snapshot().value)), "1")
+                   let impact = settings.staticTexts["refresh.impact-unknown"]
+                   XCTAssertTrue(impact.waitForExistence(timeout: 5))
+                   let evidence = try recordIPhoneSetupEvidence(app, text: impact, name: "report-unknown-impact")
+          PATCH
+          git apply --check /tmp/pr18.patch
+          git apply /tmp/pr18.patch
+          git diff --check
+          git add -u
+          tree=$(git write-tree)
+          test "$tree" = e8712884c4afa94ac33c251c4b3457b3335ae3b6
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          commit=$(git commit-tree "$tree" -p 953041ecad9a2a5ce98ef577a07c1e26d971918c -m 'fix(reports): expose static report values and preserve recovery control identities')
+          git push origin "$commit:refs/heads/codex/prepared-pr18-ax-repair"
+          echo "Prepared commit: $commit; verified tree: $tree" >> "$GITHUB_STEP_SUMMARY"
