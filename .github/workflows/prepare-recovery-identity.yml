@@ -1,0 +1,45 @@
+name: Prepare recovery identity fix
+on:
+  push:
+    branches: [codex/prepare-pr18-recovery-identity]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 827afd51343ccbfa96042ac2a2b9a7bbe2bb1381
+      - shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^{tree})" = 32409f0cd0f43f11cbcb9d4d2f68c3a7db71fc40
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('BeaconUITests/BeaconUITests.swift')
+          s = p.read_text()
+          old = '        XCTAssertTrue(window.descendants(matching: .any)["Magic Keyboard"].firstMatch.waitForExistence(timeout: 5))'
+          new = '''        let recoveredRow = window.descendants(matching: .any).matching(
+                      identifier: statusMenu ? "device.row.preview-keyboard" : "settings.device.preview-keyboard"
+                  ).firstMatch
+                  XCTAssertTrue(recoveredRow.waitForExistence(timeout: 5))
+                  XCTAssertEqual(recoveredRow.label, statusMenu
+                      ? "Magic Keyboard, 82 percent, Latest report" : "Magic Keyboard")
+                  let recoveredEvidence = XCTAttachment(screenshot: window.screenshot())
+                  recoveredEvidence.name = "setup-\\(scenario)-recovered"
+                  recoveredEvidence.lifetime = .keepAlways
+                  add(recoveredEvidence)'''
+          assert s.count(old) == 1
+          p.write_text(s.replace(old, new))
+          PY
+          test "$(git hash-object BeaconUITests/BeaconUITests.swift)" = 76ccd68d9b3c0cc34103238efd07aec8b25af571
+          git diff --check
+          git add -u
+          tree=$(git write-tree)
+          test "$tree" = 5ae5b0bf6222d9c10ea6acc55d3c369b103ed5dc
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          commit=$(git commit-tree "$tree" -p 827afd51343ccbfa96042ac2a2b9a7bbe2bb1381 -m 'test(recovery): target stable device identity and assert complete report after retry')
+          git push origin "$commit:refs/heads/codex/prepared-pr18-recovery-identity"
+          echo "Prepared $commit; tree $tree" >> "$GITHUB_STEP_SUMMARY"
