@@ -53,11 +53,19 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
         }
         #endif
 
+        let environment = ProcessInfo.processInfo.environment
+        let showIntroduction = environment["BEACON_PREVIEW_DATA"] != "1"
+            && environment["XCTestConfigurationFilePath"] == nil
+            && BeaconSetupIntroduction.shouldPresent()
         let model = BeaconModel()
         self.model = model
         statusController = BeaconStatusController(model: model)
         model.refreshNotificationAuthorizationStatus()
         model.start()
+        if showIntroduction {
+            statusController?.showDeviceSetup()
+            UserDefaults.standard.set(true, forKey: BeaconSetupIntroduction.presentedKey)
+        }
 
         #if DEBUG
         if arguments.contains("--ui-test-open-settings") {
@@ -306,6 +314,8 @@ final class BeaconModel: ObservableObject {
     /// 45s background poll can run without surfacing the UI spinner.
     private var refreshInFlight = false
     private let usesPreviewData: Bool
+    private let setupPreviewScenario: String?
+    private var previewRecoveryRequested = false
     private let bluetoothReportReader: (@Sendable () async -> BluetoothBatteryReadReport?)?
 
     var isUsingPreviewData: Bool {
@@ -318,8 +328,11 @@ final class BeaconModel: ObservableObject {
     ) {
         #if DEBUG
         usesPreviewData = environment["BEACON_PREVIEW_DATA"] == "1"
+        let scenario = environment["BEACON_SETUP_SCENARIO"]
+        setupPreviewScenario = usesPreviewData && ["empty", "denied", "failed", "checking"].contains(scenario ?? "") ? scenario : nil
         #else
         usesPreviewData = false
+        setupPreviewScenario = nil
         #endif
         self.bluetoothReportReader = bluetoothReportReader
     }
@@ -361,6 +374,7 @@ final class BeaconModel: ObservableObject {
         }
 
         if usesPreviewData {
+            previewRecoveryRequested = setupPreviewScenario == "denied" || setupPreviewScenario == "failed"
             seedPreviewData()
             return
         }
@@ -483,9 +497,26 @@ final class BeaconModel: ObservableObject {
     private func seedPreviewData() {
         var nextStore = BatterySnapshotStore(now: Date.init)
         let now = Date()
+        if let scenario = setupPreviewScenario, !previewRecoveryRequested {
+            let status: BatteryReadStatus = scenario == "denied" ? .unauthorized : scenario == "failed" ? .timedOut : .noReport
+            latestRefreshDiagnostics = BatteryRefreshDiagnostics(
+                attempts: scenario == "checking" ? [] : [BatteryProviderAttempt(
+                    provider: .coreBluetoothBatteryService, status: status, candidateCount: 0,
+                    message: "UI fixture, not a hardware observation", attemptedAt: now
+                )], refreshedAt: now, snapshotCount: 0
+            )
+            store = nextStore
+            return
+        }
         let previewSnapshots = Self.previewSnapshots(now: now)
         nextStore.merge(previewSnapshots)
-        seedPreviewHistory(now: now)
+        if setupPreviewScenario == nil { seedPreviewHistory(now: now) }
+        if setupPreviewScenario != nil {
+            latestRefreshDiagnostics = BatteryRefreshDiagnostics(attempts: [BatteryProviderAttempt(
+                provider: .coreBluetoothBatteryService, status: .reported, candidateCount: previewSnapshots.count,
+                message: "Recovered UI fixture, not a hardware observation", attemptedAt: now
+            )], refreshedAt: now, snapshotCount: previewSnapshots.count)
+        }
         store = nextStore
         logger.info("Preview battery data loaded for UI QA")
     }

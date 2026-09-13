@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		04BC3F76E0EDFDC270D9CF0C /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B301DB1DFC1AEAD9FFD407 /* BatterySnapshot.swift */; };
 		0E0DE066DF399483F5AAFAFF /* BeaconHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA14437C753C2C72E7DCF4AA /* BeaconHUDView.swift */; };
+		12D854A0F84F96DED504569E /* DeviceSetupRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE2763FE8547526A5E8DC08 /* DeviceSetupRecovery.swift */; };
 		144D530D5C2CE0B5BCD61AE7 /* BeaconQuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83003948902C5FE7458516EE /* BeaconQuickActions.swift */; };
 		1D2571D4A04FFCD5F6F21A8A /* BeaconSettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE98B7B5C78C9741FAEA0A75 /* BeaconSettingsWindowController.swift */; };
 		1E8020A02D87BDE6C54AC508 /* IPhoneLockdownBatteryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16982486B17A8CFA5DDA2116 /* IPhoneLockdownBatteryProvider.swift */; };
@@ -39,6 +40,7 @@
 		A31ACFD3EDCB4768C9EE3082 /* BluetoothBatteryResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0922ECCDF04EFE6136C64551 /* BluetoothBatteryResolver.swift */; };
 		B482AA509249A81FE5F56778 /* DeviceListPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DBB0F2D5F8FF9FFCB1AD693 /* DeviceListPresentation.swift */; };
 		B67A46A69A7E2B90FD534E21 /* BluetoothDeviceScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550C0817368D56189D384E48 /* BluetoothDeviceScanner.swift */; };
+		B98D3CEA1F5C4AE335C4900B /* DeviceSetupRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09072DC8AEC7AFB316789352 /* DeviceSetupRecoveryTests.swift */; };
 		C8E65576C4B592832F6EBC90 /* DeviceListPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2854B69F96AEFF5C6596BAFB /* DeviceListPresentationTests.swift */; };
 		CF8AD3BFEDE12AFB2B19E25B /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6628EF4A0FE3A1028C2E7DE /* DesignTokens.swift */; };
 		D34D7FADF14D90A27D49D1AE /* BeaconSettingsSupportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C076A50AB2933A2E15E880E4 /* BeaconSettingsSupportViews.swift */; };
@@ -71,6 +73,7 @@
 /* Begin PBXFileReference section */
 		035F8236D253BBD9B56A6F07 /* BeaconUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BeaconUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0572BDAF185BEAAA9EE6DDEB /* BeaconMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconMacApp.swift; sourceTree = "<group>"; };
+		09072DC8AEC7AFB316789352 /* DeviceSetupRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSetupRecoveryTests.swift; sourceTree = "<group>"; };
 		0922ECCDF04EFE6136C64551 /* BluetoothBatteryResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothBatteryResolver.swift; sourceTree = "<group>"; };
 		0A4D64755B98EE7C45D25BC8 /* StatusMenuPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuPanelController.swift; sourceTree = "<group>"; };
 		0AFAF2B21F32B40BCE0DDA23 /* DeviceBatteryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceBatteryRow.swift; sourceTree = "<group>"; };
@@ -108,6 +111,7 @@
 		B19A161032A69B238FD0C0E3 /* BeaconUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconUITests.swift; sourceTree = "<group>"; };
 		B8F5CFA3EE741ED116550AFB /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
 		C076A50AB2933A2E15E880E4 /* BeaconSettingsSupportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsSupportViews.swift; sourceTree = "<group>"; };
+		CBE2763FE8547526A5E8DC08 /* DeviceSetupRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSetupRecovery.swift; sourceTree = "<group>"; };
 		CF12E505932A7869669DBDB9 /* BatterySnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshotStore.swift; sourceTree = "<group>"; };
 		D6628EF4A0FE3A1028C2E7DE /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		DA14437C753C2C72E7DCF4AA /* BeaconHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconHUDView.swift; sourceTree = "<group>"; };
@@ -174,6 +178,7 @@
 				69BDB8AD2B4CC24408772E50 /* DashboardSettingsPane.swift */,
 				0AFAF2B21F32B40BCE0DDA23 /* DeviceBatteryRow.swift */,
 				5DBB0F2D5F8FF9FFCB1AD693 /* DeviceListPresentation.swift */,
+				CBE2763FE8547526A5E8DC08 /* DeviceSetupRecovery.swift */,
 				F2BCDB369A305BF624FE3452 /* GeneralSettingsPane.swift */,
 				DEB9CA5465A44CD5B1DA6498 /* GeneralSettingsSupport.swift */,
 				0E213AC3FB1B698F6CEEC722 /* Info.plist */,
@@ -208,6 +213,7 @@
 				FC2247AA89FCDB5CCFE789F0 /* BatterySnapshotStoreTests.swift */,
 				7F7F5FC1C8BDDCD77A766720 /* BluetoothBatteryResolverTests.swift */,
 				2854B69F96AEFF5C6596BAFB /* DeviceListPresentationTests.swift */,
+				09072DC8AEC7AFB316789352 /* DeviceSetupRecoveryTests.swift */,
 				1272E76938E13DEC819BAD84 /* LowBatteryNotifierFreshnessTests.swift */,
 				6D65C05E03CC6517BB8EA7C4 /* WindowAccessibilityTests.swift */,
 			);
@@ -337,6 +343,7 @@
 				757D87D1560E861C813D43C5 /* BatterySnapshotStoreTests.swift in Sources */,
 				E8AA626A2247A7F79EFCE42E /* BluetoothBatteryResolverTests.swift in Sources */,
 				C8E65576C4B592832F6EBC90 /* DeviceListPresentationTests.swift in Sources */,
+				B98D3CEA1F5C4AE335C4900B /* DeviceSetupRecoveryTests.swift in Sources */,
 				243543D8D019ED698C45C488 /* LowBatteryNotifierFreshnessTests.swift in Sources */,
 				376F8A2AA3589AA8668FA2C4 /* WindowAccessibilityTests.swift in Sources */,
 			);
@@ -368,6 +375,7 @@
 				CF8AD3BFEDE12AFB2B19E25B /* DesignTokens.swift in Sources */,
 				4A65059572403B13720EB6EC /* DeviceBatteryRow.swift in Sources */,
 				B482AA509249A81FE5F56778 /* DeviceListPresentation.swift in Sources */,
+				12D854A0F84F96DED504569E /* DeviceSetupRecovery.swift in Sources */,
 				22BD5E2636715103E6BFCC38 /* GeneralSettingsPane.swift in Sources */,
 				697DE07D958B6912197624C2 /* GeneralSettingsSupport.swift in Sources */,
 				1E8020A02D87BDE6C54AC508 /* IPhoneLockdownBatteryProvider.swift in Sources */,

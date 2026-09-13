@@ -64,6 +64,7 @@ final class BeaconStatusController: NSObject {
         }
         refreshDiagnosticsObserver = model.$latestRefreshDiagnostics.sink { [weak self] diagnostics in
             self?.settingsWindowController.updateContent(refreshDiagnostics: diagnostics)
+            self?.updateStatusMenuContent(refreshDiagnostics: diagnostics)
         }
         notificationAuthorizationObserver = model.$notificationAuthorizationState.sink { [weak self] authorizationState in
             self?.updateStatusMenuContent()
@@ -125,6 +126,11 @@ final class BeaconStatusController: NSObject {
         updateDesktopWidget()
     }
 
+    func showDeviceSetup() {
+        closeStatusMenu()
+        settingsWindowController.showWindow(initialPane: .devices, initiallyShowingAddDeviceGuide: true)
+    }
+
     #if DEBUG
     func showSettingsForUITesting() {
         showSettingsWindow(initialPane: .devices)
@@ -166,14 +172,17 @@ final class BeaconStatusController: NSObject {
     private func updateStatusMenuContent(
         screen: NSScreen? = NSScreen.main,
         store: BatterySnapshotStore? = nil,
-        isRefreshing: Bool? = nil
+        isRefreshing: Bool? = nil,
+        refreshDiagnostics: BatteryRefreshDiagnostics? = nil
     ) {
         let configuration = StatusWindowConfiguration.load()
         let renderedStore = store ?? model.store
         let nextSize = preferredPopoverContentSize(
             screen: screen,
             configuration: configuration,
-            store: renderedStore
+            store: renderedStore,
+            isRefreshing: isRefreshing ?? model.isRefreshing,
+            refreshDiagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics
         )
 
         statusMenuPanelController.install(
@@ -182,6 +191,8 @@ final class BeaconStatusController: NSObject {
                 isRefreshing: isRefreshing ?? model.isRefreshing,
                 isPreviewingData: model.isUsingPreviewData,
                 configuration: configuration,
+                refreshDiagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics,
+                onSetUpDevice: { [weak self] in self?.showDeviceSetup() },
                 onRefresh: { [weak model] in
                     Task { await model?.refresh() }
                 },
@@ -224,7 +235,9 @@ final class BeaconStatusController: NSObject {
     private func preferredPopoverContentSize(
         screen: NSScreen? = NSScreen.main,
         configuration: StatusWindowConfiguration = .load(),
-        store: BatterySnapshotStore? = nil
+        store: BatterySnapshotStore? = nil,
+        isRefreshing: Bool = false,
+        refreshDiagnostics: BatteryRefreshDiagnostics = BatteryRefreshDiagnostics()
     ) -> NSSize {
         let defaults = UserDefaults.standard
         let preferences = DeviceDisplayPreferences.load(from: defaults)
@@ -239,7 +252,10 @@ final class BeaconStatusController: NSObject {
         let screenHeight = screen?.visibleFrame.height ?? 900
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: dashboardItemCount,
-            visibleScreenHeight: screenHeight
+            visibleScreenHeight: screenHeight,
+            supplementalHeight: (DeviceSetupRecoveryState.resolve(
+                visibleCount: dashboardItemCount, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
+            ) == .ready ? 0 : 230) + (model.isUsingPreviewData ? 34 : 0)
         )
         return NSSize(width: size.width, height: size.height)
     }

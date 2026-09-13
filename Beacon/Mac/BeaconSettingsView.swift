@@ -168,10 +168,11 @@ struct BeaconSettingsView: View {
             alertPreferencesRevision &+= 1
         }
         .sheet(isPresented: $isShowingAddDeviceGuide) {
-            AddDeviceGuideView(
-                trustedIPhoneEnrollmentResult: trustedIPhoneEnrollmentResult,
+            DeviceSetupGuide(
+                enrollmentResult: trustedIPhoneEnrollmentResult,
                 onOpenBluetoothSettings: onOpenBluetoothSettings,
                 onTrustConnectedIPhone: onTrustConnectedIPhone,
+                onRefresh: onRefresh,
                 onDismiss: { isShowingAddDeviceGuide = false }
             )
         }
@@ -302,6 +303,12 @@ struct BeaconSettingsView: View {
 
     private var devicesTab: some View {
         VStack(alignment: .leading, spacing: 10) {
+            DeviceSetupRecoveryCard(
+                state: .resolve(visibleCount: displayedDeviceRows.count, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics),
+                isRefreshing: isRefreshing,
+                onSetUp: { isShowingAddDeviceGuide = true },
+                onRefresh: onRefresh
+            )
             RefreshHealthDisclosureView(diagnostics: refreshDiagnostics)
 
             HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
@@ -319,7 +326,9 @@ struct BeaconSettingsView: View {
 
                         if let selectedDevice {
                             deviceDetail(for: selectedDevice)
-                        } else {
+                        } else if DeviceSetupRecoveryState.resolve(
+                            visibleCount: 0, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
+                        ) == .empty {
                             emptyDeviceDetail
                         }
                     }

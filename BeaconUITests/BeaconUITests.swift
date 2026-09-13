@@ -164,4 +164,65 @@ final class BeaconUITests: XCTestCase {
             add(attachment)
         }
     }
+    @MainActor
+    func testEmptyDevicesCanOpenSetupAndReturnWithEscape() {
+        continueAfterFailure = false
+        let app = setupApp(scenario: "empty")
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        XCTAssertTrue(window.staticTexts["setup.state.empty"].waitForExistence(timeout: 5))
+        window.buttons["setup.open-guide"].click()
+        let done = app.buttons["setup.guide.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: done)
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
+        XCTAssertTrue(window.buttons["setup.retry"].isEnabled)
+        window.buttons["setup.retry"].click()
+        XCTAssertTrue(window.staticTexts["setup.state.empty"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testDeniedBluetoothCanRecheckAndRecoverWithoutRelaunch() {
+        verifySetupRecovery(scenario: "denied", state: "permission", statusMenu: false)
+    }
+
+    @MainActor
+    func testFailedStatusMenuCheckCanRecoverWithoutFakeEmptyState() {
+        verifySetupRecovery(scenario: "failed", state: "failed", statusMenu: true)
+    }
+
+    @MainActor
+    private func verifySetupRecovery(scenario: String, state: String, statusMenu: Bool) {
+        continueAfterFailure = false
+        let app = setupApp(scenario: scenario, statusMenu: statusMenu)
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows[statusMenu ? "Beacon Status Menu" : "Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        let notice = window.staticTexts["setup.state.\(state)"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertFalse(window.staticTexts["setup.state.empty"].exists)
+        if state == "permission" { XCTAssertTrue(window.buttons["setup.open-privacy"].exists) }
+        let evidence = XCTAttachment(screenshot: window.screenshot())
+        evidence.name = "setup-\(scenario)"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        window.buttons["setup.retry"].click()
+        let recovered = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: notice)
+        XCTAssertEqual(XCTWaiter.wait(for: [recovered], timeout: 5), .completed)
+        XCTAssertTrue(window.descendants(matching: .any)["Magic Keyboard"].firstMatch.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func setupApp(scenario: String, statusMenu: Bool = false) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = [statusMenu ? "--ui-test-open-status-menu" : "--ui-test-open-settings", "-AppleLanguages", "(en)"]
+        app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
+        app.launchEnvironment["BEACON_SETUP_SCENARIO"] = scenario
+        return app
+    }
+
 }
