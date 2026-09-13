@@ -240,10 +240,9 @@ struct StatusMenuView: View {
                         deviceContextMenu(for: item, displayName: item.displayName)
                     }
                     // The context-menu wrapper is the exposed AX element on macOS.
-                    // Carry the row's report value on that outer element as well.
+                    // This wrapper exposes AXLabel, but not AXValue.
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(item.displayName)
-                    .accessibilityValue(dashboardBatteryAccessibilityValue(
+                    .accessibilityLabel(item.displayName + ", " + dashboardBatteryAccessibilityValue(
                         for: DashboardBatteryDevice(item: item, isPinned: displayPreferences.isPinned(item)),
                         statusText: DeviceBatteryPresentation(item: item).state.title))
                     .accessibilityIdentifier("device.row.\(item.id)")

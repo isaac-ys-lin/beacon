@@ -325,7 +325,7 @@ final class BeaconUITests: XCTestCase {
         hierarchy.lifetime = .keepAlways
         add(hierarchy)
         let rowSnapshot = try recordIPhoneSetupEvidence(app, text: row, name: "report-menu-\(scenario)-attributes")
-        let rowValue = try XCTUnwrap(rowSnapshot.value as? String)
+        let rowValue = rowSnapshot.label
         XCTAssertTrue(rowValue.localizedCaseInsensitiveContains(expected), row.debugDescription)
         if hasPercent {
             XCTAssertTrue(rowValue.contains("Last known: 40%"), rowValue)
@@ -359,7 +359,7 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let settings = app.windows["Beacon Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10))
-        let disclosure = settings.disclosureTriangles["refresh.recovery"]
+        let disclosure = settings.disclosureTriangles.matching(NSPredicate(format: "label BEGINSWITH %@", "Refresh needs attention")).firstMatch
         XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
         disclosure.click()
         let affected = settings.buttons["refresh.inspect.report-other"]
@@ -384,7 +384,7 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let settings = app.windows["Beacon Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10))
-        let disclosure = settings.disclosureTriangles["refresh.recovery"]
+        let disclosure = settings.disclosureTriangles.matching(NSPredicate(format: "label BEGINSWITH %@", "Refresh needs attention")).firstMatch
         XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
         disclosure.click()
         let impact = settings.staticTexts["refresh.impact-unknown"]

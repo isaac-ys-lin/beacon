@@ -142,7 +142,7 @@ enum BeaconSystemSettingsActions {
 enum MenuBarBatteryFormatter {
     static func menuBarText(for snapshots: [DecoratedBatterySnapshot]) -> String? {
         let percents = snapshots.compactMap { decorated -> Int? in
-            guard decorated.freshness != .expired else { return nil }
+            guard decorated.freshness == .fresh, decorated.snapshot.readStatus == .reported else { return nil }
             guard decorated.snapshot.connectionState == .connected else { return nil }
             return decorated.snapshot.percent
         }

@@ -76,6 +76,33 @@ extension DeviceListPresentationTests {
         XCTAssertTrue(missing.contains("No battery report"), missing)
     }
 
+    func testCurrentSummariesExcludeFailedStaleAndDisconnectedReports() {
+        let now = Date()
+        let current = DecoratedBatterySnapshot(snapshot: BatterySnapshot(deviceID: "current",
+            displayName: "Current", kind: .keyboard, percent: 80, chargeState: .unplugged,
+            source: .coreBluetooth, updatedAt: now), freshness: .fresh)
+        for status in [BatteryReadStatus.unauthorized, .timedOut] {
+            let failure = BatteryProviderAttempt(provider: .coreBluetoothBatteryService, status: status,
+                candidateCount: 0, message: "fixture", attemptedAt: now, affectedDeviceIDs: ["current"])
+            let failed = batterySnapshotsWithKnownFailures([current], diagnostics: .init(attempts: [failure]))
+            XCTAssertNil(MenuBarBatteryFormatter.menuBarText(for: failed))
+            XCTAssertEqual(BeaconShortcutSnapshotFormatter.summary(for: failed).reportedDeviceCount, 0)
+        }
+        for freshness in [Freshness.stale, .expired] {
+            let cached = DecoratedBatterySnapshot(snapshot: current.snapshot, freshness: freshness)
+            XCTAssertNil(MenuBarBatteryFormatter.menuBarText(for: [cached]))
+            XCTAssertEqual(BeaconShortcutSnapshotFormatter.summary(for: [cached]).reportedDeviceCount, 0)
+        }
+        let disconnected = DecoratedBatterySnapshot(snapshot: BatterySnapshot(deviceID: "old",
+            displayName: "Old", kind: .keyboard, percent: 10, chargeState: .charging,
+            connectionState: .disconnected, source: .coreBluetooth, updatedAt: now), freshness: .fresh)
+        let summary = BeaconShortcutSnapshotFormatter.summary(for: [current, disconnected])
+        XCTAssertEqual(summary.reportedDeviceCount, 1)
+        XCTAssertEqual(summary.lowestBatteryLine, "Current 80%")
+        XCTAssertTrue(summary.lowBatteryLines.isEmpty)
+        XCTAssertTrue(summary.chargingLines.isEmpty)
+    }
+
     func testOldDiagnosticsDecodeWithoutAnAffectedDeviceClaim() throws {
         let old = Data(#"{"provider":"systemProfiler","status":"timedOut","candidateCount":0,"message":"old","attemptedAt":0}"#.utf8)
         let decoded = try JSONDecoder().decode(BatteryProviderAttempt.self, from: old)

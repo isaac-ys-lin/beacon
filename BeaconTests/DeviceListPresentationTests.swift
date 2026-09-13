@@ -2127,14 +2127,14 @@ final class DeviceListPresentationTests: XCTestCase {
             lowBatteryThreshold: 20
         )
 
-        XCTAssertEqual(summary.reportedDeviceCount, 4)
+        XCTAssertEqual(summary.reportedDeviceCount, 3)
         XCTAssertEqual(summary.lowestBatteryLine, "Apple Watch 18%")
         XCTAssertEqual(summary.lowBatteryLines, ["Apple Watch 18%"])
         XCTAssertEqual(summary.chargingLines, ["Isaac's iPhone 64%"])
         XCTAssertEqual(summary.staleDeviceCount, 1)
         XCTAssertEqual(
             summary.summaryText,
-            "Beacon: 4 reporting devices. Lowest: Apple Watch 18%. Low battery: Apple Watch 18%. Charging: Isaac's iPhone 64%. Stale reports: 1."
+            "Beacon: 3 reporting devices. Lowest: Apple Watch 18%. Low battery: Apple Watch 18%. Charging: Isaac's iPhone 64%. Stale reports: 1."
         )
         XCTAssertEqual(
             BeaconShortcutSnapshotFormatter.lowBatteryText(
