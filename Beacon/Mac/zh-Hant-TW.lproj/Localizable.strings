@@ -517,3 +517,5 @@
 "Check Result" = "檢查結果";
 "Connection Details" = "連線詳細資訊";
 "Device names are not used to match Bluetooth identities or audio outputs." = "不會以裝置名稱比對藍牙身分或音訊輸出。";
+
+"Review Result" = "查看結果";
