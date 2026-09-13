@@ -320,7 +320,11 @@ final class BeaconUITests: XCTestCase {
         menuEvidence.name = "report-menu-\(scenario)"
         menuEvidence.lifetime = .keepAlways
         add(menuEvidence)
-        let rowSnapshot = try row.snapshot()
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "report-menu-\(scenario)-hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        let rowSnapshot = try recordIPhoneSetupEvidence(app, text: row, name: "report-menu-\(scenario)-attributes")
         let rowValue = try XCTUnwrap(rowSnapshot.value as? String)
         XCTAssertTrue(rowValue.localizedCaseInsensitiveContains(expected), row.debugDescription)
         if hasPercent {

@@ -56,6 +56,26 @@ extension DeviceListPresentationTests {
         XCTAssertEqual(row.reportState, .stale)
     }
 
+    func testCachedCompositeAccessibilityExplicitlyMarksLastKnownReadings() {
+        let snapshots = ["left", "right"].map { slot in
+            DecoratedBatterySnapshot(snapshot: BatterySnapshot(deviceID: "headset-\(slot)",
+                displayName: "Headset", kind: .airPods, percent: 40, chargeState: .charging,
+                connectionState: .disconnected, source: .systemProfiler, updatedAt: Date()), freshness: .fresh)
+        }
+        let item = groupedDeviceItems(snapshots).flatMap(\.items).first!
+        let device = DashboardBatteryDevice(item: item)
+        let value = dashboardBatteryAccessibilityValue(for: device, statusText: device.reportState.title)
+        XCTAssertTrue(value.contains("Last known: 40%"), value)
+        XCTAssertTrue(value.contains("Disconnected"), value)
+        XCTAssertFalse(value.contains("charging"), value)
+        let absent = DashboardBatteryDevice(item: .device(.init(snapshot: BatterySnapshot(
+            deviceID: "none", displayName: "None", kind: .keyboard, percent: nil,
+            chargeState: .unknown, source: .coreBluetooth, readStatus: .noReport, updatedAt: Date()), freshness: .fresh)))
+        let missing = dashboardBatteryAccessibilityValue(for: absent, statusText: absent.reportState.title)
+        XCTAssertTrue(missing.contains("No report"), missing)
+        XCTAssertTrue(missing.contains("No battery report"), missing)
+    }
+
     func testOldDiagnosticsDecodeWithoutAnAffectedDeviceClaim() throws {
         let old = Data(#"{"provider":"systemProfiler","status":"timedOut","candidateCount":0,"message":"old","attemptedAt":0}"#.utf8)
         let decoded = try JSONDecoder().decode(BatteryProviderAttempt.self, from: old)

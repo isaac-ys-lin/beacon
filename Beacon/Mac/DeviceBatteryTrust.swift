@@ -151,6 +151,8 @@ struct RefreshRecoveryView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { isExpanded.toggle() }
             }
             .accessibilityIdentifier("refresh.recovery")
             .padding(10).beaconSettingsCardSurface()

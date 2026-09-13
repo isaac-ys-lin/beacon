@@ -747,7 +747,6 @@ func dashboardBatteryAccessibilityValue(
     }
 
     if statusText != BeaconL10n.string("Battery"),
-       statusText != BeaconL10n.string("No report"),
        statusText != BeaconL10n.string("Parts") {
         parts.append(statusText)
     }
@@ -771,7 +770,9 @@ private func airPodsComponentAccessibilityDescription(_ component: AirPodsCompon
     let trust = DeviceBatteryPresentation(component: component)
     var parts = [name]
     if let percent = trust.percent {
-        parts.append(BeaconL10n.format("%d percent", percent))
+        parts.append(trust.state == .current
+            ? BeaconL10n.format("%d percent", percent)
+            : BeaconL10n.format("Last known: %d%%", percent))
     } else {
         parts.append(BeaconL10n.string("no battery report"))
     }
