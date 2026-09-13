@@ -1,1 +1,1 @@
-{"base":"f4a2e86fc6820fbb3849f10ccff6461a78a3a472","target":"codex/issue-13-release-verification","message":"fix(distribution): fail closed on unverified DMG signing and notarization (#13)","payload":".beacon-source/issue13-review"}
+{"base":"f4a2e86fc6820fbb3849f10ccff6461a78a3a472","target":"codex/issue-12-regression-evidence","message":"test(acceptance): exercise native export, desktop windows and six-pane settings (#12)","payload":".beacon-source/issue12-review"}
