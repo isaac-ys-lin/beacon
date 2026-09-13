@@ -42,20 +42,23 @@ final class AcceptanceSurfaceUITests: XCTestCase {
         let export = window.buttons["general.history.export"]
         XCTAssertTrue(export.waitForExistence(timeout: 5))
         export.click()
-        let cancel = app.buttons["Cancel"].firstMatch
+        // NSSavePanel is an AX dialog; do not match the duplicate Touch Bar actions.
+        let savePanel = app.dialogs["save-panel"]
+        XCTAssertTrue(savePanel.waitForExistence(timeout: 5))
+        let cancel = savePanel.buttons["CancelButton"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 5))
-        evidence(app.windows.firstMatch, name: "native-history-save-panel")
+        evidence(savePanel, name: "native-history-save-panel")
         cancel.click()
         absent(cancel)
         XCTAssertFalse(window.staticTexts["Battery history exported."].exists)
         XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
 
         export.click()
-        let save = app.buttons["Save"].firstMatch
+        let save = savePanel.buttons["OKButton"]
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         // Exercise the standard save panel's Go to Folder UI, not an injected output URL.
         app.typeKey("g", modifierFlags: [.command, .shift])
-        let go = app.buttons["Go"].firstMatch
+        let go = savePanel.buttons["Go"].firstMatch
         XCTAssertTrue(go.waitForExistence(timeout: 5))
         app.typeKey("a", modifierFlags: .command)
         app.typeText(directory.path)
@@ -97,7 +100,8 @@ final class AcceptanceSurfaceUITests: XCTestCase {
         let app = app(arguments: ["--ui-test-show-desktop", "-Beacon.desktopWidget.show", "YES",
                                   "-Beacon.desktopWidget.style", style])
         app.launch(); defer { app.terminate() }
-        let widget = app.windows["Beacon Desktop Widget"]
+        // AppKit exposes an NSPanel as AXDialog, unlike the settings NSWindow.
+        let widget = app.dialogs["Beacon Desktop Widget"]
         XCTAssertTrue(widget.waitForExistence(timeout: 10))
         XCTAssertEqual(widget.frame.width, width, accuracy: 2)
         let reportTime = widget.staticTexts["desktop.report-time"]
