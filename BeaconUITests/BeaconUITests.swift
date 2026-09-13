@@ -213,7 +213,11 @@ final class BeaconUITests: XCTestCase {
         window.buttons["setup.retry"].click()
         let recovered = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: notice)
         XCTAssertEqual(XCTWaiter.wait(for: [recovered], timeout: 5), .completed)
-        XCTAssertTrue(window.descendants(matching: .any)["Magic Keyboard"].firstMatch.waitForExistence(timeout: 5))
+        let recoveredDevice = window.descendants(matching: .any)[
+            statusMenu ? "device.row.preview-keyboard" : "settings.device.preview-keyboard"
+        ].firstMatch
+        XCTAssertTrue(recoveredDevice.waitForExistence(timeout: 5))
+        XCTAssertTrue(recoveredDevice.label.contains("Magic Keyboard"))
     }
 
     @MainActor
