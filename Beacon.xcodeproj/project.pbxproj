@@ -29,6 +29,7 @@
 		4B647AFD6121C4383E769C95 /* BluetoothConnectionControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3587C8CB38433509CF5D6DD0 /* BluetoothConnectionControls.swift */; };
 		51AED715AB0260398EA3545E /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8F5CFA3EE741ED116550AFB /* StatusMenuView.swift */; };
 		53073ECBB082D056B27B050F /* BeaconAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F3CF1AFAD597E2693F9D08 /* BeaconAppShortcuts.swift */; };
+		53EDB326D87005C67CAF6DFF /* AcceptanceSurfaceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E42F61E407BBD4B04033C0 /* AcceptanceSurfaceUITests.swift */; };
 		58FB82C93A5920099D0A9E04 /* LowBatteryNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3024F441E85EF1AF639F9032 /* LowBatteryNotifier.swift */; };
 		59F788D19ED976594AE8F377 /* BluetoothConnectionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2415A1476B06AEB4611266D9 /* BluetoothConnectionUITests.swift */; };
 		5B7D1A21024B8E1E55A43919 /* StatusMenuPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4D64755B98EE7C45D25BC8 /* StatusMenuPanelController.swift */; };
@@ -109,6 +110,7 @@
 		3BF7B76AFDE63316A38FC936 /* IPhoneSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneSetupView.swift; sourceTree = "<group>"; };
 		4738A433E5F28FC4D87CFDD6 /* BeaconSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsView.swift; sourceTree = "<group>"; };
 		51CC15AD0413CC94BA3FA1CF /* QuickActionsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsSettingsPane.swift; sourceTree = "<group>"; };
+		51E42F61E407BBD4B04033C0 /* AcceptanceSurfaceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceSurfaceUITests.swift; sourceTree = "<group>"; };
 		53C5DC048F9ABEE693CA436C /* TrustedIPhoneRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustedIPhoneRegistry.swift; sourceTree = "<group>"; };
 		550C0817368D56189D384E48 /* BluetoothDeviceScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothDeviceScanner.swift; sourceTree = "<group>"; };
 		58F16D3C33EE768C2BB31D7C /* BatteryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryHistoryStore.swift; sourceTree = "<group>"; };
@@ -169,6 +171,7 @@
 		310A6E5613670DF7E7DF9A13 /* BeaconUITests */ = {
 			isa = PBXGroup;
 			children = (
+				51E42F61E407BBD4B04033C0 /* AcceptanceSurfaceUITests.swift */,
 				B19A161032A69B238FD0C0E3 /* BeaconUITests.swift */,
 				2415A1476B06AEB4611266D9 /* BluetoothConnectionUITests.swift */,
 				7FA54B110A1A37091A518424 /* ConnectionHUDUITests.swift */,
@@ -449,6 +452,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				53EDB326D87005C67CAF6DFF /* AcceptanceSurfaceUITests.swift in Sources */,
 				EBDBD7AD39672AD7DAC6A950 /* BeaconUITests.swift in Sources */,
 				59F788D19ED976594AE8F377 /* BluetoothConnectionUITests.swift in Sources */,
 				6C2457FBB8F673CB68F35A59 /* ConnectionHUDUITests.swift in Sources */,

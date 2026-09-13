@@ -124,6 +124,7 @@ final class BeaconUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-open-settings", "-AppleLanguages", "(\(language))", "-Beacon.appearanceTheme", theme]
         app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
+        app.launchEnvironment["BEACON_SETTINGS_MINIMUM_SIZE"] = "1"
         return app
     }
 
@@ -136,11 +137,17 @@ final class BeaconUITests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
         let isChinese = language == "zh-Hant-TW"
-        for pane in ["quickActions", "alerts", "actionHUD", "dashboard"] {
+        for pane in ["general", "devices", "quickActions", "alerts", "actionHUD", "dashboard"] {
             let button = window.buttons["settings.pane.\(pane)"]
             XCTAssertTrue(button.waitForExistence(timeout: 5))
             button.click()
             switch pane {
+            case "general":
+                XCTAssertTrue(window.buttons["general.history.export"].waitForExistence(timeout: 5))
+                XCTAssertTrue(window.buttons["general.launch-at-login.refresh"].exists)
+            case "devices":
+                XCTAssertTrue(window.buttons["settings.refresh"].waitForExistence(timeout: 5))
+                XCTAssertTrue(window.buttons["settings.iphone-setup"].exists)
             case "quickActions":
                 let toggle = window.descendants(matching: .any).matching(identifier: "quickActions.showDashboard").firstMatch
                 XCTAssertTrue(toggle.waitForExistence(timeout: 5))

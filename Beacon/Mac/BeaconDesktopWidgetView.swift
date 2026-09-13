@@ -9,7 +9,8 @@ enum DesktopWidgetPreferences {
 
     static var frameAutosaveName: String {
         #if DEBUG
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || ProcessInfo.processInfo.arguments.contains("--ui-test-show-desktop") {
             return "\(productionFrameAutosaveName).Tests"
         }
         #endif
@@ -199,6 +200,8 @@ struct BatteryDesktopWidgetView: View {
         .clipShape(RoundedRectangle(cornerRadius: NativeMacStyle.widgetCornerRadius, style: .continuous))
         .shadow(color: theme.shadow, radius: 18, x: 0, y: 10)
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("desktop.widget")
     }
 
     private var header: some View {
@@ -210,6 +213,7 @@ struct BatteryDesktopWidgetView: View {
                     .font(DesignTokens.Typography.sectionTitle)
                     .foregroundStyle(theme.textPrimary)
                 Text(latestUpdateText)
+                    .accessibilityIdentifier("desktop.report-time")
                     .font(DesignTokens.Typography.caption)
                     .foregroundStyle(theme.textMuted)
             }
@@ -288,6 +292,19 @@ final class BeaconDesktopWidgetController {
     }
 
     #if DEBUG
+    // Same narrow AX adapter as the HUD/menu tests. Production stays nonactivating.
+    func exposeWindowToAccessibilityForUITesting() {
+        guard let window else { return }
+        let size = window.contentRect(forFrameRect: window.frame).size
+        window.styleMask.remove(.nonactivatingPanel)
+        window.styleMask.formUnion([.titled, .fullSizeContentView])
+        window.title = "Beacon Desktop Widget"
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.setContentSize(size)
+        window.makeKeyAndOrderFront(nil)
+    }
+
     var debugWindowFrame: NSRect? {
         window?.frame
     }

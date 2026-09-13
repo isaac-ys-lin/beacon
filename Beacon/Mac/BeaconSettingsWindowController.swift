@@ -143,7 +143,12 @@ final class BeaconSettingsWindowController {
         window.titlebarAppearsTransparent = false
         window.backgroundColor = .controlBackgroundColor
         window.isReleasedWhenClosed = false
-        let autosaveName = "Beacon.SettingsWindow"
+        var autosaveName = "Beacon.SettingsWindow"
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--ui-test-") }) {
+            autosaveName += ".UITests"
+        }
+        #endif
         if !window.setFrameUsingName(autosaveName) {
             window.center()
         }

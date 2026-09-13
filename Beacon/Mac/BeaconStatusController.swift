@@ -155,6 +155,16 @@ final class BeaconStatusController: NSObject {
     #if DEBUG
     func showSettingsForUITesting() {
         showSettingsWindow(initialPane: .devices)
+        if ProcessInfo.processInfo.environment["BEACON_SETTINGS_MINIMUM_SIZE"] == "1" {
+            settingsWindowController.debugWindow?.setContentSize(NSSize(width: 900, height: 620))
+        }
+    }
+
+    func showDesktopWidgetForUITesting() {
+        // Use the same presentation and routing as the user's actual desktop panel.
+        // The test sets visibility/style through the argument domain, not saved preferences.
+        updateDesktopWidget()
+        desktopWidgetController.exposeWindowToAccessibilityForUITesting()
     }
 
     func showHUDForUITesting() {

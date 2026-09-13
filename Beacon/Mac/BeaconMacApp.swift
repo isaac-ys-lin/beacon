@@ -20,6 +20,7 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
         #if DEBUG
         let arguments = Set(ProcessInfo.processInfo.arguments)
         let panelUITestArguments: Set<String> = [
+            "--ui-test-show-desktop",
             "--ui-test-show-hud",
             "--ui-test-open-status-menu"
         ]
@@ -45,6 +46,7 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
         #if DEBUG
         let arguments = Set(ProcessInfo.processInfo.arguments)
         let panelUITestArguments: Set<String> = [
+            "--ui-test-show-desktop",
             "--ui-test-show-hud",
             "--ui-test-open-status-menu"
         ]
@@ -76,6 +78,9 @@ final class BeaconMacApp: NSObject, NSApplicationDelegate, UNUserNotificationCen
         }
         if arguments.contains("--ui-test-open-status-menu") {
             statusController?.showStatusMenuForUITesting()
+        }
+        if arguments.contains("--ui-test-show-desktop") {
+            statusController?.showDesktopWidgetForUITesting()
         }
         #endif
     }
