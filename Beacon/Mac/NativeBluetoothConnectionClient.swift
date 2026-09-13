@@ -44,7 +44,7 @@ private final class NativeBluetoothConnectionBackend {
             // Audio/video, HID peripherals, and unclassified paired accessories. Phones and
             // computers keep their existing setup flows; no cross-Mac transfer is introduced.
             let major = device.deviceClassMajor
-            guard major == 0 || major == kBluetoothDeviceClassMajorAudioVideo
+            guard major == 0 || major == kBluetoothDeviceClassMajorAudio
                     || major == kBluetoothDeviceClassMajorPeripheral else { return nil }
             let kind: DeviceKind
             if major == kBluetoothDeviceClassMajorPeripheral {
