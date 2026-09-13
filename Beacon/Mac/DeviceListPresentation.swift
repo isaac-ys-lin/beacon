@@ -708,12 +708,13 @@ public func dashboardDeviceSections(
 
 public func statusMenuDeviceSections(
     _ snapshots: [DecoratedBatterySnapshot],
-    preferences: DeviceDisplayPreferences
+    preferences: DeviceDisplayPreferences,
+    pairedDeviceIDs: Set<String> = []
 ) -> [DeviceSection] {
     return configuredDeviceSections(snapshots, preferences: preferences)
         .compactMap { section in
             let visibleItems = section.items.filter {
-                isDashboardVisibleItem($0) || isStatusMenuFallbackVisibleItem($0)
+                isDashboardVisibleItem($0) || isStatusMenuFallbackVisibleItem($0) || pairedDeviceIDs.contains($0.id)
             }
             guard !visibleItems.isEmpty else { return nil }
             return DeviceSection(items: visibleItems)
@@ -764,7 +765,8 @@ private func airPodsConnectionState(for components: [AirPodsComponent]) -> Conne
 
 public func deviceInspectorItems(
     _ snapshots: [DecoratedBatterySnapshot],
-    preferences: DeviceDisplayPreferences
+    preferences: DeviceDisplayPreferences,
+    pairedDeviceIDs: Set<String> = []
 ) -> [DeviceInspectorItem] {
     groupedDeviceItems(snapshots)
         .flatMap(\.items)
@@ -789,7 +791,7 @@ public func deviceInspectorItems(
                 item: item,
                 isPinned: preferences.isPinned(item),
                 isUserHidden: preferences.isHidden(item),
-                isUnavailable: isConnectionUnavailableItem(item)
+                isUnavailable: isConnectionUnavailableItem(item) && !pairedDeviceIDs.contains(item.id)
             )
         }
 }
@@ -1009,6 +1011,7 @@ private func controlTargetSort(_ lhs: DeviceListItem, _ rhs: DeviceListItem) -> 
     if lhsPercent != rhsPercent {
         return lhsPercent < rhsPercent
     }
+    if lhs.displayName == rhs.displayName { return lhs.id < rhs.id }
     return lhs.displayName.localizedStandardCompare(rhs.displayName) == .orderedAscending
 }
 
