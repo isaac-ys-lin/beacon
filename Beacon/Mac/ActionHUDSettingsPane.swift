@@ -15,7 +15,7 @@ struct ActionHUDSettingsPane: View {
                 Section {
                     Toggle("Show Action HUD", isOn: $showActionHUD)
                 } footer: {
-                    Text("Show polished in-app alerts for important battery events.")
+                    Text("Show device connection progress, results, and battery alerts.")
                 }
 
                 Section {

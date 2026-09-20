@@ -40,13 +40,19 @@ struct BluetoothConnectionControls: View {
                         .accessibilityLabel(Text(BeaconL10n.format("Device identity: %@", address)))
                 }
                 HStack(spacing: 8) {
-                    Button(BeaconL10n.string(paired?.isConnected == true && paired?.requiresAudioConfirmation == true
-                        ? "Use for Audio" : "Connect")) { run(.connect) }
-                        .disabled(busy || paired == nil || (paired?.isConnected == true && paired?.requiresAudioConfirmation != true))
-                        .accessibilityIdentifier("connection.connect.\(address)")
-                    Button("Disconnect") { run(.disconnect) }
-                        .disabled(busy || paired?.isConnected != true)
-                        .accessibilityIdentifier("connection.disconnect.\(address)")
+                    if paired?.isConnected != true || paired?.requiresAudioConfirmation == true {
+                        Button(BeaconL10n.string(paired?.isConnected == true ? "Use for Audio" : "Connect")) { run(.connect) }
+                            .disabled(busy || paired == nil)
+                            .accessibilityIdentifier("connection.connect.\(address)")
+                            .accessibilityLabel(Text(BeaconL10n.format(paired?.isConnected == true
+                                ? "Use %@ for audio" : "Connect %@", item.displayName)))
+                    }
+                    if paired?.isConnected == true {
+                        Button("Disconnect") { run(.disconnect) }
+                            .disabled(busy)
+                            .accessibilityIdentifier("connection.disconnect.\(address)")
+                            .accessibilityLabel(Text(BeaconL10n.format("Disconnect %@", item.displayName)))
+                    }
                     if let operation, operation.phase.isFailure {
                         Button("Check Result") {
                             controller.perform(operation.action, deviceID: item.id,

@@ -226,6 +226,7 @@
 "Preferred Microphone" = "偏好的麥克風";
 "Sound Settings" = "聲音設定";
 "Use Sound Settings to apply the actual listening mode or microphone change." = "請使用「聲音設定」實際變更聆聽模式或麥克風。";
+"Choose audio output and input in Sound Settings. Change AirPods listening modes in Control Center or Bluetooth Settings." = "請在「聲音設定」選擇音訊輸出與輸入；請在「控制中心」或「藍牙設定」變更 AirPods 聆聽模式。";
 "Automatic" = "自動";
 "Noise Cancellation" = "降噪";
 "Transparency" = "通透模式";
@@ -514,8 +515,27 @@
 "Connection control does not require a battery report." = "沒有電量報告也能操作連線。";
 "Device identity: %@" = "裝置識別碼：%@";
 "Use for Audio" = "設為音訊輸出";
+"Use %@ for audio" = "將 %@ 設為音訊輸出";
+"Connect %@" = "連線至 %@";
+"Disconnect %@" = "中斷 %@ 的連線";
+"Other devices, %d" = "其他裝置，%d 部";
 "Check Result" = "檢查結果";
 "Connection Details" = "連線詳細資訊";
 "Device names are not used to match Bluetooth identities or audio outputs." = "不會以裝置名稱比對藍牙身分或音訊輸出。";
 
 "Review Result" = "查看結果";
+
+"Other devices" = "其他裝置";
+"Collapsed" = "已收合";
+
+"Low at %d%% · Full charge" = "低電量 %d%%・充滿時";
+"Low at %d%%" = "低電量 %d%%";
+"Full charge" = "充滿時";
+"Alerts off" = "提醒已關閉";
+"Show device connection progress, results, and battery alerts." = "顯示裝置連線進度、操作結果與電量提醒。";
+
+"Pin to Top" = "釘選至最上方";
+"Pinned devices appear first when connected. Disconnected devices stay in Other devices." = "已連線的釘選裝置會排在最上方；未連線時仍收在「其他裝置」。";
+
+"Paired audio devices appear even without a battery report. Other supported devices appear when they report battery levels." = "已配對的音訊裝置即使沒有電量回報也會出現；其他支援的裝置會在回報電量後出現。";
+"Refresh after pairing or connecting your device." = "配對或連接裝置後，請重新整理。";

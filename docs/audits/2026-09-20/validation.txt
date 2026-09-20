@@ -1,0 +1,51 @@
+RED: original predicates
+/Users/isaacyslin/Code/airbuddy/BeaconTests/BluetoothConnectionControllerTests.swift:289: error: -[BeaconTests.BluetoothConnectionControllerTests testAudioOutputCapabilityRequiresAudioDeviceOrServiceClass] : XCTAssertFalse failed
+/Users/isaacyslin/Code/airbuddy/BeaconTests/BluetoothConnectionControllerTests.swift:59: error: -[BeaconTests.BluetoothConnectionControllerTests testPrimaryMenuKeepsOnlyConnectedOrInProgressDevices] : XCTAssertFalse failed
+/Users/isaacyslin/Code/airbuddy/BeaconTests/BluetoothConnectionControllerTests.swift:72: error: -[BeaconTests.BluetoothConnectionControllerTests testPrimaryMenuKeepsOnlyConnectedOrInProgressDevices] : XCTAssertFalse failed
+/Users/isaacyslin/Code/airbuddy/BeaconTests/BluetoothConnectionControllerTests.swift:80: error: -[BeaconTests.BluetoothConnectionControllerTests testPrimaryMenuKeepsOnlyConnectedOrInProgressDevices] : XCTAssertFalse failed
+/Users/isaacyslin/Code/airbuddy/BeaconTests/BluetoothConnectionControllerTests.swift:88: error: -[BeaconTests.BluetoothConnectionControllerTests testPrimaryMenuKeepsOnlyConnectedOrInProgressDevices] : XCTAssertFalse failed
+	 Executed 2 tests, with 5 failures (0 unexpected) in 0.126 (0.127) seconds
+	 Executed 2 tests, with 5 failures (0 unexpected) in 0.126 (0.127) seconds
+	 Executed 2 tests, with 5 failures (0 unexpected) in 0.126 (0.127) seconds
+** TEST FAILED **
+
+FULL UNIT
+	 Executed 4 tests, with 0 failures (0 unexpected) in 1.331 (1.332) seconds
+	 Executed 31 tests, with 0 failures (0 unexpected) in 0.035 (0.047) seconds
+	 Executed 5 tests, with 0 failures (0 unexpected) in 7.155 (7.157) seconds
+	 Executed 50 tests, with 0 failures (0 unexpected) in 0.100 (0.115) seconds
+	 Executed 14 tests, with 0 failures (0 unexpected) in 0.152 (0.157) seconds
+	 Executed 154 tests, with 0 failures (0 unexpected) in 3.694 (3.717) seconds
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.010 (0.011) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.189 (0.189) seconds
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.229 (0.231) seconds
+	 Executed 274 tests, with 0 failures (0 unexpected) in 12.895 (12.958) seconds
+	 Executed 274 tests, with 0 failures (0 unexpected) in 12.895 (12.959) seconds
+** TEST SUCCEEDED **
+
+TARGETED UNIT
+	 Executed 14 tests, with 0 failures (0 unexpected) in 0.215 (0.219) seconds
+	 Executed 155 tests, with 0 failures (0 unexpected) in 4.063 (4.088) seconds
+	 Executed 169 tests, with 0 failures (0 unexpected) in 4.278 (4.308) seconds
+	 Executed 169 tests, with 0 failures (0 unexpected) in 4.278 (4.308) seconds
+** TEST SUCCEEDED **
+
+UI AUTOMATION BLOCKER
+2026-09-20 16:21:36.387925+0800 BeaconUITests-Runner[17285:11033390] [Default] Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture Code=1000 "Timed out while enabling automation mode." UserInfo={NSLocalizedDescription=Timed out while enabling automation mode.}
+	BeaconUITests-Runner (17285) encountered an error (The test runner failed to initialize for UI testing. (Underlying Error: Timed out while enabling automation mode.))
+** TEST FAILED **
+
+FINAL COPY-ONLY TEST ATTEMPT
+** TEST INTERRUPTED **
+
+FINAL INSTALL
+** BUILD SUCCEEDED **
+Installed signed app to /Applications/BeaconMac.app
+Verified active app: pid=18514 executable=/Applications/BeaconMac.app/Contents/MacOS/BeaconMac
+
+FINAL READBACK
+Normal launch: pid=18668 /Applications/BeaconMac.app/Contents/MacOS/BeaconMac (no preview or test arguments)
+Installed and built executable SHA-256: 3f2d3646b215a838ff828ad99256af33c1b53dcee2714f3e0a3c44d3e3f3e57b
+codesign --verify --deep --strict: valid on disk; satisfies Designated Requirement
+plutil -lint Beacon/Mac/zh-Hant-TW.lproj/Localizable.strings: OK
+git diff --check: passed

@@ -9,6 +9,8 @@ struct PairedBluetoothDevice: Equatable, Identifiable, Sendable {
     let isConnected: Bool
     let requiresAudioConfirmation: Bool
 
+    var appearsWithoutBattery: Bool = true
+
     var id: String { "bluetooth-" + address.replacingOccurrences(of: ":", with: "-") }
 }
 
@@ -233,9 +235,13 @@ final class BluetoothConnectionController: ObservableObject {
         return true
     }
 
+    func isPrimaryMenuItem(_ item: DeviceListItem, preferences _: DeviceDisplayPreferences) -> Bool {
+        item.connectionState == .connected || operation(for: item.id)?.phase.isInProgress == true
+    }
+
     func pairedPresentationIDs(in snapshots: [DecoratedBatterySnapshot]) -> Set<String> {
         // Aggregated AirPods use the group ID, not an individual left/right/case ID.
-        Set(groupedDeviceItems(snapshots).flatMap(\.items).filter { device(for: $0.id) != nil || operation(for: $0.id) != nil }.map(\.id))
+        Set(groupedDeviceItems(snapshots).flatMap(\.items).filter { device(for: $0.id)?.appearsWithoutBattery == true || operation(for: $0.id) != nil }.map(\.id))
     }
 
     func snapshots(including snapshots: [DecoratedBatterySnapshot]) -> [DecoratedBatterySnapshot] {
@@ -253,7 +259,7 @@ final class BluetoothConnectionController: ObservableObject {
                 provider: s.provider, readStatus: s.readStatus, confidence: s.confidence,
                 identityStrength: s.identityStrength, updatedAt: s.updatedAt), freshness: freshness)
         }
-        for paired in pairedDevices where !represented.contains(paired.address) {
+        for paired in pairedDevices where paired.appearsWithoutBattery && !represented.contains(paired.address) {
             represented.insert(paired.address)
             result.append(DecoratedBatterySnapshot(snapshot: BatterySnapshot(deviceID: paired.id,
                 displayName: paired.displayName, kind: paired.kind, percent: nil, chargeState: .unknown,

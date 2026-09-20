@@ -54,12 +54,7 @@ enum StatusMenuSizing {
         let desiredHeight = panelVerticalPadding
             + headerHeight
             + contentHeight + supplementalHeight
-        let minimumHeight: CGFloat
-        if dashboardItemCount == 0 {
-            minimumHeight = panelVerticalPadding + headerHeight
-        } else {
-            minimumHeight = 248
-        }
+        let minimumHeight = panelVerticalPadding + headerHeight
         let screenCappedHeight = max(240, visibleScreenHeight - 46)
         return CGSize(width: width, height: min(max(desiredHeight, minimumHeight), screenCappedHeight))
     }
@@ -75,6 +70,8 @@ struct StatusMenuView: View {
     let configuration: StatusWindowConfiguration
     let refreshDiagnostics: BatteryRefreshDiagnostics
     let onSetUpDevice: (() -> Void)?
+    let otherDevicesExpanded: Bool
+    let onToggleOtherDevices: () -> Void
     let onRefresh: () -> Void
     let onOpenSettings: (SettingsPane, String?) -> Void
 
@@ -91,6 +88,8 @@ struct StatusMenuView: View {
         configuration: StatusWindowConfiguration = .load(),
         refreshDiagnostics: BatteryRefreshDiagnostics = BatteryRefreshDiagnostics(),
         onSetUpDevice: (() -> Void)? = nil,
+        otherDevicesExpanded: Bool = false,
+        onToggleOtherDevices: @escaping () -> Void = {},
         onRefresh: @escaping () -> Void,
         onOpenSettings: @escaping (SettingsPane, String?) -> Void = { _, _ in },
         initialDisplayPreferences: DeviceDisplayPreferences = .load()
@@ -102,6 +101,8 @@ struct StatusMenuView: View {
         self.configuration = configuration
         self.refreshDiagnostics = refreshDiagnostics
         self.onSetUpDevice = onSetUpDevice
+        self.otherDevicesExpanded = otherDevicesExpanded
+        self.onToggleOtherDevices = onToggleOtherDevices
         self.onRefresh = onRefresh
         self.onOpenSettings = onOpenSettings
         _displayPreferences = State(initialValue: initialDisplayPreferences)
@@ -223,42 +224,71 @@ struct StatusMenuView: View {
     }
 
     private var nativeDeviceList: some View {
-        ScrollView(showsIndicators: nativeItems.count > 8) {
+        ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(nativeItems.indices, id: \.self) { index in
-                    let item = nativeItems[index]
-
-                    DashboardBatteryDeviceRow(
-                        device: DashboardBatteryDevice(
-                            item: item,
-                            isPinned: displayPreferences.isPinned(item)
-                        ),
-                        lowBatteryThreshold: clampedLowBatteryThreshold,
-                        iconSize: 30,
-                        horizontalPadding: 10,
-                        verticalPadding: 10,
-                        statusWidth: 68
-                    )
-                    .contextMenu {
-                        deviceContextMenu(for: item, displayName: item.displayName)
+                deviceRows(primaryItems)
+                if !otherItems.isEmpty {
+                    Button(action: onToggleOtherDevices) {
+                        HStack {
+                            Image(systemName: otherDevicesExpanded ? "chevron.down" : "chevron.right")
+                                .accessibilityHidden(true)
+                            Text("Other devices")
+                            Spacer()
+                            Text("\(otherItems.count)").foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
                     }
-                    // The context-menu wrapper is the exposed AX element on macOS.
-                    // This wrapper exposes AXLabel, but not AXValue.
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(item.displayName + ", " + dashboardBatteryAccessibilityValue(
-                        for: DashboardBatteryDevice(item: item, isPinned: displayPreferences.isPinned(item)),
-                        statusText: DeviceBatteryPresentation(item: item).state.title))
-                    .accessibilityIdentifier("device.row.\(item.id)")
-                    if connections.device(for: item.id) != nil || connections.operation(for: item.id) != nil {
-                        BluetoothConnectionControls(item: item, controller: connections, compact: true)
-                            .padding(.horizontal, 10).padding(.bottom, 8)
-                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("status.other-devices")
+                    .accessibilityLabel(Text(BeaconL10n.format("Other devices, %d", otherItems.count)))
+                    .accessibilityValue(Text(otherDevicesExpanded ? "Expanded" : "Collapsed"))
+                    .padding(10)
+                    if otherDevicesExpanded { deviceRows(otherItems) }
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
         .frame(maxHeight: contentMaxHeight)
+    }
+
+    private func deviceRows(_ items: [DeviceListItem]) -> some View {
+        ForEach(items, id: \.id) { item in
+            DashboardBatteryDeviceRow(
+                device: DashboardBatteryDevice(
+                    item: item,
+                    isPinned: displayPreferences.isPinned(item)
+                ),
+                lowBatteryThreshold: clampedLowBatteryThreshold,
+                iconSize: 30,
+                horizontalPadding: 10,
+                verticalPadding: 10,
+                statusWidth: 68
+            )
+            .contextMenu {
+                deviceContextMenu(for: item, displayName: item.displayName)
+            }
+            // The context-menu wrapper is the exposed AX element on macOS.
+            // This wrapper exposes AXLabel, but not AXValue.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(item.displayName + ", " + dashboardBatteryAccessibilityValue(
+                for: DashboardBatteryDevice(item: item, isPinned: displayPreferences.isPinned(item)),
+                statusText: DeviceBatteryPresentation(item: item).state.title))
+            .accessibilityIdentifier("device.row.\(item.id)")
+            .help(item.displayName)
+            if connections.device(for: item.id) != nil || connections.operation(for: item.id) != nil {
+                BluetoothConnectionControls(item: item, controller: connections, compact: true)
+                    .padding(.horizontal, 10).padding(.bottom, 8)
+            }
+        }
+    }
+
+    private var primaryItems: [DeviceListItem] {
+        nativeItems.filter { connections.isPrimaryMenuItem($0, preferences: displayPreferences) }
+    }
+
+    private var otherItems: [DeviceListItem] {
+        nativeItems.filter { !connections.isPrimaryMenuItem($0, preferences: displayPreferences) }
     }
 
     // MARK: - Computed sections

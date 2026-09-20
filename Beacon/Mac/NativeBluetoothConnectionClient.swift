@@ -4,6 +4,12 @@ import CoreBluetooth
 import CoreAudio
 import IOKit
 
+func supportsBluetoothAudioOutput(major: BluetoothDeviceClassMajor,
+                                  serviceClass: BluetoothServiceClassMajor) -> Bool {
+    major == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorAudio)
+        || serviceClass & BluetoothServiceClassMajor(kBluetoothServiceClassMajorAudio) != 0
+}
+
 @MainActor
 extension BluetoothConnectionClient {
     static func live() -> Self {
@@ -44,17 +50,24 @@ private final class NativeBluetoothConnectionBackend {
             // Audio/video, HID peripherals, and unclassified paired accessories. Phones and
             // computers keep their existing setup flows; no cross-Mac transfer is introduced.
             let major = device.deviceClassMajor
-            guard major == 0 || major == kBluetoothDeviceClassMajorAudio
-                    || major == kBluetoothDeviceClassMajorPeripheral else { return nil }
+            guard major == 0 || major == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorAudio)
+                    || major == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorPeripheral) else { return nil }
+            // An unclassified class does not imply an audio output. Some keyboards and mice
+            // report it, so require an explicit audio device or service class before offering
+            // default-output selection.
+            let supportsAudioOutput = supportsBluetoothAudioOutput(
+                major: major, serviceClass: device.serviceClassMajor
+            )
             let kind: DeviceKind
-            if major == kBluetoothDeviceClassMajorPeripheral {
+            if major == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorPeripheral) {
                 kind = device.deviceClassMinor & 0x10 != 0 ? .keyboard : .bluetoothPeripheral
             } else {
                 kind = .bluetoothPeripheral
             }
             return PairedBluetoothDevice(address: address, displayName: device.name ?? address,
                 kind: kind, isConnected: device.isConnected(),
-                requiresAudioConfirmation: major != kBluetoothDeviceClassMajorPeripheral)
+                requiresAudioConfirmation: supportsAudioOutput,
+                appearsWithoutBattery: supportsAudioOutput)
         }
     }
 

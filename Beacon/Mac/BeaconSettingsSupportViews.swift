@@ -49,7 +49,7 @@ struct AddDeviceGuideView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Set Up a Device")
                         .font(DesignTokens.Typography.windowTitle)
-                    Text("Pair or connect a supported device. Beacon discovers it automatically after a battery report arrives.")
+                    Text("Paired audio devices appear even without a battery report. Other supported devices appear when they report battery levels.")
                         .font(DesignTokens.Typography.caption)
                         .foregroundStyle(DesignTokens.Palette.secondaryText)
                 }
@@ -101,7 +101,7 @@ struct AddDeviceGuideView: View {
             }
 
             HStack(spacing: 10) {
-                Label("Devices appear automatically after Beacon receives a fresh battery report.", systemImage: "arrow.clockwise")
+                Label("Refresh after pairing or connecting your device.", systemImage: "arrow.clockwise")
                     .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
 
@@ -764,8 +764,6 @@ struct AirPodsAudioControlsCard: View {
     let onOpenSoundSettings: () -> Void
     let onOpenBluetoothSettings: () -> Void
 
-    @State private var preferences: AirPodsAudioPreferences
-
     init(
         deviceID: String,
         onOpenSoundSettings: @escaping () -> Void,
@@ -774,7 +772,6 @@ struct AirPodsAudioControlsCard: View {
         self.deviceID = deviceID
         self.onOpenSoundSettings = onOpenSoundSettings
         self.onOpenBluetoothSettings = onOpenBluetoothSettings
-        _preferences = State(initialValue: AirPodsAudioPreferences.load(for: deviceID))
     }
 
     var body: some View {
@@ -783,47 +780,12 @@ struct AirPodsAudioControlsCard: View {
                 Label("Audio Controls", systemImage: "waveform")
                     .font(DesignTokens.Typography.captionEmphasis)
                 Spacer()
-                Text("Reference only")
-                    .font(DesignTokens.Typography.caption2Emphasis)
-                    .foregroundStyle(DesignTokens.Palette.accent)
-                    .padding(.horizontal, 7)
-                    .frame(height: 20)
-                    .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
             }
 
-            HStack(spacing: 8) {
-                AudioPreferenceTile(
-                    title: "Listening",
-                    value: preferences.listeningMode.title,
-                    systemImage: preferences.listeningMode.systemImage,
-                    color: DesignTokens.Palette.accent
-                )
-                AudioPreferenceTile(
-                    title: "Mic Input",
-                    value: preferences.microphone.title,
-                    systemImage: "mic",
-                    color: DesignTokens.Palette.charging
-                )
-            }
-
-            Text("These choices are notes saved in Beacon; they do not change your AirPods.")
+            Text(BeaconL10n.string("Choose audio output and input in Sound Settings. Change AirPods listening modes in Control Center or Bluetooth Settings."))
                 .font(DesignTokens.Typography.caption2)
                 .foregroundStyle(DesignTokens.Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
-
-            Picker("Preferred Listening Mode", selection: listeningModeBinding) {
-                ForEach(AirPodsListeningModePreference.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            Picker("Preferred Microphone", selection: microphoneBinding) {
-                ForEach(AirPodsMicrophonePreference.allCases) { microphone in
-                    Text(microphone.shortTitle).tag(microphone)
-                }
-            }
-            .pickerStyle(.segmented)
 
             HStack(spacing: 8) {
                 Button {
@@ -831,88 +793,23 @@ struct AirPodsAudioControlsCard: View {
                 } label: {
                     Label("Sound Settings", systemImage: "speaker.wave.2")
                 }
+                .accessibilityIdentifier("airpods.audio-controls.sound-settings")
 
                 Button {
                     onOpenBluetoothSettings()
                 } label: {
                     Label("Bluetooth", systemImage: BeaconSymbols.bluetooth)
                 }
+                .accessibilityIdentifier("airpods.audio-controls.bluetooth-settings")
 
                 Spacer()
             }
             .font(DesignTokens.Typography.captionEmphasis)
-
-            Text("Use Sound Settings to apply the actual listening mode or microphone change.")
-                .font(DesignTokens.Typography.caption2)
-                .foregroundStyle(DesignTokens.Palette.tertiaryText)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .beaconSettingsCardSurface()
-        .onChange(of: deviceID) { _, nextDeviceID in
-            preferences = AirPodsAudioPreferences.load(for: nextDeviceID)
-        }
-    }
-
-    private var listeningModeBinding: Binding<AirPodsListeningModePreference> {
-        Binding(
-            get: { preferences.listeningMode },
-            set: { mode in
-                preferences = preferences.settingListeningMode(mode)
-                preferences.save(for: deviceID)
-            }
-        )
-    }
-
-    private var microphoneBinding: Binding<AirPodsMicrophonePreference> {
-        Binding(
-            get: { preferences.microphone },
-            set: { microphone in
-                preferences = preferences.settingMicrophone(microphone)
-                preferences.save(for: deviceID)
-            }
-        )
-    }
-}
-
-struct AudioPreferenceTile: View {
-    let title: LocalizedStringKey
-    let value: String
-    let systemImage: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: resolveSymbol(systemImage, fallback: "circle.fill"))
-                .font(.system(size: 12, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(color)
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(DesignTokens.Palette.card.opacity(0.72))
-                )
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(value)
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .foregroundStyle(DesignTokens.Palette.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-                Text(title)
-                    .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(DesignTokens.Palette.card.opacity(0.72))
-        )
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("airpods.audio-controls")
     }
 }
 

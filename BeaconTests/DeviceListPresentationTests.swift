@@ -952,6 +952,13 @@ final class DeviceListPresentationTests: XCTestCase {
         )
     }
 
+    func testAlertSummaryReflectsEnabledAlertsAndActualThreshold() {
+        XCTAssertEqual(batteryAlertSummary(threshold: 20, lowEnabled: true, chargedEnabled: true), "Low at 20% · Full charge")
+        XCTAssertEqual(batteryAlertSummary(threshold: 15, lowEnabled: true, chargedEnabled: false), "Low at 15%")
+        XCTAssertEqual(batteryAlertSummary(threshold: 20, lowEnabled: false, chargedEnabled: true), "Full charge")
+        XCTAssertEqual(batteryAlertSummary(threshold: 20, lowEnabled: false, chargedEnabled: false), "Alerts off")
+    }
+
     func testStatusMenuSizingGrowsWithDashboardDeviceCount() {
         let oneDevice = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: 1,
@@ -963,7 +970,7 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(oneDevice.width, 386)
-        XCTAssertGreaterThan(oneDevice.height, 240)
+        XCTAssertEqual(oneDevice.height, 162, "One row should not reserve empty space for extra devices")
         XCTAssertGreaterThan(fiveDevices.height, oneDevice.height)
         XCTAssertLessThan(fiveDevices.height, 560)
     }

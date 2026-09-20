@@ -172,6 +172,25 @@ final class BeaconUITests: XCTestCase {
         }
     }
     @MainActor
+    func testAirPodsShowsSystemSettingsInsteadOfLocalOnlyModePickers() {
+        continueAfterFailure = false
+        let app = dailySettingsApp(language: "en", theme: "light")
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows["Beacon Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons["settings.pane.devices"].click()
+        let airPods = window.buttons["settings.device.preview-airpods"]
+        XCTAssertTrue(airPods.waitForExistence(timeout: 5))
+        airPods.click()
+        XCTAssertTrue(window.buttons["airpods.audio-controls.sound-settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(window.buttons["airpods.audio-controls.bluetooth-settings"].exists)
+        XCTAssertFalse(window.staticTexts["These choices are notes saved in Beacon; they do not change your AirPods."].exists)
+        XCTAssertFalse(window.segmentedControls["Preferred Listening Mode"].exists)
+        XCTAssertFalse(window.segmentedControls["Preferred Microphone"].exists)
+    }
+
+    @MainActor
     func testEmptyDevicesCanOpenSetupAndReturnWithEscape() {
         continueAfterFailure = false
         let app = setupApp(scenario: "empty")
@@ -325,6 +344,10 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let menu = app.windows["Beacon Status Menu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        if scenario == "disconnected" {
+            XCTAssertFalse(menu.descendants(matching: .any)["device.row.report-test"].firstMatch.exists)
+            menu.buttons["status.other-devices"].click()
+        }
         let row = menu.descendants(matching: .any)["device.row.report-test"].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         let menuEvidence = XCTAttachment(screenshot: menu.screenshot())

@@ -15,8 +15,15 @@ private final class BluetoothConnectionPreview {
 
     var client: BluetoothConnectionClient {
         BluetoothConnectionClient(pairedDevices: { [self] in
-            addresses.map { PairedBluetoothDevice(address: $0, displayName: "Test Headphones",
+            let headphones = addresses.map { PairedBluetoothDevice(address: $0, displayName: "Test Headphones",
                 kind: .bluetoothPeripheral, isConnected: connected.contains($0), requiresAudioConfirmation: true) }
+            guard scenario == "mixed" else { return headphones }
+            return headphones + [
+                PairedBluetoothDevice(address: "aa:bb:cc:dd:ee:03", displayName: "Test Keyboard",
+                    kind: .keyboard, isConnected: true, requiresAudioConfirmation: false),
+                PairedBluetoothDevice(address: "aa:bb:cc:dd:ee:04", displayName: "Test Mouse",
+                    kind: .mouse, isConnected: true, requiresAudioConfirmation: false)
+            ]
         }, request: { [self] address, action in
             requested[address] = action
             requestedAt[address] = Date()

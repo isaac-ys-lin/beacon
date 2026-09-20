@@ -211,6 +211,8 @@ final class BeaconStatusController: NSObject {
         }
     }
 
+    private var otherDevicesExpanded = false
+
     private func updateStatusMenuContent(
         screen: NSScreen? = NSScreen.main,
         store: BatterySnapshotStore? = nil,
@@ -237,6 +239,12 @@ final class BeaconStatusController: NSObject {
                 configuration: configuration,
                 refreshDiagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics,
                 onSetUpDevice: { [weak self] in self?.showDeviceSetup() },
+                otherDevicesExpanded: otherDevicesExpanded,
+                onToggleOtherDevices: { [weak self] in
+                    guard let self else { return }
+                    self.otherDevicesExpanded.toggle()
+                    self.updateStatusMenuContent()
+                },
                 onRefresh: { [weak model] in
                     Task { await model?.refresh() }
                 },
@@ -260,6 +268,7 @@ final class BeaconStatusController: NSObject {
     }
 
     private func showStatusMenu(relativeTo sender: NSStatusBarButton) {
+        otherDevicesExpanded = false
         updateStatusMenuContent(screen: sender.window?.screen)
         statusMenuPanelController.show(relativeTo: sender)
         menuLogger.info("Status menu opened")
@@ -291,19 +300,26 @@ final class BeaconStatusController: NSObject {
             presented, preferences: preferences,
             pairedDeviceIDs: model.connections.pairedPresentationIDs(in: presented)
         )
-        let dashboardItemCount = sections.reduce(0) { partial, section in
-            partial + section.items.count
-        }
+        let allItems = sections.flatMap(\.items)
+        let primaryItems = allItems.filter { model.connections.isPrimaryMenuItem($0, preferences: preferences) }
+        let visibleItems = otherDevicesExpanded ? allItems : primaryItems
+        let dashboardItemCount = visibleItems.count
         let screenHeight = screen?.visibleFrame.height ?? 900
         let size = StatusMenuSizing.preferredContentSize(
             dashboardItemCount: dashboardItemCount,
             visibleScreenHeight: screenHeight,
             supplementalHeight: (DeviceSetupRecoveryState.resolve(
-                visibleCount: dashboardItemCount, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
+                visibleCount: allItems.count, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
             ) == .ready ? 0 : 230) + (model.isUsingPreviewData ? 34 : 0)
                 + (refreshDiagnostics.attempts.contains { $0.status != .reported && $0.status != .noReport } ? 38 : 0)
-                + CGFloat(model.connections.pairedDevices.count) * 48
-                + CGFloat(model.connections.operations.count) * 92
+                + (primaryItems.count < allItems.count ? (visibleItems.isEmpty ? 62 : 42) : 0)
+                + visibleItems.reduce(CGFloat.zero) { height, item in
+                    let operation = model.connections.operation(for: item.id)
+                    guard model.connections.device(for: item.id) != nil || operation != nil else { return height }
+                    let sameName = model.connections.pairedDevices.filter { $0.displayName == item.displayName }.count > 1
+                    let resultHeight: CGFloat = operation.map { $0.phase.isFailure ? 160 : 42 } ?? 0
+                    return height + 40 + (sameName ? 20 : 0) + resultHeight
+                }
         )
         return NSSize(width: size.width, height: size.height)
     }

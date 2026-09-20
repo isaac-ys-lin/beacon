@@ -558,7 +558,7 @@ struct BeaconSettingsView: View {
                 Text(deviceAlertSubtitle(for: row))
                     .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
@@ -888,13 +888,15 @@ struct BeaconSettingsView: View {
                     set: { setDisplayPreferences(displayPreferences.settingPinned($0, for: row.item)) }
                 )) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Label("Keep visible", systemImage: "pin.fill")
-                        Text("Pinned devices stay at the top of the dashboard.")
+                        Label("Pin to Top", systemImage: "pin.fill")
+                        Text("Pinned devices appear first when connected. Disconnected devices stay in Other devices.")
                             .font(DesignTokens.Typography.caption2)
                             .foregroundStyle(DesignTokens.Palette.secondaryText)
                     }
                 }
                 .toggleStyle(.switch)
+                .accessibilityLabel("Pin to Top")
+                .accessibilityIdentifier("settings.device.pin")
                 .padding(12)
                 .disabled(row.isHidden)
                 .opacity(row.isHidden ? 0.45 : 1)
@@ -911,6 +913,8 @@ struct BeaconSettingsView: View {
                     }
                 }
                 .toggleStyle(.switch)
+                .accessibilityLabel("Notify when charged")
+                .accessibilityIdentifier("settings.device.charged")
                 .padding(12)
                 .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
                 .opacity(row.isHidden || !chargedBatteryAlertsEnabled ? 0.45 : 1)
@@ -1169,25 +1173,13 @@ struct BeaconSettingsView: View {
     }
 
     private func alertSummary(for item: DeviceListItem) -> String {
-        let hasCustomLow = LowBatteryNotifier.hasCustomThreshold(forDeviceID: item.id)
-        let hasCharged = LowBatteryNotifier.isChargedAlertEnabled(
-            forDeviceID: item.id,
-            displayName: item.displayName
-        )
-
-        switch (hasCustomLow, hasCharged) {
-        case (true, true):
-            return BeaconL10n.format(
-                "%d%% + Full",
-                LowBatteryNotifier.threshold(forDeviceID: item.id)
+        batteryAlertSummary(
+            threshold: LowBatteryNotifier.threshold(forDeviceID: item.id),
+            lowEnabled: lowBatteryAlertsEnabled,
+            chargedEnabled: chargedBatteryAlertsEnabled && LowBatteryNotifier.isChargedAlertEnabled(
+                forDeviceID: item.id, displayName: item.displayName
             )
-        case (true, false):
-            return "\(LowBatteryNotifier.threshold(forDeviceID: item.id))%"
-        case (false, true):
-            return BeaconL10n.string("Global + Full")
-        case (false, false):
-            return BeaconL10n.string("Global")
-        }
+        )
     }
 
     private func deviceAlertSubtitle(for row: DeviceInspectorItem) -> String {
@@ -1203,4 +1195,13 @@ struct BeaconSettingsView: View {
         return BeaconL10n.format("Using the default low-battery threshold of %d%%.", clampedLowBatteryThreshold)
     }
 
+}
+
+func batteryAlertSummary(threshold: Int, lowEnabled: Bool, chargedEnabled: Bool) -> String {
+    switch (lowEnabled, chargedEnabled) {
+    case (true, true): return BeaconL10n.format("Low at %d%% · Full charge", threshold)
+    case (true, false): return BeaconL10n.format("Low at %d%%", threshold)
+    case (false, true): return BeaconL10n.string("Full charge")
+    case (false, false): return BeaconL10n.string("Alerts off")
+    }
 }

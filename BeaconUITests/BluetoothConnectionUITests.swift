@@ -12,6 +12,16 @@ final class BluetoothConnectionUITests: XCTestCase {
         app.launchEnvironment["BEACON_CONNECTION_SCENARIO"] = scenario
         app.launch()
         XCTAssertTrue(app.windows[settings ? "Beacon Settings" : "Beacon Status Menu"].waitForExistence(timeout: 10))
+        if !settings {
+            let other = app.buttons["status.other-devices"]
+            XCTAssertTrue(other.waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["connection.connect.aa:bb:cc:dd:ee:01"].exists)
+            other.click()
+            XCTAssertTrue(app.buttons["connection.connect.aa:bb:cc:dd:ee:01"].waitForExistence(timeout: 5))
+            other.click()
+            XCTAssertFalse(app.buttons["connection.connect.aa:bb:cc:dd:ee:01"].exists)
+            other.click()
+        }
         return app
     }
     @MainActor
@@ -24,6 +34,23 @@ final class BluetoothConnectionUITests: XCTestCase {
         image.name = "connection-\(address.suffix(2))-\(text)-fixture-not-hardware"
         image.lifetime = .keepAlways; add(image)
     }
+    @MainActor
+    func testConnectedInputDevicesOfferOnlyDisconnectAndOfflineDevicesCollapse() {
+        let app = launch("mixed"); defer { app.terminate() }
+        let window = app.windows["Beacon Status Menu"]
+        let expandedHeight = window.frame.height
+        app.buttons["status.other-devices"].click()
+        XCTAssertLessThan(window.frame.height, expandedHeight)
+        for suffix in ["03", "04"] {
+            XCTAssertTrue(app.buttons["connection.disconnect.aa:bb:cc:dd:ee:\(suffix)"].exists)
+            XCTAssertFalse(app.buttons["connection.connect.aa:bb:cc:dd:ee:\(suffix)"].exists)
+        }
+        XCTAssertFalse(app.buttons["connection.connect.aa:bb:cc:dd:ee:01"].exists)
+        let image = XCTAttachment(screenshot: window.screenshot())
+        image.name = "mixed-devices-collapsed-fixture-not-hardware"
+        image.lifetime = .keepAlways; add(image)
+    }
+
     @MainActor
     func testNoBatterySameNamedHeadphonesConnectAndDisconnectOnlySelectedIdentity() {
         let app = launch("ready"); defer { app.terminate() }
@@ -43,7 +70,10 @@ final class BluetoothConnectionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["connection.disconnect.\(second)"].isEnabled)
         app.buttons["connection.disconnect.\(second)"].click()
         expectState(app, second, "Disconnection confirmed")
-        XCTAssertFalse(app.buttons["connection.disconnect.\(second)"].isEnabled)
+        XCTAssertFalse(app.buttons["connection.disconnect.\(second)"].exists)
+        app.buttons["status.other-devices"].click()
+        XCTAssertFalse(app.buttons["connection.connect.\(second)"].exists)
+        XCTAssertFalse(app.staticTexts["connection.state.\(second)"].exists)
         XCTAssertFalse(app.staticTexts["connection.state.\(first)"].exists)
     }
     @MainActor

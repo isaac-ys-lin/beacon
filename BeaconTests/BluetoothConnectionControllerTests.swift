@@ -1,4 +1,5 @@
 import XCTest
+import IOBluetooth
 @testable import Beacon
 
 /// Injected observations exercise software contracts, not physical-device acceptance.
@@ -16,6 +17,7 @@ private final class ConnectionFixture {
     var requestResult = BluetoothCommandResult()
     var denied = false
     var requests: [(String, BluetoothConnectionAction)] = []
+    var audioSelections: [String] = []
     var client: BluetoothConnectionClient {
         .init(pairedDevices: { [self] in devices }, request: { [self] address, action in
             requests.append((address, action)); return requestResult
@@ -25,7 +27,10 @@ private final class ConnectionFixture {
             }
             if observations.count > 1 { observations.removeFirst(); frames[address] = observations }
             return next
-        }, selectAudioOutput: { _ in 0 },
+        }, selectAudioOutput: { [self] address in
+            audioSelections.append(address)
+            return 0
+        },
               authorizationFailure: { [self] in denied ? .permissionDenied : nil })
     }
     func controller() -> BluetoothConnectionController {
@@ -43,6 +48,59 @@ final class BluetoothConnectionControllerTests: XCTestCase {
         }
         XCTFail("Injected operation did not reach a terminal state")
         return try XCTUnwrap(controller.operation(for: address))
+    }
+
+    @MainActor
+    func testPrimaryMenuKeepsOnlyConnectedOrInProgressDevices() async throws {
+        let fixture = ConnectionFixture()
+        let controller = fixture.controller()
+        let item = try XCTUnwrap(groupedDeviceItems(controller.snapshots(including: [])).flatMap(\.items).first)
+        XCTAssertFalse(controller.isPrimaryMenuItem(item, preferences: .init()))
+        XCTAssertFalse(controller.isPrimaryMenuItem(item, preferences: .init(pinnedDeviceIDs: [item.id])))
+        fixture.devices = [.init(address: ConnectionFixture.first, displayName: "Headphones",
+            kind: .bluetoothPeripheral, isConnected: true, requiresAudioConfirmation: true)]
+        controller.refreshPairedDevices()
+        let connected = try XCTUnwrap(groupedDeviceItems(controller.snapshots(including: [])).flatMap(\.items).first)
+        XCTAssertTrue(controller.isPrimaryMenuItem(connected, preferences: .init()))
+
+        fixture.devices[0] = .init(address: ConnectionFixture.first, displayName: "Headphones",
+            kind: .bluetoothPeripheral, isConnected: false, requiresAudioConfirmation: true)
+        controller.perform(.connect, deviceID: item.id, displayName: item.displayName)
+        XCTAssertTrue(controller.isPrimaryMenuItem(item, preferences: .init()))
+        let timedOut = try await completed(controller, address: ConnectionFixture.first)
+        XCTAssertEqual(timedOut.phase, .timedOut)
+        XCTAssertFalse(controller.isPrimaryMenuItem(item, preferences: .init()))
+
+        fixture.frames[ConnectionFixture.first] = [
+            .init(isPaired: true, isConnected: true), .init(isPaired: true, isConnected: false)
+        ]
+        controller.perform(.connect, deviceID: item.id, displayName: item.displayName)
+        let failed = try await completed(controller, address: ConnectionFixture.first)
+        XCTAssertEqual(failed.phase, .failed)
+        XCTAssertFalse(controller.isPrimaryMenuItem(item, preferences: .init()))
+
+        fixture.frames[ConnectionFixture.first] = [
+            .init(isPaired: true, isConnected: true), .init(isPaired: true, isConnected: false)
+        ]
+        controller.perform(.disconnect, deviceID: item.id, displayName: item.displayName)
+        let disconnected = try await completed(controller, address: ConnectionFixture.first)
+        XCTAssertEqual(disconnected.phase, .disconnected)
+        XCTAssertFalse(controller.isPrimaryMenuItem(item, preferences: .init()))
+    }
+
+    @MainActor
+    func testNonAudioPairingsDoNotCreateRowsOrBypassVisibility() {
+        let fixture = ConnectionFixture()
+        fixture.devices[1].appearsWithoutBattery = false
+        let controller = fixture.controller()
+        let snapshots = controller.snapshots(including: [])
+        XCTAssertEqual(snapshots.map(\.id), [fixture.devices[0].id])
+        XCTAssertEqual(controller.pairedDevices.count, 2, "Keep identities available for existing battery devices")
+        fixture.devices[0].appearsWithoutBattery = false
+        controller.refreshPairedDevices()
+        XCTAssertTrue(controller.snapshots(including: []).isEmpty)
+        XCTAssertTrue(controller.pairedPresentationIDs(in: snapshots).isEmpty)
+        XCTAssertEqual(controller.snapshots(including: snapshots).count, 1, "Existing battery-source rows are not deleted")
     }
 
     @MainActor
@@ -85,6 +143,22 @@ final class BluetoothConnectionControllerTests: XCTestCase {
             XCTAssertEqual(result.phase, expected, "\(action): \(observations)")
             if expected != .connected { XCTAssertNil(result.audioOutputUID) }
         }
+    }
+
+    @MainActor
+    func testNonAudioConnectionNeverSelectsAnAudioOutput() async throws {
+        let fixture = ConnectionFixture()
+        fixture.devices[0] = .init(address: ConnectionFixture.first, displayName: "Mouse",
+            kind: .mouse, isConnected: false, requiresAudioConfirmation: false)
+        fixture.frames[ConnectionFixture.first] = [
+            .init(isPaired: true, isConnected: true), .init(isPaired: true, isConnected: true)
+        ]
+        let controller = fixture.controller()
+
+        XCTAssertTrue(controller.perform(.connect, deviceID: ConnectionFixture.first, displayName: "Mouse"))
+        let result = try await completed(controller, address: ConnectionFixture.first)
+        XCTAssertEqual(result.phase, .connected)
+        XCTAssertTrue(fixture.audioSelections.isEmpty)
     }
 
     @MainActor
@@ -206,5 +280,19 @@ final class BluetoothConnectionControllerTests: XCTestCase {
                     "aa:bb:cc:dd:ee", "00000000-0000-0000-0000-000000000000"] {
             XCTAssertNil(NativeBluetoothAudioOutput.address(fromOutputUID: uid), uid)
         }
+    }
+
+    func testAudioOutputCapabilityRequiresAudioDeviceOrServiceClass() {
+        let noServices: BluetoothServiceClassMajor = 0
+        let audioService = BluetoothServiceClassMajor(kBluetoothServiceClassMajorAudio)
+
+        XCTAssertFalse(supportsBluetoothAudioOutput(major: 0, serviceClass: noServices))
+        XCTAssertFalse(supportsBluetoothAudioOutput(
+            major: BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorPeripheral), serviceClass: noServices
+        ))
+        XCTAssertTrue(supportsBluetoothAudioOutput(
+            major: BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorAudio), serviceClass: noServices
+        ))
+        XCTAssertTrue(supportsBluetoothAudioOutput(major: 0, serviceClass: audioService))
     }
 }
