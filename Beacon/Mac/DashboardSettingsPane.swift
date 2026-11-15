@@ -7,6 +7,7 @@ struct DashboardSettingsPane: View {
     @Binding var showDesktopWidget: Bool
     @Binding var desktopWidgetStyleRawValue: String
     @AppStorage(BeaconAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
+    @AppStorage(MacPowerSourceReader.showsThisMacDefaultsKey) private var showsThisMac = true
 
     var body: some View {
         HStack(alignment: .top, spacing: 18) {
@@ -25,11 +26,12 @@ struct DashboardSettingsPane: View {
                 }
 
                 Section {
+                    Toggle("Show this Mac's battery", isOn: $showsThisMac)
                     Toggle("Show lowest battery in menu bar", isOn: $showMenuBarBattery)
                 } header: {
                     Text("Menu Bar Dashboard")
                 } footer: {
-                    Text("Shows the lowest current battery percentage next to the menu bar icon.")
+                    Text("The dashboard can include this Mac's built-in battery. The menu bar percentage shows the lowest accessory, since macOS already shows the Mac's own battery.")
                 }
 
                 Section {

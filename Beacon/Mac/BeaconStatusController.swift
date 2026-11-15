@@ -12,6 +12,7 @@ final class BeaconStatusController: NSObject {
     private let hudController = BeaconHUDController()
     private let desktopWidgetController = BeaconDesktopWidgetController()
     private let shortcutController = BeaconShortcutController()
+    private var lastShowsThisMac = UserDefaults.standard.object(forKey: MacPowerSourceReader.showsThisMacDefaultsKey) as? Bool ?? true
     private let bluetoothPowerStateObserver: BluetoothPowerStateObserver?
     private let menuLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "menu-bar")
     private let quickActionLogger = Logger(subsystem: "com.isaacyslin.Beacon.mac", category: "quick-actions")
@@ -341,6 +342,11 @@ final class BeaconStatusController: NSObject {
     }
 
     private func handlePreferencesChanged() {
+        let showsThisMac = UserDefaults.standard.object(forKey: MacPowerSourceReader.showsThisMacDefaultsKey) as? Bool ?? true
+        if showsThisMac != lastShowsThisMac {
+            lastShowsThisMac = showsThisMac
+            Task { await model.refresh(userInitiated: false) }
+        }
         hudController.refreshPreferences()
         model.refreshNotificationAuthorizationStatus()
         updateStatusButton()

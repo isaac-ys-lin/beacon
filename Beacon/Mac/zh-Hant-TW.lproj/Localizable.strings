@@ -553,3 +553,5 @@
 "Record Shortcut" = "錄製快捷鍵";
 "Include ⌘, ⌥ or ⌃." = "請包含 ⌘、⌥ 或 ⌃。";
 "Already used by %@." = "已被「%@」使用。";
+"Show this Mac's battery" = "顯示這台 Mac 的電量";
+"The dashboard can include this Mac's built-in battery. The menu bar percentage shows the lowest accessory, since macOS already shows the Mac's own battery." = "儀表板可加入這台 Mac 的內建電池。選單列百分比只顯示最低的周邊裝置，因為 macOS 已經顯示 Mac 本身的電量。";
