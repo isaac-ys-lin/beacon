@@ -540,3 +540,16 @@
 "Paired audio devices appear even without a battery report. Other supported devices appear when they report battery levels." = "已配對的音訊裝置即使沒有電量回報也會出現；其他支援的裝置會在回報電量後出現。";
 "Refresh after pairing or connecting your device." = "配對或連接裝置後，請重新整理。";
 "Beacon could not perform this action right now." = "Beacon 目前無法執行這個動作。";
+"Click a shortcut to record a new one. Press Delete to clear it or Esc to cancel. Enabled shortcuts work in any app while Beacon is running." = "按一下快捷鍵即可重新錄製；按 Delete 清除，按 Esc 取消。已啟用的快捷鍵在 Beacon 執行時可於任何 App 使用。";
+"Shortcuts App" = "「捷徑」App";
+"Battery summary, lowest battery, low-battery list, trends, connect and disconnect are available as Shortcuts actions." = "電量摘要、最低電量、低電量清單、趨勢、連線與中斷連線都可作為「捷徑」動作使用。";
+"Open Shortcuts" = "打開「捷徑」";
+"macOS did not accept this shortcut. Another app or a system shortcut may already use it; record a different one." = "macOS 未接受這個快捷鍵，可能已被其他 App 或系統快捷鍵使用；請錄製另一組。";
+"Shortcut for %@" = "%@ 的快捷鍵";
+"Recording" = "錄製中";
+"None" = "無";
+"Click to record a shortcut" = "按一下以錄製快捷鍵";
+"Type Shortcut" = "請按快捷鍵";
+"Record Shortcut" = "錄製快捷鍵";
+"Include ⌘, ⌥ or ⌃." = "請包含 ⌘、⌥ 或 ⌃。";
+"Already used by %@." = "已被「%@」使用。";

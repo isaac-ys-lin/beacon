@@ -1,31 +1,35 @@
+import Carbon
 import SwiftUI
 
 struct QuickActionsSettingsPane: View {
     @Binding var preferences: BeaconQuickActionPreferences
+    @ObservedObject private var status = BeaconShortcutStatus.shared
 
     var body: some View {
-        HStack(alignment: .top, spacing: 18) {
-            shortcutsForm
-            ScrollView {
-                statusPanel
-            }
-            .frame(width: 252)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var shortcutsForm: some View {
         Form {
             Section {
-                AutomationShortcutsBanner()
-
                 ForEach(quickActionSettingsSummary(for: preferences).supportedActions) { action in
                     actionSetting(for: action)
                 }
             } header: {
                 Text("Keyboard Shortcuts")
             } footer: {
-                Text("Enabled shortcuts are registered globally while Beacon is running. Supported actions also appear in macOS Shortcuts.")
+                Text("Click a shortcut to record a new one. Press Delete to clear it or Esc to cancel. Enabled shortcuts work in any app while Beacon is running.")
+            }
+
+            Section {
+                LabeledContent {
+                    Button("Open Shortcuts") {
+                        if let url = URL(string: "shortcuts://") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                } label: {
+                    Text("Shortcuts App")
+                    Text("Battery summary, lowest battery, low-battery list, trends, connect and disconnect are available as Shortcuts actions.")
+                }
+            } header: {
+                Text("Automation")
             }
         }
         .formStyle(.grouped)
@@ -33,104 +37,50 @@ struct QuickActionsSettingsPane: View {
     }
 
     private func actionSetting(for action: BeaconQuickAction) -> some View {
-        Toggle(isOn: Binding(
-            get: { preferences.isEnabled(action) },
-            set: { setQuickActionEnabled($0, for: action) }
-        )) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(action.title)
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(action.subtitle)
-                    .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let shortcut = action.shortcut {
-                    Text(shortcut.displayText)
-                        .font(DesignTokens.Typography.caption2Emphasis)
-                        .monospaced()
-                        .foregroundStyle(DesignTokens.Palette.accent)
+        let isEnabled = preferences.isEnabled(action)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action.title)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(action.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-            .padding(.vertical, 4)
-        }
-        .toggleStyle(.switch)
-        .accessibilityLabel(Text(action.title))
-        .accessibilityHint(Text(action.subtitle))
-        .accessibilityIdentifier("quickActions.\(action.id)")
-    }
-
-    private var statusPanel: some View {
-        let summary = quickActionSettingsSummary(for: preferences)
-
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: resolveSymbol("sparkles.rectangle.stack", fallback: "sparkles"))
-                    .font(.system(size: 17, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DesignTokens.Palette.accent)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(DesignTokens.Palette.controlPill)
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Automation")
-                        .font(DesignTokens.Typography.sectionTitle)
-                    Text("Global shortcuts and Shortcuts actions.")
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                }
-            }
-
-            VStack(spacing: 8) {
-                summaryMetricRow(
-                    "Enabled",
-                    value: BeaconL10n.format(
-                        "%1$d of %2$d",
-                        summary.enabledSupportedActions.count,
-                        summary.supportedActionCount
-                    ),
-                    systemImage: "checkmark.circle.fill",
-                    color: DesignTokens.Palette.charging
+                Spacer(minLength: 8)
+                ShortcutRecorderField(
+                    shortcut: preferences.shortcut(for: action),
+                    actionTitle: action.title,
+                    onChange: { setShortcut($0, for: action) },
+                    conflictingAction: { preferences.action(using: $0, excluding: action) }
                 )
-                summaryMetricRow(
-                    "Default On",
-                    value: "\(summary.defaultEnabledActionCount)",
-                    systemImage: "bolt.circle.fill",
-                    color: DesignTokens.Palette.accent
-                )
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Enabled Shortcuts")
-                    .font(DesignTokens.Typography.captionEmphasis)
-
-                if summary.enabledSupportedActions.isEmpty {
-                    Text("No shortcuts enabled")
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                } else {
-                    ForEach(summary.enabledSupportedActions) { action in
-                        actionChip(for: action)
-                    }
+                .disabled(!isEnabled)
+                .accessibilityIdentifier("quickActions.\(action.id).shortcut")
+                Toggle(isOn: Binding(
+                    get: { preferences.isEnabled(action) },
+                    set: { setQuickActionEnabled($0, for: action) }
+                )) {
+                    Text(action.title)
                 }
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .accessibilityLabel(Text(action.title))
+                .accessibilityHint(Text(action.subtitle))
+                .accessibilityIdentifier("quickActions.\(action.id)")
             }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 7) {
-                statusRow("Core actions available", isActive: true)
-                statusRow("macOS Shortcuts supported", isActive: true)
+            if isEnabled, status.registrationFailures.contains(action) {
+                Label(
+                    "macOS did not accept this shortcut. Another app or a system shortcut may already use it; record a different one.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("quickActions.\(action.id).conflict")
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .beaconSettingsCardSurface()
-        .padding(.top, 18)
+        .padding(.vertical, 2)
     }
 
     private func setQuickActionEnabled(_ isEnabled: Bool, for action: BeaconQuickAction) {
@@ -139,57 +89,97 @@ struct QuickActionsSettingsPane: View {
         nextPreferences.save()
     }
 
-    private func summaryMetricRow(
-        _ title: String,
-        value: String,
-        systemImage: String,
-        color: Color
-    ) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(color)
-            Text(BeaconL10n.string(title))
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-            Spacer(minLength: 0)
-            Text(value)
-                .font(DesignTokens.Typography.captionEmphasis)
-                .foregroundStyle(DesignTokens.Palette.text)
+    private func setShortcut(_ shortcut: BeaconQuickActionShortcut?, for action: BeaconQuickAction) {
+        let nextPreferences = preferences.settingShortcut(shortcut, for: action)
+        preferences = nextPreferences
+        nextPreferences.save()
+    }
+}
+
+/// A click-to-record shortcut field modelled on System Settings > Keyboard Shortcuts.
+struct ShortcutRecorderField: View {
+    let shortcut: BeaconQuickActionShortcut?
+    let actionTitle: String
+    let onChange: (BeaconQuickActionShortcut?) -> Void
+    let conflictingAction: (BeaconQuickActionShortcut) -> BeaconQuickAction?
+
+    @State private var isRecording = false
+    @State private var monitor: Any?
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 3) {
+            Button {
+                isRecording ? stopRecording() : startRecording()
+            } label: {
+                Text(label)
+                    .monospacedDigit()
+                    .frame(minWidth: 84)
+                    .foregroundStyle(isRecording || shortcut == nil ? .secondary : .primary)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityLabel(Text(BeaconL10n.format("Shortcut for %@", actionTitle)))
+            .accessibilityValue(Text(isRecording ? BeaconL10n.string("Recording") : (shortcut?.displayText ?? BeaconL10n.string("None"))))
+            .help(BeaconL10n.string("Click to record a shortcut"))
+            if let message {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+        .onDisappear(perform: stopRecording)
+    }
+
+    private var label: String {
+        if isRecording { return BeaconL10n.string("Type Shortcut") }
+        return shortcut?.displayText ?? BeaconL10n.string("Record Shortcut")
+    }
+
+    private func startRecording() {
+        message = nil
+        isRecording = true
+        NotificationCenter.default.post(name: .beaconShortcutRecordingDidChange, object: nil, userInfo: ["isRecording": true])
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            handle(event)
+            return nil
         }
     }
 
-    private func actionChip(for action: BeaconQuickAction) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: action.systemImage)
-                .font(.system(size: 10, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DesignTokens.Palette.accent)
-                .accessibilityHidden(true)
-            Text(action.title)
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.text)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill.opacity(0.92))
-        )
+    private func stopRecording() {
+        guard isRecording || monitor != nil else { return }
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        isRecording = false
+        NotificationCenter.default.post(name: .beaconShortcutRecordingDidChange, object: nil, userInfo: ["isRecording": false])
     }
 
-    private func statusRow(_ title: String, isActive: Bool) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: isActive ? "checkmark.circle.fill" : "minus.circle")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(isActive ? DesignTokens.Palette.charging : DesignTokens.Palette.secondaryText)
-            Text(BeaconL10n.string(title))
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-            Spacer(minLength: 0)
+    private func handle(_ event: NSEvent) {
+        let plainFlags = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        if plainFlags.isEmpty, Int(event.keyCode) == kVK_Escape {
+            stopRecording()
+            return
         }
+        if plainFlags.isEmpty, [kVK_Delete, kVK_ForwardDelete].contains(Int(event.keyCode)) {
+            onChange(nil)
+            stopRecording()
+            return
+        }
+        guard let recorded = BeaconQuickActionShortcut(event: event) else { return }
+        guard recorded.isValidGlobalShortcut else {
+            message = BeaconL10n.string("Include ⌘, ⌥ or ⌃.")
+            NSSound.beep()
+            return
+        }
+        if let other = conflictingAction(recorded) {
+            message = BeaconL10n.format("Already used by %@.", other.title)
+            NSSound.beep()
+            return
+        }
+        onChange(recorded)
+        stopRecording()
     }
 }
 

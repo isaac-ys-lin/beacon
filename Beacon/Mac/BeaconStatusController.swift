@@ -131,6 +131,16 @@ final class BeaconStatusController: NSObject {
                 Task { @MainActor in
                     self?.handlePreferencesChanged()
                 }
+            },
+            NotificationCenter.default.addObserver(
+                forName: .beaconShortcutRecordingDidChange,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                let isRecording = notification.userInfo?["isRecording"] as? Bool ?? false
+                Task { @MainActor in
+                    self?.shortcutController.setSuspended(isRecording)
+                }
             }
         ]
         BeaconIntentBridge.shared.register(
@@ -350,6 +360,9 @@ final class BeaconStatusController: NSObject {
     }
 
     private func registerQuickActions() {
+        shortcutController.onRegistrationFailuresChange = { failures in
+            BeaconShortcutStatus.shared.registrationFailures = failures
+        }
         shortcutController.registerEnabledShortcuts { [weak self] action in
             Task { @MainActor in
                 _ = self?.performQuickAction(action)
