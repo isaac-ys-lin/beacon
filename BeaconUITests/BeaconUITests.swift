@@ -12,7 +12,7 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let window = app.windows["Beacon Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["General"].click()
+        window.descendants(matching: .any)["settings.pane.general"].click()
         let refresh = window.buttons["general.launch-at-login.refresh"]
         XCTAssertTrue(refresh.waitForExistence(timeout: 5))
         XCTAssertTrue(window.buttons["general.launch-at-login.settings"].exists)
@@ -85,7 +85,7 @@ final class BeaconUITests: XCTestCase {
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 let window = app.windows.firstMatch
-                window.buttons["settings.pane.quickActions"].click()
+                window.descendants(matching: .any)["settings.pane.quickActions"].click()
                 let toggle = window.descendants(matching: .any).matching(identifier: "quickActions.refreshBatteries").firstMatch
                 if toggle.exists, let originalValue, String(describing: toggle.value ?? "") != originalValue {
                     toggle.click()
@@ -95,7 +95,7 @@ final class BeaconUITests: XCTestCase {
         }
         var window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["settings.pane.quickActions"].click()
+        window.descendants(matching: .any)["settings.pane.quickActions"].click()
         var toggle = window.descendants(matching: .any).matching(identifier: "quickActions.refreshBatteries").firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.label, "Refresh Batteries")
@@ -108,7 +108,7 @@ final class BeaconUITests: XCTestCase {
         app.launch()
         window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["settings.pane.quickActions"].click()
+        window.descendants(matching: .any)["settings.pane.quickActions"].click()
         toggle = window.descendants(matching: .any).matching(identifier: "quickActions.refreshBatteries").firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(String(describing: try XCTUnwrap(toggle.value)), changedValue)
@@ -138,7 +138,7 @@ final class BeaconUITests: XCTestCase {
         XCTAssertTrue(window.waitForExistence(timeout: 10))
         let isChinese = language == "zh-Hant-TW"
         for pane in ["general", "devices", "quickActions", "alerts", "actionHUD", "dashboard"] {
-            let button = window.buttons["settings.pane.\(pane)"]
+            let button = window.descendants(matching: .any)["settings.pane.\(pane)"]
             XCTAssertTrue(button.waitForExistence(timeout: 5))
             button.click()
             switch pane {
@@ -179,7 +179,7 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let window = app.windows["Beacon Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["settings.pane.devices"].click()
+        window.descendants(matching: .any)["settings.pane.devices"].click()
         let airPods = window.buttons["settings.device.preview-airpods"]
         XCTAssertTrue(airPods.waitForExistence(timeout: 5))
         airPods.click()

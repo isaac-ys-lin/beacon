@@ -381,6 +381,44 @@ struct GetBeaconBatteryTrendsIntent: AppIntent {
     }
 }
 
+struct ToggleBeaconHeadsetMicrophoneIntent: AppIntent {
+    static let title: LocalizedStringResource = "Toggle Headset Microphone"
+    static let description = IntentDescription("Switch the Mac's audio input between a connected Bluetooth headset and the built-in microphone.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        guard BeaconIntentBridge.shared.perform(.toggleHeadsetMicrophone) else {
+            throw BeaconIntentError.actionUnavailable
+        }
+        let controller = AudioInputController.shared
+        let name = controller.devices.first { $0.uid == controller.currentUID }?.name ?? ""
+        return .result(value: name)
+    }
+}
+
+struct SetBeaconAudioInputLockIntent: AppIntent {
+    static let title: LocalizedStringResource = "Set Audio Input Lock"
+    static let description = IntentDescription("Turn Audio Input Lock on or off. When turning it on without a preferred microphone, the current input is used.")
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Lock", default: true)
+    var isEnabled: Bool
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        let controller = AudioInputController.shared
+        controller.start()
+        var preferences = controller.preferences
+        preferences.isEnabled = isEnabled
+        if isEnabled, preferences.preferredUID == nil {
+            preferences.preferredUID = controller.currentUID
+        }
+        controller.update(preferences)
+        return .result()
+    }
+}
+
 struct BeaconAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(

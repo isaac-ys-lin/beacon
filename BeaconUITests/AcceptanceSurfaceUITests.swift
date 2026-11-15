@@ -38,7 +38,7 @@ final class AcceptanceSurfaceUITests: XCTestCase {
         app.launch()
         let window = app.windows["Beacon Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["settings.pane.general"].click()
+        window.descendants(matching: .any)["settings.pane.general"].click()
         let export = window.buttons["general.history.export"]
         XCTAssertTrue(export.waitForExistence(timeout: 5))
         export.click()
@@ -89,7 +89,7 @@ final class AcceptanceSurfaceUITests: XCTestCase {
         app.launch(); defer { app.terminate() }
         let window = app.windows["Beacon Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["settings.pane.general"].click()
+        window.descendants(matching: .any)["settings.pane.general"].click()
         app.typeKey("w", modifierFlags: .command)
         absent(window)
     }

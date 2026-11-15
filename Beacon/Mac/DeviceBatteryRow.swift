@@ -60,20 +60,6 @@ struct BeaconLogoMark: View {
     }
 }
 
-struct BluetoothLogoMark: View {
-    var size: CGFloat = 28
-
-    var body: some View {
-        Image(systemName: BeaconSymbols.bluetooth)
-            .font(.system(size: max(15, size * 0.70), weight: .regular))
-            .symbolRenderingMode(.monochrome)
-            .foregroundStyle(Color.primary.opacity(0.68))
-            .frame(width: size, height: size)
-        .frame(width: size, height: size)
-        .accessibilityLabel("Bluetooth")
-    }
-}
-
 struct BeaconHeaderSettingsIcon: View {
     let color: Color
     var glyphSize: CGFloat = 13

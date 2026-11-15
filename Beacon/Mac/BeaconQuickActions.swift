@@ -72,6 +72,8 @@ enum BeaconQuickAction: String, CaseIterable, Identifiable, Sendable {
     case openBluetoothSettings
     case connectNearbyDevice
     case disconnectLowestDevice
+    case toggleHeadsetMicrophone
+    case toggleAudioInputLock
     case transferToMac
 
     var id: String { rawValue }
@@ -85,6 +87,8 @@ enum BeaconQuickAction: String, CaseIterable, Identifiable, Sendable {
         case .openBluetoothSettings: return BeaconL10n.string("Open Bluetooth Settings")
         case .connectNearbyDevice: return BeaconL10n.string("Connect Prioritized Device")
         case .disconnectLowestDevice: return BeaconL10n.string("Disconnect Lowest Device")
+        case .toggleHeadsetMicrophone: return BeaconL10n.string("Toggle Headset Microphone")
+        case .toggleAudioInputLock: return BeaconL10n.string("Toggle Audio Input Lock")
         case .transferToMac: return BeaconL10n.string("Transfer to Another Mac")
         }
     }
@@ -105,6 +109,10 @@ enum BeaconQuickAction: String, CaseIterable, Identifiable, Sendable {
             return BeaconL10n.string("Connect a visible disconnected paired device, prioritizing the lowest reported battery.")
         case .disconnectLowestDevice:
             return BeaconL10n.string("Disconnect the visible connected Bluetooth device with the lowest battery.")
+        case .toggleHeadsetMicrophone:
+            return BeaconL10n.string("Switch between a Bluetooth headset microphone and the Mac's built-in microphone.")
+        case .toggleAudioInputLock:
+            return BeaconL10n.string("Turn Audio Input Lock on or off.")
         case .transferToMac:
             return BeaconL10n.string("Excluded from this build by product scope.")
         }
@@ -119,6 +127,8 @@ enum BeaconQuickAction: String, CaseIterable, Identifiable, Sendable {
         case .openBluetoothSettings: return "dot.radiowaves.left.and.right"
         case .connectNearbyDevice: return "dot.radiowaves.left.and.right"
         case .disconnectLowestDevice: return "bolt.horizontal.circle"
+        case .toggleHeadsetMicrophone: return "mic.slash"
+        case .toggleAudioInputLock: return "lock"
         case .transferToMac: return resolveSymbol("macbook.and.iphone", fallback: "desktopcomputer")
         }
     }
@@ -132,7 +142,7 @@ enum BeaconQuickAction: String, CaseIterable, Identifiable, Sendable {
         case .showDashboard, .refreshBatteries:
             return true
         case .openSettings, .addDevice, .openBluetoothSettings, .connectNearbyDevice,
-             .disconnectLowestDevice, .transferToMac:
+             .disconnectLowestDevice, .toggleHeadsetMicrophone, .toggleAudioInputLock, .transferToMac:
             return false
         }
     }
@@ -148,7 +158,7 @@ enum BeaconQuickAction: String, CaseIterable, Identifiable, Sendable {
         case .openBluetoothSettings: (kVK_ANSI_L, "L")
         case .connectNearbyDevice: (kVK_ANSI_N, "N")
         case .disconnectLowestDevice: (kVK_ANSI_X, "X")
-        case .transferToMac: nil
+        case .toggleHeadsetMicrophone, .toggleAudioInputLock, .transferToMac: nil
         }
         guard let key else { return nil }
         return BeaconQuickActionShortcut(keyCode: UInt32(key.0), modifiers: modifiers, keyLabel: key.1)
@@ -166,6 +176,8 @@ enum BeaconQuickAction: String, CaseIterable, Identifiable, Sendable {
         case .connectNearbyDevice: return 6
         case .disconnectLowestDevice: return 7
         case .transferToMac: return 8
+        case .toggleHeadsetMicrophone: return 9
+        case .toggleAudioInputLock: return 10
         }
     }
 }

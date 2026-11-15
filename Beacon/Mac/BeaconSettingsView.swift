@@ -202,57 +202,41 @@ struct BeaconSettingsView: View {
     }
 
     private var settingsSidebar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Beacon")
-                .font(DesignTokens.Typography.sidebarTitle)
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 10)
-                .padding(.top, 4)
-
-            VStack(spacing: 2) {
-                ForEach(SettingsPane.allCases) { pane in
-                    Button {
-                        selectedPane = pane
-                    } label: {
-                        HStack(spacing: 9) {
-                            SettingsPaneIcon(pane: pane)
-
+        VStack(alignment: .leading, spacing: 0) {
+            List(selection: Binding<SettingsPane?>(
+                get: { selectedPane },
+                set: { if let pane = $0 { selectedPane = pane } }
+            )) {
+                Section {
+                    ForEach(SettingsPane.allCases) { pane in
+                        Label {
                             Text(pane.title)
-                                .font(selectedPane == pane ? DesignTokens.Typography.controlLabelEmphasis : DesignTokens.Typography.controlLabel)
-                                .foregroundStyle(selectedPane == pane ? .primary : .secondary)
-
-                            Spacer(minLength: 0)
+                        } icon: {
+                            SettingsPaneIcon(pane: pane)
                         }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .frame(height: 30)
-                            .contentShape(Rectangle())
-                            .background(
-                                RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                                    .fill(selectedPane == pane ? NativeMacStyle.rowSelection : Color.clear)
-                            )
+                        .tag(pane)
+                        .accessibilityIdentifier("settings.pane.\(pane.id)")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("settings.pane.\(pane.id)")
-                    .accessibilityAddTraits(selectedPane == pane ? .isSelected : [])
+                } header: {
+                    Text("Beacon")
                 }
             }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
 
-            Spacer()
+            Divider()
 
             Button(action: onQuit) {
                 Label("Quit Beacon", systemImage: "power")
-                    .font(DesignTokens.Typography.controlLabel)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .frame(height: 30)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
             .help("Quit Beacon")
         }
-        .padding(12)
-        .frame(width: 190)
+        .frame(width: 200)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.regularMaterial)
     }
@@ -318,6 +302,7 @@ struct BeaconSettingsView: View {
                 case .alerts: alertsTab
                 case .actionHUD: actionHUDTab
                 case .quickActions: quickActionsTab
+                case .audio: AudioInputSettingsPane()
                 case .dashboard: dashboardTab
                 }
             }

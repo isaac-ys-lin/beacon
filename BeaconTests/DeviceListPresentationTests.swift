@@ -2061,11 +2061,11 @@ final class DeviceListPresentationTests: XCTestCase {
 
         let summary = quickActionSettingsSummary(for: preferences)
 
-        XCTAssertEqual(summary.supportedActionCount, 7)
+        XCTAssertEqual(summary.supportedActionCount, 9)
         XCTAssertEqual(summary.defaultEnabledActionCount, 2)
         XCTAssertEqual(summary.enabledSupportedActions, [.showDashboard, .openSettings])
         XCTAssertEqual(summary.unsupportedActions, [.transferToMac])
-        XCTAssertEqual(summary.disabledSupportedActions.count, 5)
+        XCTAssertEqual(summary.disabledSupportedActions.count, 7)
         XCTAssertFalse(summary.enabledSupportedActions.contains(.transferToMac))
     }
 

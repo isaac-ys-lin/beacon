@@ -1,9 +1,17 @@
 import Foundation
 
+/// A short informational HUD, e.g. a restored microphone or a toggled input.
+struct BeaconHUDNotice: Equatable {
+    let title: String
+    let message: String
+    let systemImage: String
+}
+
 /// Ordering only: this does not execute hardware commands or manufacture their results.
 enum BeaconHUDEvent: Equatable {
     case battery(BatteryAlertEvent)
     case connection(BluetoothConnectionOperation)
+    case notice(BeaconHUDNotice)
 
     var operation: BluetoothConnectionOperation? {
         if case let .connection(operation) = self { return operation }

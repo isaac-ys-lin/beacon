@@ -124,16 +124,7 @@ struct BatteryActionHUDView: View {
         }
         .padding(.horizontal, 18)
         .frame(width: 520, height: 92)
-        .background(
-            RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-                .fill(theme.panel.opacity(0.96))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-                        .stroke(theme.hairlineDefault, lineWidth: 0.8)
-                )
-                .shadow(color: theme.shadow, radius: 32, x: 0, y: 16)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
+        .beaconHUDSurface(theme: theme, cornerRadius: Self.cornerRadius)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("hud.preview")
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
@@ -185,5 +176,87 @@ struct BatteryActionHUDView: View {
 
     private var theme: BeaconThemePalette {
         appearanceTheme.palette(resolvedSystemScheme: colorScheme)
+    }
+}
+
+struct NoticeActionHUDView: View {
+    let notice: BeaconHUDNotice
+    var showsDismissButton = false
+    var onDismiss: (() -> Void)?
+    @AppStorage(BeaconAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: notice.systemImage)
+                .font(.system(size: 22, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 52, height: 52)
+                .background(Circle().fill(theme.accentSoft))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(notice.title)
+                    .font(DesignTokens.Typography.rowTitleEmphasis)
+                    .foregroundStyle(theme.textPrimary)
+                    .lineLimit(1)
+                Text(notice.message)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(theme.textMuted)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 12)
+
+            if showsDismissButton {
+                Button {
+                    onDismiss?()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(theme.textMuted)
+                        .frame(width: 24, height: 24)
+                        .background(Circle().fill(theme.hover.opacity(0.70)))
+                }
+                .buttonStyle(.plain)
+                .help("Dismiss")
+                .accessibilityLabel("Dismiss")
+                .accessibilityIdentifier("hud.dismiss")
+            }
+        }
+        .padding(.horizontal, 18)
+        .frame(width: 520, height: 92)
+        .beaconHUDSurface(theme: theme, cornerRadius: BatteryActionHUDView.cornerRadius)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("hud.notice")
+        .preferredColorScheme(appearanceTheme.colorSchemeOverride)
+    }
+
+    private var appearanceTheme: BeaconAppearanceTheme {
+        BeaconAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
+    }
+
+    private var theme: BeaconThemePalette {
+        appearanceTheme.palette(resolvedSystemScheme: colorScheme)
+    }
+}
+
+extension View {
+    /// The HUD background: Liquid Glass on macOS 26 and later, the opaque panel before.
+    @ViewBuilder
+    func beaconHUDSurface(theme: BeaconThemePalette, cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self.background(
+                shape
+                    .fill(theme.panel.opacity(0.96))
+                    .overlay(shape.stroke(theme.hairlineDefault, lineWidth: 0.8))
+                    .shadow(color: theme.shadow, radius: 32, x: 0, y: 16)
+            )
+            .clipShape(shape)
+        }
     }
 }

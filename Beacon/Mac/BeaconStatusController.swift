@@ -23,6 +23,7 @@ final class BeaconStatusController: NSObject {
     private var refreshStateObserver: AnyCancellable?
     private var refreshDiagnosticsObserver: AnyCancellable?
     private var alertEventsObserver: AnyCancellable?
+    private var audioRestorationObserver: AnyCancellable?
     private var notificationAuthorizationObserver: AnyCancellable?
     private var notificationDeliveryObserver: AnyCancellable?
     private var trustedIPhoneRegistryObserver: AnyCancellable?
@@ -104,6 +105,18 @@ final class BeaconStatusController: NSObject {
             self?.settingsWindowController.updateContent(enrollmentResult: report)
             self?.updateDesktopWidget()
         }
+        audioRestorationObserver = AudioInputController.shared.$lastRestoration
+            .compactMap { $0 }
+            .sink { [weak self] restoration in
+                self?.hudController.show(notice: BeaconHUDNotice(
+                    title: BeaconL10n.format("Kept %@", restoration.restoredName),
+                    message: restoration.blockedName.map {
+                        BeaconL10n.format("Audio Input Lock switched back from %@.", $0)
+                    } ?? BeaconL10n.string("Audio Input Lock restored your preferred microphone."),
+                    systemImage: "lock.fill"
+                ))
+            }
+        AudioInputController.shared.start()
         alertEventsObserver = model.$latestAlertEvents
             .filter { !$0.isEmpty }
             .sink { [weak self] events in
@@ -408,6 +421,35 @@ final class BeaconStatusController: NSObject {
             return performDeviceControlQuickAction(.connectNearby)
         case .disconnectLowestDevice:
             return performDeviceControlQuickAction(.disconnectLowest)
+        case .toggleHeadsetMicrophone:
+            let controller = AudioInputController.shared
+            controller.start()
+            guard let name = controller.toggleHeadsetMicrophone() else {
+                hudController.show(notice: BeaconHUDNotice(
+                    title: BeaconL10n.string("No headset microphone"),
+                    message: BeaconL10n.string("Connect a Bluetooth headset to switch its microphone."),
+                    systemImage: "mic.slash"
+                ))
+                return false
+            }
+            hudController.show(notice: BeaconHUDNotice(
+                title: BeaconL10n.format("Microphone: %@", name),
+                message: BeaconL10n.string("Audio input switched."),
+                systemImage: "mic"
+            ))
+            return true
+        case .toggleAudioInputLock:
+            let controller = AudioInputController.shared
+            controller.start()
+            let isLocked = controller.toggleLock()
+            hudController.show(notice: BeaconHUDNotice(
+                title: BeaconL10n.string(isLocked ? "Audio Input Lock on" : "Audio Input Lock off"),
+                message: isLocked
+                    ? BeaconL10n.string("Beacon keeps your preferred microphone selected.")
+                    : BeaconL10n.string("Apps and headsets can change the input again."),
+                systemImage: isLocked ? "lock.fill" : "lock.open"
+            ))
+            return true
         case .transferToMac:
             return false
         }

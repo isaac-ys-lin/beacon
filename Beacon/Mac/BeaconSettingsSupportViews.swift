@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 extension View {
@@ -395,20 +396,45 @@ struct SettingsEmptyStateCard: View {
     }
 }
 
+/// A System Settings–style sidebar icon: a white glyph on a tinted rounded square.
 struct SettingsPaneIcon: View {
     let pane: SettingsPane
 
     var body: some View {
-        if pane == .devices {
-            BluetoothLogoMark(size: 20)
-        } else if pane == .dashboard {
-            BeaconLogoMark(size: 20)
-        } else {
-            Image(systemName: pane.systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.secondary)
-                .frame(width: 20, height: 20)
+        Image(systemName: pane.sidebarSymbol)
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(pane.sidebarTint.gradient)
+            )
+            .accessibilityHidden(true)
+    }
+}
+
+extension SettingsPane {
+    var sidebarSymbol: String {
+        switch self {
+        case .general: return "gearshape.fill"
+        case .devices: return resolveSymbol("headphones", fallback: "dot.radiowaves.left.and.right")
+        case .alerts: return "bell.badge.fill"
+        case .actionHUD: return resolveSymbol("rectangle.inset.topright.filled", fallback: "rectangle.fill")
+        case .quickActions: return "command"
+        case .audio: return "mic.fill"
+        case .dashboard: return resolveSymbol("square.grid.2x2.fill", fallback: "square.grid.2x2")
+        }
+    }
+
+    var sidebarTint: Color {
+        switch self {
+        case .general: return .gray
+        case .devices: return .blue
+        case .alerts: return .red
+        case .actionHUD: return .indigo
+        case .quickActions: return .orange
+        case .audio: return .pink
+        case .dashboard: return .green
         }
     }
 }
@@ -416,6 +442,7 @@ struct SettingsPaneIcon: View {
 enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case general
     case devices
+    case audio
     case alerts
     case actionHUD
     case quickActions
@@ -430,6 +457,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .alerts: return BeaconL10n.string("Alerts")
         case .actionHUD: return BeaconL10n.string("Action HUD")
         case .quickActions: return BeaconL10n.string("Quick Actions")
+        case .audio: return BeaconL10n.string("Audio Input")
         case .dashboard: return BeaconL10n.string("Dashboard")
         }
     }
@@ -441,6 +469,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .alerts: return "bell.badge"
         case .actionHUD: return "sparkles"
         case .quickActions: return "keyboard"
+        case .audio: return "mic"
         case .dashboard: return BeaconSymbols.app
         }
     }
@@ -566,8 +595,13 @@ struct AirPodsAudioControlsCard: View {
 struct DeviceCurrentStatsCard: View {
     let item: DeviceListItem
     let historySamples: [BatteryHistorySample]
+    @ObservedObject private var deviceDetails = BluetoothDeviceDetailsStore.shared
 
     private var presentation: DeviceBatteryPresentation { .init(item: item) }
+
+    private var firmwareVersion: String? {
+        deviceDetails.details(forDeviceID: item.id)?.firmwareVersion
+    }
 
     private var historySummary: BatteryHistorySummary? {
         BatteryHistoryStore.summary(for: historySamples)
@@ -622,6 +656,18 @@ struct DeviceCurrentStatsCard: View {
                     systemImage: "clock",
                     color: updatedColor
                 )
+
+                if let firmwareVersion {
+                    Divider().padding(.leading, 40)
+
+                    SettingsInfoRow(
+                        title: "Firmware",
+                        value: firmwareVersion,
+                        systemImage: "cpu",
+                        color: .secondary
+                    )
+                    .accessibilityIdentifier("device.report.firmware")
+                }
             }
             .background(settingsGroupBackground)
 
@@ -643,8 +689,10 @@ struct DeviceCurrentStatsCard: View {
                         .foregroundStyle(trendColor)
                 }
 
-                BatteryHistorySparkline(samples: historySummary?.samples ?? [])
-                    .frame(height: 34)
+                if (historySummary?.samples.count ?? 0) >= 2 {
+                    BatteryHistorySparkline(samples: historySummary?.samples ?? [])
+                        .frame(height: 96)
+                }
 
                 Text(rangeText)
                     .font(DesignTokens.Typography.caption2)
@@ -786,78 +834,54 @@ struct DeviceCurrentStatsCard: View {
 
 }
 
+/// Battery level over time, drawn with Swift Charts on a real time axis and a
+/// fixed 0–100% scale (as in System Settings > Battery), so uneven sampling or
+/// a 2% wobble is not exaggerated.
 struct BatteryHistorySparkline: View {
     let samples: [BatteryHistorySample]
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(DesignTokens.Palette.card.opacity(0.58))
-
-                if samples.count >= 2 {
-                    sparkPath(in: proxy.size)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    DesignTokens.Palette.accent,
-                                    trendColor
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round)
-                        )
-                        .padding(7)
-                } else {
-                    HStack(spacing: 5) {
-                        ForEach(0..<8, id: \.self) { _ in
-                            Capsule(style: .continuous)
-                                .fill(DesignTokens.Palette.separator.opacity(0.55))
-                                .frame(width: 16, height: 4)
-                        }
+        if sortedSamples.count >= 2 {
+            Chart(sortedSamples) { sample in
+                AreaMark(
+                    x: .value("Time", sample.recordedAt),
+                    y: .value("Battery", sample.percent)
+                )
+                .foregroundStyle(.linearGradient(
+                    colors: [Color.accentColor.opacity(0.28), Color.accentColor.opacity(0.02)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
+                .interpolationMethod(.monotone)
+                LineMark(
+                    x: .value("Time", sample.recordedAt),
+                    y: .value("Battery", sample.percent)
+                )
+                .foregroundStyle(Color.accentColor)
+                .lineStyle(StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+                .interpolationMethod(.monotone)
+            }
+            .chartYScale(domain: 0...100)
+            .chartYAxis {
+                AxisMarks(values: [0, 50, 100]) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let percent = value.as(Int.self) { Text("\(percent)%") }
                     }
-                    .padding(.horizontal, 10)
                 }
             }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 3)) {
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.weekday(.abbreviated).hour())
+                }
+            }
+            .accessibilityLabel(Text("Battery Trend"))
         }
     }
 
     private var sortedSamples: [BatteryHistorySample] {
         samples.sorted { $0.recordedAt < $1.recordedAt }
-    }
-
-    private var trendColor: Color {
-        guard let first = sortedSamples.first, let last = sortedSamples.last else {
-            return DesignTokens.Palette.secondaryText
-        }
-        if last.percent > first.percent { return DesignTokens.Palette.charging }
-        if last.percent < first.percent { return DesignTokens.Palette.warning }
-        return DesignTokens.Palette.accent
-    }
-
-    private func sparkPath(in size: CGSize) -> Path {
-        let points = sortedSamples
-        guard points.count >= 2 else { return Path() }
-        let width = max(size.width - 14, 1)
-        let height = max(size.height - 14, 1)
-        let minPercent = Double(points.map(\.percent).min() ?? 0)
-        let maxPercent = Double(points.map(\.percent).max() ?? 100)
-        let denominator = max(maxPercent - minPercent, 1)
-
-        var path = Path()
-        for (index, sample) in points.enumerated() {
-            let x = CGFloat(index) / CGFloat(points.count - 1) * width
-            let normalized = (Double(sample.percent) - minPercent) / denominator
-            let y = height - CGFloat(normalized) * height
-            let point = CGPoint(x: x, y: y)
-            if index == 0 {
-                path.move(to: point)
-            } else {
-                path.addLine(to: point)
-            }
-        }
-        return path
     }
 }
 

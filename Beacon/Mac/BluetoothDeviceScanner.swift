@@ -387,6 +387,10 @@ public struct BluetoothDeviceScanner {
                 timeout: min(systemProfilerTimeout, remaining)
             )
             let candidates = result.succeeded ? parseSystemProfilerBluetoothData(result.output) : []
+            if result.succeeded {
+                let details = BluetoothDeviceDetailsStore.parse(systemProfilerJSON: result.output)
+                await MainActor.run { BluetoothDeviceDetailsStore.shared.replace(with: details) }
+            }
             let status: BatteryReadStatus
             if result.timedOut || result.wasCancelled {
                 status = .timedOut

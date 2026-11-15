@@ -41,10 +41,7 @@ struct ConnectionActionHUDView: View {
         }
         .padding(18)
         .frame(width: 520, height: 150)
-        .background(RoundedRectangle(cornerRadius: BatteryActionHUDView.cornerRadius)
-            .fill(theme.panel.opacity(0.96))
-            .overlay(RoundedRectangle(cornerRadius: BatteryActionHUDView.cornerRadius)
-                .stroke(theme.hairlineDefault, lineWidth: 0.8)))
+        .beaconHUDSurface(theme: theme, cornerRadius: BatteryActionHUDView.cornerRadius)
         .foregroundStyle(theme.textPrimary)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("hud.connection")

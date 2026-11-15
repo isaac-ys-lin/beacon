@@ -31,6 +31,11 @@ final class BeaconHUDController {
         enqueue(.connection(operation))
     }
 
+    func show(notice: BeaconHUDNotice) {
+        guard BatteryHUDPreferences.isEnabled(defaults: defaults) else { return }
+        enqueue(.notice(notice))
+    }
+
     func refreshPreferences() {
         if !BatteryHUDPreferences.isEnabled(defaults: defaults) && !isUITestPresentation {
             queue = BeaconHUDQueue()
@@ -90,6 +95,10 @@ final class BeaconHUDController {
             view = AnyView(ConnectionActionHUDView(operation: operation, showsDismissButton: showsDismiss,
                 onDismiss: { [weak self] in self?.dismiss() },
                 onReview: { [weak self] in self?.onReviewOperation?(operation.deviceID) }))
+        case let .notice(notice):
+            logger.info("Notice presented")
+            view = AnyView(NoticeActionHUDView(notice: notice, showsDismissButton: showsDismiss,
+                onDismiss: { [weak self] in self?.dismiss() }))
         }
         let hostingController = NSHostingController(rootView: view)
         hostingController.view.frame = NSRect(origin: .zero, size: contentSize)
