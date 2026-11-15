@@ -68,7 +68,7 @@
 "System follows your current macOS appearance. Dark and Light keep Beacon fixed." = "「系統」會跟隨 macOS 外觀；「深色」與「淺色」會固定 Beacon 的外觀。";
 "Show lowest battery in menu bar" = "在選單列顯示最低電量";
 "Menu Bar Dashboard" = "選單列儀表板";
-"Choose the compact details shown when the menu bar icon opens the battery dashboard." = "選擇從選單列圖示打開電量儀表板時顯示的精簡資訊。";
+"Shows the lowest current battery percentage next to the menu bar icon." = "在選單列圖示旁顯示目前最低的電量百分比。";
 "Show floating desktop widget" = "顯示浮動桌面小工具";
 "Widget size" = "小工具大小";
 "Desktop Widget" = "桌面小工具";
@@ -348,7 +348,7 @@
 "Battery Alerts..." = "電量提醒⋯";
 "Audio Controls..." = "音訊控制⋯";
 "Options" = "選項";
-"Refresh Battery" = "重新整理電量";
+"Refresh All Devices" = "重新整理所有裝置";
 "Connect" = "連接";
 "Disconnect" = "中斷";
 "Pin %@" = "釘選 %@";
@@ -539,3 +539,4 @@
 
 "Paired audio devices appear even without a battery report. Other supported devices appear when they report battery levels." = "已配對的音訊裝置即使沒有電量回報也會出現；其他支援的裝置會在回報電量後出現。";
 "Refresh after pairing or connecting your device." = "配對或連接裝置後，請重新整理。";
+"Beacon could not perform this action right now." = "Beacon 目前無法執行這個動作。";

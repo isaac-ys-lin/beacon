@@ -2109,6 +2109,42 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertEqual(BeaconIntentBridge.shared.snapshots(), snapshots)
     }
 
+    @MainActor
+    func testBeaconIntentBridgeWaitsForFirstReportBeforeAnsweringReadShortcuts() async {
+        let snapshots = [
+            makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
+        ]
+        var hasReport = false
+        var current: [DecoratedBatterySnapshot] = []
+
+        BeaconIntentBridge.shared.register(
+            handler: { _ in true },
+            snapshotProvider: { current },
+            hasCompletedRefresh: { hasReport },
+            refresher: {
+                current = snapshots
+                hasReport = true
+            }
+        )
+
+        let answered = await BeaconIntentBridge.shared.reportedSnapshots()
+        XCTAssertEqual(answered, snapshots)
+    }
+
+    @MainActor
+    func testBeaconIntentBridgeRefreshAwaitsCompletion() async {
+        var refreshed = false
+        BeaconIntentBridge.shared.register(
+            handler: { _ in true },
+            snapshotProvider: { [] },
+            hasCompletedRefresh: { refreshed },
+            refresher: { refreshed = true }
+        )
+
+        await BeaconIntentBridge.shared.refresh()
+        XCTAssertTrue(refreshed)
+    }
+
     func testBeaconShortcutSummaryFormatsUsefulAutomationText() {
         let snapshots = [
             makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),

@@ -140,6 +140,12 @@ final class BeaconStatusController: NSObject {
             snapshotProvider: { [weak model] in
                 guard let model else { return [] }
                 return batterySnapshotsWithKnownFailures(model.store.decoratedSnapshots, diagnostics: model.latestRefreshDiagnostics)
+            },
+            hasCompletedRefresh: { [weak model] in
+                !(model?.latestRefreshDiagnostics.attempts.isEmpty ?? true)
+            },
+            refresher: { [weak model] in
+                await model?.refreshAndWait()
             }
         )
         registerQuickActions()

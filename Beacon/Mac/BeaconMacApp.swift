@@ -394,6 +394,15 @@ final class BeaconModel: ObservableObject {
         refreshLoop?.cancel()
     }
 
+    /// Refreshes and returns after a refresh has completed, waiting out one
+    /// that is already running instead of returning immediately.
+    func refreshAndWait() async {
+        while refreshInFlight {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        await refresh()
+    }
+
     func refresh(userInitiated: Bool = true) async {
         guard !refreshInFlight else { return }
         refreshInFlight = true

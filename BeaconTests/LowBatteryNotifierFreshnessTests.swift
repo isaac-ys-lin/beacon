@@ -75,6 +75,38 @@ final class LowBatteryNotifierFreshnessTests: XCTestCase {
         )
     }
 
+    func testFailedSystemNotificationDoesNotRepeatAlertOnEveryPoll() {
+        let defaults = makeDefaults()
+        defer { clear(defaults) }
+        let low = DecoratedBatterySnapshot(snapshot: snapshot(percent: 10), freshness: .fresh)
+        let failingPost: LowBatteryNotifier.NotificationPoster = { _, completion in
+            completion("Notifications are not allowed")
+        }
+
+        let first = LowBatteryNotifier.notifyIfNeeded(for: [low], defaults: defaults, post: failingPost)
+        let second = LowBatteryNotifier.notifyIfNeeded(for: [low], defaults: defaults, post: failingPost)
+
+        XCTAssertEqual(first.map(\.kind), [.lowBattery])
+        XCTAssertTrue(second.isEmpty, "A HUD-surfaced alert must latch even when the system notification fails")
+    }
+
+    func testNotifyIfNeededReportsDeliveryFailure() {
+        let defaults = makeDefaults()
+        defer { clear(defaults) }
+        let low = DecoratedBatterySnapshot(snapshot: snapshot(percent: 10), freshness: .fresh)
+        let reported = expectation(description: "delivery reported")
+
+        _ = LowBatteryNotifier.notifyIfNeeded(
+            for: [low],
+            defaults: defaults,
+            post: { _, completion in completion("denied") },
+            deliveryHandler: { result in
+                if result.state == .failed { reported.fulfill() }
+            }
+        )
+        wait(for: [reported], timeout: 1)
+    }
+
     private func snapshot(
         deviceID: String = "keyboard",
         displayName: String = "Magic Keyboard",

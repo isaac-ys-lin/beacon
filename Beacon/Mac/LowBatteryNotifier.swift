@@ -288,13 +288,30 @@ enum LowBatteryNotifier {
         }
     }
 
+    /// Posts a notification request and reports `nil` on success or an error message.
+    typealias NotificationPoster = @Sendable (
+        UNNotificationRequest,
+        @escaping @Sendable (String?) -> Void
+    ) -> Void
+
+    static let systemNotificationPoster: NotificationPoster = { request, completion in
+        UNUserNotificationCenter.current().add(request) { error in
+            completion(error?.localizedDescription)
+        }
+    }
+
+    /// Returns the alert events surfaced by this check. An event is latched as
+    /// soon as it is returned, because the caller always presents it (Action HUD)
+    /// even when the system notification is refused; otherwise a denied
+    /// notification permission would re-raise the same alert on every poll.
     @discardableResult
     static func notifyIfNeeded(
         for snapshots: [DecoratedBatterySnapshot],
+        defaults: UserDefaults = .standard,
+        post: @escaping NotificationPoster = systemNotificationPoster,
         deliveryHandler: @escaping @Sendable (NotificationCenterDeliveryResult) -> Void = { _ in }
     ) -> [BatteryAlertEvent] {
-        let defaults = UserDefaults.standard
-        let events = pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: false)
+        let events = pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: true)
         logger.info("Notification check snapshots=\(snapshots.count) events=\(events.count)")
 
         for event in events {
@@ -320,12 +337,11 @@ enum LowBatteryNotifier {
                 content: content,
                 trigger: nil
             )
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error {
-                    logger.error("Notification add failed: \(error.localizedDescription, privacy: .private)")
-                    deliveryHandler(.failed(error.localizedDescription))
+            post(request) { errorMessage in
+                if let errorMessage {
+                    logger.error("Notification add failed: \(errorMessage, privacy: .private)")
+                    deliveryHandler(.failed(errorMessage))
                 } else {
-                    markAlerted(event, defaults: .standard)
                     logger.info("Notification add succeeded")
                     deliveryHandler(.queued(notificationTitle))
                 }

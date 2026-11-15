@@ -112,38 +112,6 @@ struct BeaconHeaderRefreshIcon: View {
     }
 }
 
-struct BluetoothSettingsIcon: View {
-    let color: Color
-    var glyphSize: CGFloat = 18
-    var frameSize: CGFloat = 28
-
-    var body: some View {
-        Group {
-            if let template = bluetoothTemplateImage {
-                Image(nsImage: template)
-                    .renderingMode(.template)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } else {
-                Image(systemName: BeaconSymbols.bluetooth)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            }
-        }
-        .foregroundStyle(color)
-        .frame(width: glyphSize, height: glyphSize)
-        .frame(width: frameSize, height: frameSize)
-    }
-
-    private var bluetoothTemplateImage: NSImage? {
-        guard let image = NSImage(named: NSImage.Name("NSBluetoothTemplate"))?.copy() as? NSImage else {
-            return nil
-        }
-        image.isTemplate = true
-        return image
-    }
-}
-
 struct BeaconUtilityIconButtonStyle: ButtonStyle {
     let theme: BeaconThemePalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

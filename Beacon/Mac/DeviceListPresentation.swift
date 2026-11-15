@@ -584,7 +584,7 @@ public enum DeviceContextMenuAction: String, CaseIterable, Identifiable, Equatab
         case .batteryAlerts: return BeaconL10n.string("Battery Alerts...")
         case .audioControls: return BeaconL10n.string("Audio Controls...")
         case .options: return BeaconL10n.string("Options")
-        case .refresh: return BeaconL10n.string("Refresh Battery")
+        case .refresh: return BeaconL10n.string("Refresh All Devices")
         case .connect: return BeaconL10n.string("Connect")
         case .pin: return BeaconL10n.format("Pin %@", displayName)
         case .unpin: return BeaconL10n.format("Unpin %@", displayName)

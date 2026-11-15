@@ -29,7 +29,7 @@ struct DashboardSettingsPane: View {
                 } header: {
                     Text("Menu Bar Dashboard")
                 } footer: {
-                    Text("Choose the compact details shown when the menu bar icon opens the battery dashboard.")
+                    Text("Shows the lowest current battery percentage next to the menu bar icon.")
                 }
 
                 Section {

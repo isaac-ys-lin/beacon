@@ -7,15 +7,21 @@ final class BeaconIntentBridge {
 
     private var actionHandler: ((BeaconQuickAction) -> Bool)?
     private var snapshotProvider: (() -> [DecoratedBatterySnapshot])?
+    private var hasCompletedRefresh: (() -> Bool)?
+    private var refresher: (() async -> Void)?
 
     private init() {}
 
     func register(
         handler: @escaping (BeaconQuickAction) -> Bool,
-        snapshotProvider: (() -> [DecoratedBatterySnapshot])? = nil
+        snapshotProvider: (() -> [DecoratedBatterySnapshot])? = nil,
+        hasCompletedRefresh: (() -> Bool)? = nil,
+        refresher: (() async -> Void)? = nil
     ) {
         actionHandler = handler
         self.snapshotProvider = snapshotProvider
+        self.hasCompletedRefresh = hasCompletedRefresh
+        self.refresher = refresher
     }
 
     @discardableResult
@@ -28,6 +34,36 @@ final class BeaconIntentBridge {
 
     func snapshots() -> [DecoratedBatterySnapshot] {
         snapshotProvider?() ?? []
+    }
+
+    /// Runs a refresh and returns only after it has finished.
+    func refresh() async {
+        await refresher?()
+    }
+
+    /// Snapshots for read-only Shortcuts. A Shortcut can launch Beacon cold, so
+    /// wait (bounded) for the first refresh rather than answering "no devices".
+    func reportedSnapshots(timeout: Duration = .seconds(15)) async -> [DecoratedBatterySnapshot] {
+        if let hasCompletedRefresh, !hasCompletedRefresh() {
+            await refresher?()
+            let clock = ContinuousClock()
+            let deadline = clock.now.advanced(by: timeout)
+            while !hasCompletedRefresh(), clock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+        return snapshots()
+    }
+}
+
+enum BeaconIntentError: Error, CustomLocalizedStringResourceConvertible {
+    case actionUnavailable
+
+    var localizedStringResource: LocalizedStringResource {
+        switch self {
+        case .actionUnavailable:
+            return "Beacon could not perform this action right now."
+        }
     }
 }
 
@@ -193,7 +229,9 @@ struct ShowBeaconDashboardIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        BeaconIntentBridge.shared.perform(.showDashboard)
+        guard BeaconIntentBridge.shared.perform(.showDashboard) else {
+            throw BeaconIntentError.actionUnavailable
+        }
         return .result()
     }
 }
@@ -205,7 +243,7 @@ struct RefreshBeaconBatteriesIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        BeaconIntentBridge.shared.perform(.refreshBatteries)
+        await BeaconIntentBridge.shared.refresh()
         return .result()
     }
 }
@@ -217,7 +255,9 @@ struct OpenBeaconSettingsIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        BeaconIntentBridge.shared.perform(.openSettings)
+        guard BeaconIntentBridge.shared.perform(.openSettings) else {
+            throw BeaconIntentError.actionUnavailable
+        }
         return .result()
     }
 }
@@ -229,7 +269,9 @@ struct AddBeaconDeviceIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        BeaconIntentBridge.shared.perform(.addDevice)
+        guard BeaconIntentBridge.shared.perform(.addDevice) else {
+            throw BeaconIntentError.actionUnavailable
+        }
         return .result()
     }
 }
@@ -241,7 +283,9 @@ struct OpenBeaconBluetoothSettingsIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        BeaconIntentBridge.shared.perform(.openBluetoothSettings)
+        guard BeaconIntentBridge.shared.perform(.openBluetoothSettings) else {
+            throw BeaconIntentError.actionUnavailable
+        }
         return .result()
     }
 }
@@ -286,7 +330,7 @@ struct GetBeaconSummaryIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let summary = BeaconShortcutSnapshotFormatter.summary(
-            for: BeaconIntentBridge.shared.snapshots()
+            for: await BeaconIntentBridge.shared.reportedSnapshots()
         )
         return .result(value: summary.summaryText)
     }
@@ -301,7 +345,7 @@ struct GetBeaconLowestBatteryIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         return .result(
             value: BeaconShortcutSnapshotFormatter.lowestBatteryText(
-                for: BeaconIntentBridge.shared.snapshots()
+                for: await BeaconIntentBridge.shared.reportedSnapshots()
             )
         )
     }
@@ -316,7 +360,7 @@ struct GetBeaconLowBatteryDevicesIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         return .result(
             value: BeaconShortcutSnapshotFormatter.lowBatteryText(
-                for: BeaconIntentBridge.shared.snapshots()
+                for: await BeaconIntentBridge.shared.reportedSnapshots()
             )
         )
     }
@@ -331,7 +375,7 @@ struct GetBeaconBatteryTrendsIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         return .result(
             value: BeaconShortcutSnapshotFormatter.batteryTrendText(
-                for: BeaconIntentBridge.shared.snapshots()
+                for: await BeaconIntentBridge.shared.reportedSnapshots()
             )
         )
     }
