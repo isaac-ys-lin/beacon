@@ -3,10 +3,11 @@ import XCTest
 /// Actual separate HUD and inspector windows; Bluetooth/audio observations remain fixtures.
 final class ConnectionHUDUITests: XCTestCase {
     @MainActor
-    private func launch(_ scenario: String) -> XCUIApplication {
+    private func launch(_ scenario: String, theme: String? = nil) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-show-hud", "-AppleLanguages", "(en)", "-Beacon.showActionHUD", "YES"]
+        if let theme { app.launchArguments += ["-Beacon.appearanceTheme", theme] }
         app.launchEnvironment["BEACON_PREVIEW_DATA"] = "1"
         app.launchEnvironment["BEACON_SETUP_SCENARIO"] = "empty"
         app.launchEnvironment["BEACON_CONNECTION_SCENARIO"] = scenario
@@ -47,5 +48,27 @@ final class ConnectionHUDUITests: XCTestCase {
         expect(selected, "Bluetooth connected; audio not confirmed")
         XCTAssertTrue(settings.buttons["connection.retry.aa:bb:cc:dd:ee:02"].exists)
         XCTAssertFalse(settings.staticTexts["connection.state.aa:bb:cc:dd:ee:01"].exists)
+    }
+
+    /// Visual evidence: the connection and battery HUDs as real windows (screen
+    /// capture keeps the Liquid Glass material), in both appearances.
+    @MainActor func testHUDAppearanceEvidenceLight() { captureHUDs(theme: "light") }
+    @MainActor func testHUDAppearanceEvidenceDark() { captureHUDs(theme: "dark") }
+
+    @MainActor
+    private func captureHUDs(theme: String) {
+        let app = launch("ready", theme: theme); defer { app.terminate() }
+        let hud = app.windows["Beacon HUD Preview"]
+        expect(hud.staticTexts["hud.connection.state"], "Connection confirmed")
+        attach(hud, "hud-connection-\(theme)")
+        hud.buttons["hud.dismiss"].click()
+        XCTAssertTrue(hud.staticTexts["Queued Keyboard is running low"].waitForExistence(timeout: 5))
+        attach(hud, "hud-battery-\(theme)")
+    }
+
+    @MainActor
+    private func attach(_ element: XCUIElement, _ name: String) {
+        let shot = XCTAttachment(screenshot: element.screenshot())
+        shot.name = name; shot.lifetime = .keepAlways; add(shot)
     }
 }
