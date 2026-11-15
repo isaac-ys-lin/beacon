@@ -74,7 +74,6 @@
 		D805A3AC420A4F1F4E08DE48 /* BeaconSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4738A433E5F28FC4D87CFDD6 /* BeaconSettingsView.swift */; };
 		D89270F3EC5A89B82B3E0321 /* QuickActionShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57F2E73F7A44D627BD8E19BD /* QuickActionShortcutTests.swift */; };
 		DBC5716E79C48BACF67A4CCF /* BluetoothConnectionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D53AA00A5D392CDABE83BDCE /* BluetoothConnectionController.swift */; };
-		DE4F73DCD277B829888A4845 /* BeaconDesktopWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */; };
 		DEE9315EC70B0BDB18F54A19 /* AudioInputLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EA3F8CB997B5EBFAC29A862 /* AudioInputLock.swift */; };
 		DFC559BACEFC876F5A35E41A /* DashboardSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69BDB8AD2B4CC24408772E50 /* DashboardSettingsPane.swift */; };
 		E1792396415CAFFB93259DE7 /* NativeBluetoothConnectionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366E1A5B7FD0E20A73932F07 /* NativeBluetoothConnectionClient.swift */; };
@@ -180,7 +179,6 @@
 		A11F3FCBE3CCB0BFC94851DE /* BeaconMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeaconMac.entitlements; sourceTree = "<group>"; };
 		A1EDA9A752ECB1C73DD2C08B /* BeaconWidgetPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconWidgetPublisher.swift; sourceTree = "<group>"; };
 		A5B9ECB80D054087353332A1 /* AudioInputLockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioInputLockTests.swift; sourceTree = "<group>"; };
-		A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconDesktopWidgetView.swift; sourceTree = "<group>"; };
 		AE98B7B5C78C9741FAEA0A75 /* BeaconSettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconSettingsWindowController.swift; sourceTree = "<group>"; };
 		B19A161032A69B238FD0C0E3 /* BeaconUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconUITests.swift; sourceTree = "<group>"; };
 		B45F7C9F077041B590FEF567 /* MacPowerSourceReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPowerSourceReader.swift; sourceTree = "<group>"; };
@@ -256,7 +254,6 @@
 				EE8F6FDFC7313A2021A7F2FE /* BatteryProviderRunner.swift */,
 				37F3CF1AFAD597E2693F9D08 /* BeaconAppShortcuts.swift */,
 				395D06A79B6C75E1C9EA51C2 /* BeaconControlListener.swift */,
-				A98447BDF2F9D5773ECADE47 /* BeaconDesktopWidgetView.swift */,
 				8AEC0B7B0A3C5597B299A2B5 /* BeaconHUDController.swift */,
 				39E78082A9BAF092358602B7 /* BeaconHUDQueue.swift */,
 				DA14437C753C2C72E7DCF4AA /* BeaconHUDView.swift */,
@@ -542,7 +539,6 @@
 				1EE94522FFC39C4D79D3F76F /* BatterySnapshotStore.swift in Sources */,
 				53073ECBB082D056B27B050F /* BeaconAppShortcuts.swift in Sources */,
 				66F03D0BD363B0F9579AA9C3 /* BeaconControlListener.swift in Sources */,
-				DE4F73DCD277B829888A4845 /* BeaconDesktopWidgetView.swift in Sources */,
 				39D59897D914543FDE7B70F3 /* BeaconHUDController.swift in Sources */,
 				C5AEFD0491CB02B8F63709E1 /* BeaconHUDQueue.swift in Sources */,
 				0E0DE066DF399483F5AAFAFF /* BeaconHUDView.swift in Sources */,

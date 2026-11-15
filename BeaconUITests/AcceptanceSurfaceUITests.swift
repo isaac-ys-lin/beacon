@@ -93,31 +93,4 @@ final class AcceptanceSurfaceUITests: XCTestCase {
         app.typeKey("w", modifierFlags: .command)
         absent(window)
     }
-
-    @MainActor func testNativeDesktopCompactRoutesToDashboard() { checkDesktop(style: "compact", width: 256) }
-    @MainActor func testNativeDesktopExpandedRoutesToDashboard() { checkDesktop(style: "expanded", width: 318) }
-
-    @MainActor
-    private func checkDesktop(style: String, width: CGFloat) {
-        let app = app(arguments: ["--ui-test-show-desktop", "-Beacon.desktopWidget.show", "YES",
-                                  "-Beacon.desktopWidget.style", style])
-        app.launch(); defer { app.terminate() }
-        // AppKit exposes an NSPanel as AXDialog, unlike the settings NSWindow.
-        let widget = app.dialogs["Beacon Desktop Widget"]
-        XCTAssertTrue(widget.waitForExistence(timeout: 10))
-        XCTAssertEqual(widget.frame.width, width, accuracy: 2)
-        let reportTime = widget.staticTexts["desktop.report-time"]
-        XCTAssertTrue(reportTime.waitForExistence(timeout: 5))
-        XCTAssertEqual(reportTime.value as? String ?? reportTime.label, "No reports")
-        let settings = widget.buttons["Open Beacon Settings"]
-        XCTAssertTrue(settings.isHittable)
-        evidence(widget, name: "native-desktop-" + style)
-        settings.click()
-        let window = app.windows["Beacon Settings"]
-        XCTAssertTrue(window.waitForExistence(timeout: 5))
-        let provenance = window.staticTexts["dashboard.preview.provenance"]
-        XCTAssertTrue(provenance.waitForExistence(timeout: 5))
-        XCTAssertEqual(provenance.value as? String ?? provenance.label, "Sample Preview")
-        XCTAssertTrue(widget.exists)
-    }
 }

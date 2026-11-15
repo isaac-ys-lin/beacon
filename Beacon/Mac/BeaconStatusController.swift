@@ -10,7 +10,6 @@ final class BeaconStatusController: NSObject {
     private let statusMenuPanelController = StatusMenuPanelController()
     private let settingsWindowController: BeaconSettingsWindowController
     private let hudController = BeaconHUDController()
-    private let desktopWidgetController = BeaconDesktopWidgetController()
     private let shortcutController = BeaconShortcutController()
     private var lastShowsThisMac = UserDefaults.standard.object(forKey: MacPowerSourceReader.showsThisMacDefaultsKey) as? Bool ?? true
     private let bluetoothPowerStateObserver: BluetoothPowerStateObserver?
@@ -75,17 +74,17 @@ final class BeaconStatusController: NSObject {
             self?.updateStatusButton(store: store)
             self?.updateStatusMenuContent(store: store)
             self?.settingsWindowController.updateContent(store: store)
-            self?.updateDesktopWidget(store: store)
+            self?.publishWidgetSnapshot(store: store)
         }
         refreshStateObserver = model.$isRefreshing.sink { [weak self] isRefreshing in
             self?.updateStatusButton(isRefreshing: isRefreshing)
             self?.updateStatusMenuContent(isRefreshing: isRefreshing)
             self?.settingsWindowController.updateContent(isRefreshing: isRefreshing)
-            self?.updateDesktopWidget()
+            self?.publishWidgetSnapshot()
         }
         refreshDiagnosticsObserver = model.$latestRefreshDiagnostics.sink { [weak self] diagnostics in
             self?.updateStatusButton(refreshDiagnostics: diagnostics)
-            self?.updateDesktopWidget(refreshDiagnostics: diagnostics)
+            self?.publishWidgetSnapshot()
             self?.settingsWindowController.updateContent(refreshDiagnostics: diagnostics)
             self?.updateStatusMenuContent(refreshDiagnostics: diagnostics)
         }
@@ -99,12 +98,12 @@ final class BeaconStatusController: NSObject {
         trustedIPhoneRegistryObserver = model.$trustedIPhoneRegistry.sink { [weak self] registry in
             self?.updateStatusMenuContent()
             self?.settingsWindowController.updateContent(trustedIPhones: registry.devices)
-            self?.updateDesktopWidget()
+            self?.publishWidgetSnapshot()
         }
         trustedIPhoneEnrollmentObserver = model.$trustedIPhoneEnrollmentResult.sink { [weak self] report in
             self?.updateStatusMenuContent()
             self?.settingsWindowController.updateContent(enrollmentResult: report)
-            self?.updateDesktopWidget()
+            self?.publishWidgetSnapshot()
         }
         audioRestorationObserver = AudioInputController.shared.$lastRestoration
             .compactMap { $0 }
@@ -144,7 +143,7 @@ final class BeaconStatusController: NSObject {
         bluetoothPowerStateCancellable = bluetoothPowerStateObserver?.$state
             .sink { [weak self] _ in
                 self?.updateStatusMenuContent()
-                self?.updateDesktopWidget()
+                self?.publishWidgetSnapshot()
             }
         preferencesObservers = [
             NotificationCenter.default.addObserver(
@@ -193,7 +192,7 @@ final class BeaconStatusController: NSObject {
         )
         registerQuickActions()
         updateStatusButton()
-        updateDesktopWidget()
+        publishWidgetSnapshot()
     }
 
     func showDeviceSetup() {
@@ -207,13 +206,6 @@ final class BeaconStatusController: NSObject {
         if ProcessInfo.processInfo.environment["BEACON_SETTINGS_MINIMUM_SIZE"] == "1" {
             settingsWindowController.debugWindow?.setContentSize(NSSize(width: 900, height: 620))
         }
-    }
-
-    func showDesktopWidgetForUITesting() {
-        // Use the same presentation and routing as the user's actual desktop panel.
-        // The test sets visibility/style through the argument domain, not saved preferences.
-        updateDesktopWidget()
-        desktopWidgetController.exposeWindowToAccessibilityForUITesting()
     }
 
     func showHUDForUITesting() {
@@ -384,22 +376,15 @@ final class BeaconStatusController: NSObject {
         updateStatusButton()
         updateStatusMenuContent()
         registerQuickActions()
-        updateDesktopWidget()
+        publishWidgetSnapshot()
     }
 
-    private func updateDesktopWidget(store: BatterySnapshotStore? = nil, refreshDiagnostics: BatteryRefreshDiagnostics? = nil) {
+    private func publishWidgetSnapshot(store: BatterySnapshotStore? = nil) {
+        guard !model.isUsingPreviewData else { return }
         let renderedStore = store ?? model.store
-        if !model.isUsingPreviewData {
-            BeaconWidgetPublisher.publish(
-                dashboardDeviceSections(renderedStore.decoratedSnapshots, preferences: DeviceDisplayPreferences.load())
-                    .flatMap(\.items)
-            )
-        }
-        desktopWidgetController.update(
-            snapshots: batterySnapshotsWithKnownFailures(renderedStore.decoratedSnapshots, diagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics),
-            onOpenSettings: { [weak self] in
-                self?.showSettingsWindow(initialPane: .dashboard)
-            }
+        BeaconWidgetPublisher.publish(
+            dashboardDeviceSections(renderedStore.decoratedSnapshots, preferences: DeviceDisplayPreferences.load())
+                .flatMap(\.items)
         )
     }
 

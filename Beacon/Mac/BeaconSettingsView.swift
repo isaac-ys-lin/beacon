@@ -72,8 +72,6 @@ struct BeaconSettingsView: View {
     @AppStorage(BatteryHUDPreferences.dismissDelaySecondsKey) private var hudDismissDelaySeconds = BatteryHUDPreferences.defaultDismissDelaySeconds
     @AppStorage(BatteryHUDPreferences.showDismissButtonKey) private var showHUDDismissButton = false
     @AppStorage(StatusWindowPreferences.showMenuBarBatteryKey) private var showMenuBarBattery = false
-    @AppStorage(DesktopWidgetPreferences.showDesktopWidgetKey) private var showDesktopWidget = false
-    @AppStorage(DesktopWidgetPreferences.widgetStyleKey) private var desktopWidgetStyleRawValue = DesktopWidgetStyle.compact.rawValue
     @AppStorage(BeaconAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
     @AppStorage("Beacon.settings.showUnavailableDevices") private var showUnavailableDevices = true
 
@@ -809,9 +807,7 @@ struct BeaconSettingsView: View {
         DashboardSettingsPane(
             snapshots: snapshots,
             isPreviewingData: isPreviewingData,
-            showMenuBarBattery: $showMenuBarBattery,
-            showDesktopWidget: $showDesktopWidget,
-            desktopWidgetStyleRawValue: $desktopWidgetStyleRawValue
+            showMenuBarBattery: $showMenuBarBattery
         )
     }
 
@@ -830,8 +826,6 @@ struct BeaconSettingsView: View {
         hudDismissDelaySeconds = BatteryHUDPreferences.defaultDismissDelaySeconds
         showHUDDismissButton = false
         showMenuBarBattery = false
-        showDesktopWidget = false
-        desktopWidgetStyleRawValue = DesktopWidgetStyle.compact.rawValue
         appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
         showUnavailableDevices = true
         displayPreferences = DeviceDisplayPreferences()
