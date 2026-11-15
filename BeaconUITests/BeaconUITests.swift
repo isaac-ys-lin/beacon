@@ -183,7 +183,10 @@ final class BeaconUITests: XCTestCase {
                         isSystemBaselineCategory = issue.compactDescription.contains("nearly")
                             || issue.element?.identifier.hasPrefix("settings.pane.") == true
                             || Self.knownSecondaryOrMisreadContrast.contains { text.hasPrefix($0) }
-                            || text.hasSuffix(" samples")
+                            || (["On", "Off"].contains(String(describing: issue.element?.value ?? ""))
+                                && Self.hudStateRows.contains { text.hasPrefix($0) })
+                            || text.range(of: #"^Version \d+(\.\d+)* \(\d+\)$"#, options: .regularExpression) != nil
+                            || text.range(of: #"^[\d,]+ samples$"#, options: .regularExpression) != nil
                     case .action:
                         isSystemBaselineCategory = issue.element?.elementType == .popUpButton
                     default:
@@ -210,14 +213,18 @@ final class BeaconUITests: XCTestCase {
 
     private static let knownSecondaryOrMisreadContrast = [
         "Charged alerts also require", "Turn a headset microphone off", "System follows your current macOS appearance",
-        "Beacon does not contact an update service", "This build is distributed outside", "Version ",
-        "Low battery", "Finished charging", "Auto dismiss", "Dismiss button",
+        "Beacon does not contact an update service", "This build is distributed outside",
     ]
+    /// Action HUD state-summary rows; matched with their On/Off value so the
+    /// toggles of the same name stay gated.
+    private static let hudStateRows = ["Low battery", "Finished charging", "Auto dismiss (", "Dismiss button"]
 
     /// Baseline only, never fails: the same audit against Apple's own System
     /// Settings, to tell platform-rendered noise from Beacon's own defects.
-    /// Opt-in (BEACON_AUDIT_SYSTEM_SETTINGS=1) because it drives System Settings,
-    /// and XCTest's automation session has crashed it on teardown.
+    /// Opt-in because it drives System Settings, and XCTest's automation session
+    /// has crashed it on teardown. Run with
+    /// `TEST_RUNNER_BEACON_AUDIT_SYSTEM_SETTINGS=1 xcodebuild test ...`
+    /// (xcodebuild passes TEST_RUNNER_-prefixed variables to the runner, unprefixed).
     @MainActor
     func testSystemSettingsAccessibilityAuditBaseline() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["BEACON_AUDIT_SYSTEM_SETTINGS"] == "1")

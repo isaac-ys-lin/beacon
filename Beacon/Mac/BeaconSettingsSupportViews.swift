@@ -5,9 +5,11 @@ extension View {
     func beaconSettingsCardSurface(
         cornerRadius: CGFloat = DesignTokens.Radius.card
     ) -> some View {
-        // Content sits on the opaque grouped-content color, as in a grouped Form.
-        // Liquid Glass is reserved for controls and HUDs; translucent cards let
-        // the window tint through and drop secondary text below readable contrast.
+        // Opaque content color, which keeps secondary text above the audit's
+        // contrast threshold. Known gap: grouped Form rows are a quaternary fill
+        // over the window (light 233/236/237, dark 63/71/76), so this card reads
+        // whiter in light and darker in dark. Matching that fill added three hard
+        // contrast failures (2026-11-15). Liquid Glass stays on controls and HUDs.
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
             .background {
