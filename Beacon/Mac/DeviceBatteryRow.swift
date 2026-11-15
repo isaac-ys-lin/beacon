@@ -305,6 +305,7 @@ struct DeviceIconPlate: View {
                     .foregroundStyle(badge.color(in: theme))
                     .frame(width: max(13, size * 0.36), height: max(13, size * 0.36))
                     .offset(x: size * 0.31, y: -size * 0.31)
+                    .accessibilityHidden(true)
             }
         }
         .frame(width: size, height: size)

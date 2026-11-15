@@ -387,9 +387,13 @@ struct BeaconSettingsView: View {
                 .padding(.leading, 50)
 
             HStack(spacing: 8) {
+                // Status color rides on a dot; the words stay at full text contrast.
+                Circle()
+                    .fill(notificationAuthorizationColor)
+                    .frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
                 Text(notificationAuthorizationState.title)
                     .font(DesignTokens.Typography.captionEmphasis)
-                    .foregroundStyle(notificationAuthorizationColor)
 
                 if notificationAuthorizationState == .unknown {
                     ProgressView()
@@ -557,7 +561,7 @@ struct BeaconSettingsView: View {
         Text(row.isHidden ? BeaconL10n.string("Hidden") : alertSummary(for: row.item))
             .font(DesignTokens.Typography.captionEmphasis)
             .monospacedDigit()
-            .foregroundStyle(row.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.accent)
+            .foregroundStyle(DesignTokens.Palette.text)
             .padding(.horizontal, 9)
             .frame(height: 24)
             .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
@@ -597,7 +601,7 @@ struct BeaconSettingsView: View {
                 Text("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
                     .font(DesignTokens.Typography.percentSmall)
                     .monospacedDigit()
-                    .foregroundStyle(DesignTokens.Palette.accent)
+                    .foregroundStyle(DesignTokens.Palette.text)
                     .frame(width: 40, alignment: .trailing)
             }
             .padding(.horizontal, 12)
@@ -661,7 +665,7 @@ struct BeaconSettingsView: View {
                 Text("\(clampedLowBatteryThreshold)%")
                     .font(DesignTokens.Typography.percentSmall)
                     .monospacedDigit()
-                    .foregroundStyle(DesignTokens.Palette.accent)
+                    .foregroundStyle(DesignTokens.Palette.text)
                     .frame(width: 40, alignment: .trailing)
             }
             .font(DesignTokens.Typography.controlLabel)
@@ -758,6 +762,7 @@ struct BeaconSettingsView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(DesignTokens.Palette.controlPill)
                 )
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
@@ -914,7 +919,7 @@ struct BeaconSettingsView: View {
                     Text("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
                         .font(DesignTokens.Typography.percentSmall)
                         .monospacedDigit()
-                        .foregroundStyle(DesignTokens.Palette.accent)
+                        .foregroundStyle(DesignTokens.Palette.text)
                 }
 
                 Slider(

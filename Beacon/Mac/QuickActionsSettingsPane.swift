@@ -39,15 +39,27 @@ struct QuickActionsSettingsPane: View {
     private func actionSetting(for action: BeaconQuickAction) -> some View {
         let isEnabled = preferences.isEnabled(action)
         return VStack(alignment: .leading, spacing: 6) {
+            // Same layout as System Settings > Keyboard > Keyboard Shortcuts: a labelled
+            // checkbox for the action, the shortcut on the trailing edge.
             HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(action.title)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(action.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                Toggle(isOn: Binding(
+                    get: { preferences.isEnabled(action) },
+                    set: { setQuickActionEnabled($0, for: action) }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(action.title)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(action.subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                .toggleStyle(.checkbox)
+                // VoiceOver reads the action name; the subtitle is the hint.
+                .accessibilityLabel(Text(action.title))
+                .accessibilityHint(Text(action.subtitle))
+                .accessibilityIdentifier("quickActions.\(action.id)")
                 Spacer(minLength: 8)
                 ShortcutRecorderField(
                     shortcut: preferences.shortcut(for: action),
@@ -57,17 +69,6 @@ struct QuickActionsSettingsPane: View {
                 )
                 .disabled(!isEnabled)
                 .accessibilityIdentifier("quickActions.\(action.id).shortcut")
-                Toggle(isOn: Binding(
-                    get: { preferences.isEnabled(action) },
-                    set: { setQuickActionEnabled($0, for: action) }
-                )) {
-                    Text(action.title)
-                }
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .accessibilityLabel(Text(action.title))
-                .accessibilityHint(Text(action.subtitle))
-                .accessibilityIdentifier("quickActions.\(action.id)")
             }
             if isEnabled, status.registrationFailures.contains(action) {
                 Label(

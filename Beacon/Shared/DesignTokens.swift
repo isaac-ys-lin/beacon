@@ -258,7 +258,7 @@ public enum DesignTokens {
 
         public static let text = Color.primary
         public static let secondaryText = Color.secondary
-        public static let tertiaryText = Color.secondary.opacity(0.72)
+        public static let tertiaryText = Color.secondary
 
         #if os(macOS)
         /// Subtle hover highlight for list rows — matches native macOS selection style.

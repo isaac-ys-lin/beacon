@@ -3504,7 +3504,8 @@ final class DeviceListPresentationTests: XCTestCase {
                 let uniqueColors = Set(visibleColors.map(roundedRGBAComponents))
                 let rightEdgeColors = sampledColors(
                     in: bitmap,
-                    xValues: stride(from: 852, to: 878, by: 4),
+                    // Trailing column: the shortcut recorder buttons and their key text.
+                    xValues: stride(from: 760, to: 878, by: 4),
                     yValues: stride(from: 150, to: 500, by: 12),
                     backingScale: scale
                 )

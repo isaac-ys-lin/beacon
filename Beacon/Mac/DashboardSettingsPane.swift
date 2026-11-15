@@ -65,6 +65,9 @@ struct DashboardSettingsPane: View {
                         .fixedSize(horizontal: false, vertical: true)
                     StatusWindowPreview(showsMenuBarBattery: showMenuBarBattery)
                         .frame(width: 292)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text(BeaconL10n.string("Battery dashboard preview")))
+                        .accessibilityAddTraits(.isImage)
                     Divider()
                     HStack {
                         Text("Desktop Widget")
@@ -98,6 +101,9 @@ struct DashboardSettingsPane: View {
                         alignment: .topLeading
                     )
                     .opacity(showDesktopWidget ? 1 : 0.5)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(BeaconL10n.string("Desktop widget preview")))
+                    .accessibilityAddTraits(.isImage)
                     .allowsHitTesting(false)
                 }
             }

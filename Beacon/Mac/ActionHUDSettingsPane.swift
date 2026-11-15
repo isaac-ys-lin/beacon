@@ -130,6 +130,9 @@ struct ActionHUDSettingsPane: View {
                 .frame(width: 248, height: 54)
             }
             .opacity(showActionHUD ? 1 : 0.45)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(BeaconL10n.string("Action HUD preview")))
+            .accessibilityAddTraits(.isImage)
             Divider()
             VStack(alignment: .leading, spacing: 7) {
                 hudStateRow(BeaconL10n.string("Low battery"), isOn: showLowBatteryHUD)
@@ -152,9 +155,10 @@ struct ActionHUDSettingsPane: View {
             Image(systemName: isOn ? "checkmark.circle.fill" : "minus.circle")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(isOn ? DesignTokens.Palette.charging : DesignTokens.Palette.secondaryText)
+                .accessibilityHidden(true)
             Text(title)
                 .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
+                .accessibilityValue(Text(BeaconL10n.string(isOn ? "On" : "Off")))
             Spacer(minLength: 0)
         }
     }

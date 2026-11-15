@@ -2,27 +2,19 @@ import Charts
 import SwiftUI
 
 extension View {
-    @ViewBuilder
     func beaconSettingsCardSurface(
         cornerRadius: CGFloat = DesignTokens.Radius.card
     ) -> some View {
+        // Content sits on the opaque grouped-content color, as in a grouped Form.
+        // Liquid Glass is reserved for controls and HUDs; translucent cards let
+        // the window tint through and drop secondary text below readable contrast.
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        if #available(macOS 26.0, *) {
-            self
-                .background {
-                    shape
-                        .fill(.regularMaterial)
-                        .glassEffect(.regular, in: shape)
-                        .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
-                }
-        } else {
-            self
-                .background {
-                    shape
-                        .fill(.regularMaterial)
-                        .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
-                }
-        }
+        return self
+            .background {
+                shape
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .overlay(shape.stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7))
+            }
     }
 }
 
@@ -127,6 +119,7 @@ struct TrustedIPhoneStatusLine: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(color)
                 .frame(width: 14, height: 14)
+                .accessibilityHidden(true)
 
             Text(message)
                 .font(DesignTokens.Typography.caption2)
@@ -950,6 +943,7 @@ struct SettingsDeviceSidebarRow: View {
                                 .font(.system(size: 7, weight: .bold))
                                 .foregroundStyle(iconBadge.color(in: theme))
                                 .offset(x: 5, y: 4)
+                                .accessibilityHidden(true)
                         }
                     }
 
@@ -1022,6 +1016,7 @@ struct SettingsAlertPreview: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(DesignTokens.Palette.controlPill)
                 )
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
