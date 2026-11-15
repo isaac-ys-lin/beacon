@@ -514,7 +514,6 @@ struct AirPodsAudioControlsSection: View {
         } footer: {
             Text(BeaconL10n.string("Choose audio output and input in Sound Settings. Change AirPods listening modes in Control Center or Bluetooth Settings."))
         }
-        .accessibilityIdentifier("airpods.audio-controls")
     }
 }
 

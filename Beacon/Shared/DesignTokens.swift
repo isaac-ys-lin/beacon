@@ -227,13 +227,14 @@ public enum NativeMacStyle {
 extension View {
     /// The menu bar panel's surface: the same behind-window material NSPopover uses.
     func beaconPopoverSurface(
-        cornerRadius: CGFloat = NativeMacStyle.popoverCornerRadius
+        cornerRadius: CGFloat = NativeMacStyle.popoverCornerRadius,
+        colorScheme: ColorScheme
     ) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
             .background {
                 #if os(macOS)
-                PopoverMaterialBackground()
+                PopoverMaterialBackground(colorScheme: colorScheme)
                 #else
                 Rectangle().fill(.regularMaterial)
                 #endif
@@ -290,6 +291,9 @@ extension View {
 
 #if os(macOS)
 private struct PopoverMaterialBackground: NSViewRepresentable {
+    /// Beacon's resolved theme, which can differ from the window's appearance.
+    let colorScheme: ColorScheme
+
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = .popover
@@ -298,6 +302,8 @@ private struct PopoverMaterialBackground: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+    }
 }
 #endif

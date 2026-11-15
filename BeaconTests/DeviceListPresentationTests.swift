@@ -224,6 +224,13 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
+    private func visualEffectViews(in view: NSView) -> [NSVisualEffectView] {
+        let current = view as? NSVisualEffectView
+        return view.subviews.reduce(current.map { [$0] } ?? []) { partial, subview in
+            partial + visualEffectViews(in: subview)
+        }
+    }
+
     private func scrollViews(in view: NSView) -> [NSScrollView] {
         let current = view as? NSScrollView
         return view.subviews.reduce(current.map { [$0] } ?? []) { partial, subview in
@@ -995,7 +1002,7 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(oneDevice.width, 386)
-        XCTAssertEqual(oneDevice.height, 148, "One row should not reserve empty space for extra devices")
+        XCTAssertEqual(oneDevice.height, 142, "One row should not reserve empty space for extra devices")
         XCTAssertGreaterThan(fiveDevices.height, oneDevice.height)
         XCTAssertLessThan(fiveDevices.height, 560)
     }
@@ -1008,8 +1015,8 @@ final class DeviceListPresentationTests: XCTestCase {
 
         XCTAssertEqual(size.width, 386)
         // 28 vertical padding + 44 header
-        // + (18 list padding + 5 * 58 rows + 4 * 8 row gaps).
-        XCTAssertEqual(size.height, 412)
+        // + (18 list padding + 5 * 52 rows + 4 * 8 row gaps).
+        XCTAssertEqual(size.height, 382)
     }
 
     func testStatusMenuSizingUsesHeaderOnlyHeightWhenEmpty() {
@@ -1212,6 +1219,20 @@ final class DeviceListPresentationTests: XCTestCase {
         let pngData = bitmap.representation(using: .png, properties: [:])
         XCTAssertNotNil(pngData)
         XCTAssertGreaterThan((pngData ?? Data()).count, 900)
+    }
+
+    @MainActor
+    func testStatusMenuMaterialFollowsExplicitTheme() {
+        for (theme, expected) in [(BeaconAppearanceTheme.dark, NSAppearance.Name.darkAqua), (.light, .aqua)] {
+            withAppearanceTheme(theme) {
+                let hostingView = NSHostingView(rootView: StatusMenuView(snapshots: [], onRefresh: {}))
+                hostingView.frame = NSRect(x: 0, y: 0, width: 386, height: 120)
+                hostingView.layoutSubtreeIfNeeded()
+                let materials = visualEffectViews(in: hostingView)
+                XCTAssertFalse(materials.isEmpty)
+                XCTAssertEqual(materials.first?.appearance?.name, expected, "\(theme.rawValue)")
+            }
+        }
     }
 
     @MainActor
@@ -2914,7 +2935,7 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testBeaconAlertsCanRenderInitialSelectedDeviceOverrides() throws {
+    func testAlertsRouteWithDeviceOpensDevicesPane() throws {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
             makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18),
@@ -2945,7 +2966,7 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testBeaconAlertsDetailPaneIsScrollable() throws {
+    func testAlertsRouteWithDeviceIsScrollable() throws {
         let view = BeaconSettingsView(
             snapshots: [
                 makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 35),
@@ -3023,7 +3044,7 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsEmptyStatesRenderSurfacedDetailCards() throws {
+    func testSettingsEmptyStatesRenderVisibleContent() throws {
         try withAppearanceTheme(.light) {
             for pane in [SettingsPane.devices, .alerts] {
                 let (hostingView, bitmap) = try renderedBitmap(
@@ -3052,7 +3073,7 @@ final class DeviceListPresentationTests: XCTestCase {
                 XCTAssertGreaterThanOrEqual(
                     uniqueVisibleColors.count,
                     8,
-                    "Expected the \(pane.title) empty detail area to render as a surfaced card, not plain text."
+                    "Expected the \(pane.title) empty state to render visible content."
                 )
             }
         }

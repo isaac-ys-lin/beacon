@@ -183,7 +183,6 @@ struct GeneralSettingsPane: View {
         } footer: {
             Text("Distributed outside the Mac App Store. Beacon never downloads updates in the background, and battery reports stay on this Mac.")
         }
-        .accessibilityIdentifier("general.about")
     }
 
     private var launchAtLoginStatusColor: Color {

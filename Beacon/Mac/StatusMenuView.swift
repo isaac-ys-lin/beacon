@@ -44,7 +44,7 @@ enum StatusMenuSizing {
         supplementalHeight: CGFloat = 0
     ) -> CGSize {
         let panelVerticalPadding: CGFloat = 28
-        let rowHeight: CGFloat = 58
+        let rowHeight: CGFloat = 52
         let rowSpacing: CGFloat = dashboardItemCount > 1 ? CGFloat(dashboardItemCount - 1) * 8 : 0
         let listVerticalPadding: CGFloat = dashboardItemCount == 0 ? 0 : 18
         let emptyHeight: CGFloat = 0
@@ -147,7 +147,10 @@ struct StatusMenuView: View {
         .frame(width: statusWindowWidth)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("status.menu")
-        .beaconPopoverSurface(cornerRadius: NativeMacStyle.popoverCornerRadius)
+        .beaconPopoverSurface(
+            cornerRadius: NativeMacStyle.popoverCornerRadius,
+            colorScheme: appearanceTheme.colorSchemeOverride ?? colorScheme
+        )
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
     }
 
