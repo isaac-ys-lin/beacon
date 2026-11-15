@@ -300,10 +300,11 @@ enum LowBatteryNotifier {
         }
     }
 
-    /// Returns the alert events surfaced by this check. An event is latched as
-    /// soon as it is returned, because the caller always presents it (Action HUD)
-    /// even when the system notification is refused; otherwise a denied
-    /// notification permission would re-raise the same alert on every poll.
+    /// Returns the alert events surfaced by this check. An event the Action HUD
+    /// will present is latched immediately, so a refused system notification does
+    /// not re-raise it on every poll. An event the HUD will not show is latched
+    /// only once the system notification is accepted, so it is retried rather
+    /// than lost.
     @discardableResult
     static func notifyIfNeeded(
         for snapshots: [DecoratedBatterySnapshot],
@@ -311,7 +312,7 @@ enum LowBatteryNotifier {
         post: @escaping NotificationPoster = systemNotificationPoster,
         deliveryHandler: @escaping @Sendable (NotificationCenterDeliveryResult) -> Void = { _ in }
     ) -> [BatteryAlertEvent] {
-        let events = pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: true)
+        let events = pendingAlertEvents(for: snapshots, defaults: defaults, markAsQueued: false)
         logger.info("Notification check snapshots=\(snapshots.count) events=\(events.count)")
 
         for event in events {
@@ -331,6 +332,12 @@ enum LowBatteryNotifier {
             }
             content.sound = .default
             let notificationTitle = content.title
+            let hudPresents = BatteryHUDPreferences.isEnabled(for: event.kind, defaults: defaults)
+            if hudPresents {
+                markAlerted(event, defaults: defaults)
+            }
+            // UserDefaults is documented thread-safe; it is only written here.
+            nonisolated(unsafe) let latchDefaults = defaults
 
             let request = UNNotificationRequest(
                 identifier: event.notificationIdentifier,
@@ -342,6 +349,9 @@ enum LowBatteryNotifier {
                     logger.error("Notification add failed: \(errorMessage, privacy: .private)")
                     deliveryHandler(.failed(errorMessage))
                 } else {
+                    if !hudPresents {
+                        markAlerted(event, defaults: latchDefaults)
+                    }
                     logger.info("Notification add succeeded")
                     deliveryHandler(.queued(notificationTitle))
                 }

@@ -128,6 +128,27 @@ final class BeaconUITests: XCTestCase {
         return app
     }
 
+    /// Apple's automated accessibility audit (labels, contrast, hit regions,
+    /// clipped text, Dynamic Type) on every settings pane.
+    @MainActor
+    func testSettingsPanesPassAccessibilityAudit() throws {
+        let app = dailySettingsApp(language: "en", theme: "light")
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        for pane in ["general", "devices", "audio", "quickActions", "alerts", "actionHUD", "dashboard"] {
+            let button = window.descendants(matching: .any)["settings.pane.\(pane)"]
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            button.click()
+            try app.performAccessibilityAudit { issue in
+                let element = issue.element.map { "\($0.elementType) '\($0.label)' id=\($0.identifier)" } ?? "nil"
+                print("AXAUDIT pane=\(pane) type=\(issue.auditType) element=\(element) desc=\(issue.compactDescription)")
+                return false
+            }
+        }
+    }
+
     @MainActor
     private func checkDailySettings(language: String, theme: String) {
         continueAfterFailure = false
@@ -137,7 +158,7 @@ final class BeaconUITests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
         let isChinese = language == "zh-Hant-TW"
-        for pane in ["general", "devices", "quickActions", "alerts", "actionHUD", "dashboard"] {
+        for pane in ["general", "devices", "audio", "quickActions", "alerts", "actionHUD", "dashboard"] {
             let button = window.descendants(matching: .any)["settings.pane.\(pane)"]
             XCTAssertTrue(button.waitForExistence(timeout: 5))
             button.click()
@@ -148,6 +169,10 @@ final class BeaconUITests: XCTestCase {
             case "devices":
                 XCTAssertTrue(window.buttons["settings.refresh"].waitForExistence(timeout: 5))
                 XCTAssertTrue(window.buttons["settings.iphone-setup"].exists)
+            case "audio":
+                let lock = window.descendants(matching: .any).matching(identifier: "audio.lock").firstMatch
+                XCTAssertTrue(lock.waitForExistence(timeout: 5))
+                XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "audio.current").firstMatch.exists)
             case "quickActions":
                 let toggle = window.descendants(matching: .any).matching(identifier: "quickActions.showDashboard").firstMatch
                 XCTAssertTrue(toggle.waitForExistence(timeout: 5))

@@ -90,6 +90,22 @@ final class LowBatteryNotifierFreshnessTests: XCTestCase {
         XCTAssertTrue(second.isEmpty, "A HUD-surfaced alert must latch even when the system notification fails")
     }
 
+    func testFailedNotificationIsRetriedWhenTheHUDWillNotShowIt() {
+        let defaults = makeDefaults()
+        defer { clear(defaults) }
+        defaults.set(false, forKey: BatteryHUDPreferences.showActionHUDKey)
+        let low = DecoratedBatterySnapshot(snapshot: snapshot(percent: 10), freshness: .fresh)
+        let failingPost: LowBatteryNotifier.NotificationPoster = { _, completion in completion("denied") }
+        let succeedingPost: LowBatteryNotifier.NotificationPoster = { _, completion in completion(nil) }
+
+        XCTAssertEqual(LowBatteryNotifier.notifyIfNeeded(for: [low], defaults: defaults, post: failingPost).count, 1)
+        XCTAssertEqual(
+            LowBatteryNotifier.notifyIfNeeded(for: [low], defaults: defaults, post: succeedingPost).count, 1,
+            "With the HUD off, a refused notification was shown nowhere and must be retried"
+        )
+        XCTAssertTrue(LowBatteryNotifier.notifyIfNeeded(for: [low], defaults: defaults, post: succeedingPost).isEmpty)
+    }
+
     func testNotifyIfNeededReportsDeliveryFailure() {
         let defaults = makeDefaults()
         defer { clear(defaults) }

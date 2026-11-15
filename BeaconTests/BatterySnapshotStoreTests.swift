@@ -101,7 +101,7 @@ final class BatterySnapshotStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshots[0].source, .bluetoothUnsupported)
     }
 
-    func testExternalBatterySnapshotsHideMacBookAndMissingReports() {
+    func testAlertableSnapshotsIncludeThisMacAndHideMissingReports() {
         let mac = BatterySnapshot(
             deviceID: "mac",
             displayName: "MacBook",
@@ -133,8 +133,9 @@ final class BatterySnapshotStoreTests: XCTestCase {
         var store = BatterySnapshotStore(now: { Date(timeIntervalSince1970: 120) })
         store.merge([mac, unsupportedKeyboard, keyboard])
 
-        XCTAssertEqual(store.externalBatterySnapshots.map(\.deviceID), ["keyboard"])
-        XCTAssertEqual(store.decoratedExternalBatterySnapshots.map(\.snapshot.deviceID), ["keyboard"])
+        // A portable Mac is eligible for Battery Alerts, as its context menu offers.
+        XCTAssertEqual(Set(store.externalBatterySnapshots.map(\.deviceID)), ["mac", "keyboard"])
+        XCTAssertEqual(Set(store.decoratedExternalBatterySnapshots.map(\.snapshot.deviceID)), ["mac", "keyboard"])
     }
 
     func testExternalBatterySnapshotsHideDisconnectedLastKnownBatteryReports() {

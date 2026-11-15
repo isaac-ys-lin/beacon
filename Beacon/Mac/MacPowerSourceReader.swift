@@ -1,5 +1,6 @@
 import Foundation
 import IOKit.ps
+import SystemConfiguration
 
 /// Reads this Mac's internal battery through the public IOPowerSources API.
 /// Desktop Macs have no internal battery and produce no snapshot.
@@ -14,7 +15,10 @@ enum MacPowerSourceReader {
         let descriptions = list.compactMap { source in
             IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue() as? [String: Any]
         }
-        return snapshot(from: descriptions, macName: Host.current().localizedName ?? "This Mac", now: now)
+        // The Computer Name from Sharing settings (e.g. "Isaac's MacBook Pro"),
+        // not the network host name.
+        let name = (SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? BeaconL10n.string("This Mac")
+        return snapshot(from: descriptions, macName: name, now: now)
     }
 
     static func snapshot(from descriptions: [[String: Any]], macName: String, now: Date) -> BatterySnapshot? {

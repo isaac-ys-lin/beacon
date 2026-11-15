@@ -160,9 +160,10 @@ public struct BatterySnapshotStore: Sendable {
         return .fresh
     }
 
+    /// Snapshots eligible for battery alerts: any reported, connected battery,
+    /// including this Mac's own (AirBuddy-style alerts cover portable Macs).
     public static func isVisibleExternalBattery(_ snapshot: BatterySnapshot) -> Bool {
-        snapshot.kind != .macBook
-            && snapshot.percent != nil
+        snapshot.percent != nil
             && snapshot.connectionState == .connected
     }
 
