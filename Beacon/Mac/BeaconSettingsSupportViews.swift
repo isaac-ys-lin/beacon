@@ -616,7 +616,12 @@ struct DeviceCurrentStatsCard: View {
                 Text(presentation.state.title)
                     .accessibilityIdentifier("device.report.state")
                     .font(DesignTokens.Typography.caption2Emphasis)
-                    .foregroundStyle(reportColor)
+                    .foregroundStyle(DesignTokens.Palette.text)
+                    .overlay(alignment: .leading) {
+                        Circle().fill(reportColor).frame(width: 6, height: 6).offset(x: -10)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.leading, 8)
                     .padding(.horizontal, 7)
                     .frame(height: 20)
                     .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
@@ -898,6 +903,7 @@ struct SettingsInfoRow: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(color)
                 .frame(width: 22)
+                .accessibilityHidden(true)
 
             Text(title)
                 .font(DesignTokens.Typography.caption)
@@ -905,15 +911,17 @@ struct SettingsInfoRow: View {
 
             Spacer(minLength: 12)
 
+            // Status colour stays on the icon; text keeps system contrast.
             Text(value)
                 .font(DesignTokens.Typography.captionEmphasis)
-                .foregroundStyle(color)
+                .foregroundStyle(DesignTokens.Palette.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .multilineTextAlignment(.trailing)
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 38)
+        .accessibilityElement(children: .combine)
     }
 }
 

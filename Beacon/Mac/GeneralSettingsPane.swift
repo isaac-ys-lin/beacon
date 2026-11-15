@@ -113,9 +113,13 @@ struct GeneralSettingsPane: View {
             Divider()
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Circle()
+                    .fill(launchAtLoginStatusColor)
+                    .frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
                 Text(launchAtLoginModel.title)
                     .font(DesignTokens.Typography.captionEmphasis)
-                    .foregroundStyle(launchAtLoginStatusColor)
+                    .foregroundStyle(DesignTokens.Palette.text)
                     .accessibilityIdentifier("general.launch-at-login.status")
                 Text(launchAtLoginModel.subtitle)
                     .font(DesignTokens.Typography.caption)
