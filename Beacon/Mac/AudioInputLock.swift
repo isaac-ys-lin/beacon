@@ -105,6 +105,8 @@ final class AudioInputController: ObservableObject {
     @Published private(set) var currentUID: String?
     /// Set when the lock switches the input back; observed by the Action HUD.
     @Published private(set) var lastRestoration: Restoration?
+    /// Mirrors the saved lock switch for observers (Control Center, menus).
+    @Published private(set) var lockEnabled = false
 
     private let system: AudioInputSystem
     private let defaults: UserDefaults
@@ -119,6 +121,7 @@ final class AudioInputController: ObservableObject {
     func start() {
         guard !isStarted else { return }
         isStarted = true
+        lockEnabled = preferences.isEnabled
         system.startObserving { [weak self] in self?.systemDidChange() }
         systemDidChange()
     }
@@ -129,6 +132,7 @@ final class AudioInputController: ObservableObject {
 
     func update(_ preferences: AudioInputLockPreferences) {
         preferences.save(to: defaults)
+        lockEnabled = preferences.isEnabled
         enforceLock()
     }
 

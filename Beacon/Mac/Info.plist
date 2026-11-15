@@ -26,6 +26,8 @@
 #else
 	<false/>
 #endif
+	<key>BeaconAppGroup</key>
+	<string>$(TeamIdentifierPrefix)com.isaacyslin.Beacon</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Beacon reads connected Bluetooth device battery reports when available.</string>
 </dict>

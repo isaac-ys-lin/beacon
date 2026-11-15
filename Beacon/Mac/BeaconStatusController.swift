@@ -24,6 +24,7 @@ final class BeaconStatusController: NSObject {
     private var refreshDiagnosticsObserver: AnyCancellable?
     private var alertEventsObserver: AnyCancellable?
     private var audioRestorationObserver: AnyCancellable?
+    private var audioLockStateObserver: AnyCancellable?
     private var notificationAuthorizationObserver: AnyCancellable?
     private var notificationDeliveryObserver: AnyCancellable?
     private var trustedIPhoneRegistryObserver: AnyCancellable?
@@ -117,6 +118,24 @@ final class BeaconStatusController: NSObject {
                 ))
             }
         AudioInputController.shared.start()
+        BeaconControlListener.start(
+            onRefresh: { [weak self] in
+                guard let self else { return }
+                Task { await self.model.refresh() }
+            },
+            onAudioLock: { isEnabled in
+                let controller = AudioInputController.shared
+                var preferences = controller.preferences
+                preferences.isEnabled = isEnabled
+                if isEnabled, preferences.preferredUID == nil {
+                    preferences.preferredUID = controller.currentUID
+                }
+                controller.update(preferences)
+            }
+        )
+        audioLockStateObserver = AudioInputController.shared.$lockEnabled
+            .removeDuplicates()
+            .sink { BeaconControlListener.publishAudioLockState($0) }
         alertEventsObserver = model.$latestAlertEvents
             .filter { !$0.isEmpty }
             .sink { [weak self] events in
@@ -370,6 +389,12 @@ final class BeaconStatusController: NSObject {
 
     private func updateDesktopWidget(store: BatterySnapshotStore? = nil, refreshDiagnostics: BatteryRefreshDiagnostics? = nil) {
         let renderedStore = store ?? model.store
+        if !model.isUsingPreviewData {
+            BeaconWidgetPublisher.publish(
+                dashboardDeviceSections(renderedStore.decoratedSnapshots, preferences: DeviceDisplayPreferences.load())
+                    .flatMap(\.items)
+            )
+        }
         desktopWidgetController.update(
             snapshots: batterySnapshotsWithKnownFailures(renderedStore.decoratedSnapshots, diagnostics: refreshDiagnostics ?? model.latestRefreshDiagnostics),
             onOpenSettings: { [weak self] in
