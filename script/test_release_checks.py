@@ -31,6 +31,8 @@ class ReleaseChecksTests(unittest.TestCase):
         self.calls = []
         self.fail = None
         self.entitlements = {"com.apple.security.device.bluetooth": True}
+        self.widget_entitlements = {"com.apple.security.app-sandbox": True,
+                                    "com.apple.security.application-groups": [f"{TEAM}.com.isaacyslin.Beacon"]}
         self.signature = SIGNATURE
         self.policy = "assessments enabled"
         self.assessment = "accepted\nsource=Notarized Developer ID\n"
@@ -44,6 +46,10 @@ class ReleaseChecksTests(unittest.TestCase):
             "CFBundleIdentifier": "com.isaacyslin.Beacon.mac", "CFBundleVersion": "123",
             "CFBundleShortVersionString": "1.0", "CFBundleExecutable": "BeaconMac",
             "BeaconSourceCommit": "a" * 40}))
+        widget = path / "Contents/PlugIns/BeaconWidgets.appex/Contents"
+        (widget / "MacOS").mkdir(parents=True)
+        (widget / "MacOS/BeaconWidgets").write_bytes(b"fixture, never executed")
+        (widget / "Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "com.isaacyslin.Beacon.mac.widgets"}))
         return path
 
     def fake_run(self, command):
@@ -54,7 +60,7 @@ class ReleaseChecksTests(unittest.TestCase):
         if command[:2] == ["/usr/sbin/spctl", "--status"]:
             data = self.policy.encode()
         elif "--entitlements" in command:
-            data = plistlib.dumps(self.entitlements)
+            data = plistlib.dumps(self.widget_entitlements if command[-1].endswith(".appex") else self.entitlements)
         elif "--display" in command:
             data = self.signature.encode()
         elif "attach" in command and not self.no_app:
@@ -139,6 +145,43 @@ class ReleaseChecksTests(unittest.TestCase):
         framework = app / "Contents/Frameworks/Unreviewed.framework"
         framework.mkdir(parents=True)
         with self.assertRaises(checks.VerificationError): checks.signing_layout(app)
+
+    def testOnlyTheReviewedWidgetExtensionIsAllowedAsNestedCode(self):
+        for mutate in (
+            lambda app: (app / "Contents/PlugIns/Other.appex/Contents/MacOS").mkdir(parents=True),
+            lambda app: (app / "Contents/PlugIns/BeaconTests.xctest").mkdir(parents=True),
+            lambda app: (app / "Contents/PlugIns/BeaconWidgets.appex/Contents/Frameworks/X.framework").mkdir(parents=True),
+            lambda app: (app / "Contents/PlugIns/BeaconWidgets.appex/Contents/MacOS/second").write_bytes(b"x"),
+            lambda app: __import__("shutil").rmtree(app / "Contents/PlugIns"),
+        ):
+            with self.subTest(mutate=mutate):
+                app = self.make_app(Path(tempfile.mkdtemp(dir=self.root)) / "BeaconMac.app")
+                checks.signing_layout(app)
+                mutate(app)
+                with self.assertRaises(checks.VerificationError): checks.signing_layout(app)
+
+    def testWidgetExtensionMustBeSandboxedInTheTeamGroupAndDeveloperIDSigned(self):
+        app = self.make_app(self.root / "BeaconMac.app")
+        with patch.object(checks, "run", side_effect=self.fake_run):
+            checks.check_signature(app, TEAM)
+            self.assertTrue(any(c[-1].endswith(".appex") and "--entitlements" in c for c in self.calls))
+            for bad in ({"com.apple.security.application-groups": [f"{TEAM}.com.isaacyslin.Beacon"]},
+                        {**self.widget_entitlements, "com.apple.security.app-sandbox": False},
+                        {**self.widget_entitlements, "com.apple.security.application-groups": ["OTHERTEAM1.com.isaacyslin.Beacon"]},
+                        {**self.widget_entitlements, "com.apple.security.get-task-allow": True}):
+                with self.subTest(entitlements=bad):
+                    self.widget_entitlements = bad
+                    with self.assertRaises(checks.VerificationError): checks.check_signature(app, TEAM)
+        self.widget_entitlements = {"com.apple.security.app-sandbox": True,
+                                    "com.apple.security.application-groups": [f"{TEAM}.com.isaacyslin.Beacon"]}
+        original = self.fake_run
+        def development_signed_widget(command):
+            result = original(command)
+            if command[-1].endswith(".appex") and "--verbose=4" in command:
+                return subprocess.CompletedProcess(command, 0, stdout=result.stdout.replace(b"Developer ID Application", b"Apple Development"), stderr=b"")
+            return result
+        with patch.object(checks, "run", side_effect=development_signed_widget):
+            with self.assertRaises(checks.VerificationError): checks.check_signature(app, TEAM)
 
     def testProductionVerifierRefusesNonMacHostAndExistingEvidence(self):
         with patch.object(checks.platform, "system", return_value="Linux"), patch.object(checks, "run") as run:

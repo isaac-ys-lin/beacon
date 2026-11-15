@@ -18,7 +18,7 @@ final class ReleaseScriptTests: XCTestCase {
         process.waitUntilExit()
         let text = String(decoding: data, as: UTF8.self)
         XCTAssertEqual(process.terminationStatus, 0, text)
-        XCTAssertTrue(text.contains("Ran 14 tests"), text)
+        XCTAssertTrue(text.contains("Ran 16 tests"), text)
         XCTAssertTrue(text.contains("OK"), text)
     }
 }

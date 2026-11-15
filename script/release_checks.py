@@ -57,20 +57,44 @@ def accepted_notary_result(path: Path) -> str:
     return result["id"]
 
 
+WIDGET_EXTENSION = Path("Contents/PlugIns/BeaconWidgets.appex")
+WIDGET_BUNDLE_ID = "com.isaacyslin.Beacon.mac.widgets"
+NESTED_SUFFIXES = {".app", ".framework", ".xpc", ".appex", ".bundle", ".dylib", ".xctest"}
+
+
+def _single_executable(bundle: Path, label: str) -> None:
+    macos = bundle / "Contents/MacOS"
+    executables = list(macos.iterdir()) if macos.is_dir() else []
+    if len(executables) != 1 or not executables[0].is_file():
+        raise VerificationError(f"Unexpected {label} executable layout requires explicit signing review")
+
+
 def signing_layout(app: Path) -> None:
-    """Fail closed if Beacon grows nested code needing its own signing/entitlements."""
+    """Fail closed unless nested code is exactly the reviewed widget extension.
+
+    The widget is signed first with its own sandboxed entitlements; nothing else
+    may receive the app's (unsandboxed) entitlements or go unsigned.
+    """
     contents = app / "Contents"
     if not contents.is_dir():
         raise VerificationError("App bundle is missing")
-    nested_suffixes = {".app", ".framework", ".xpc", ".appex", ".bundle", ".dylib"}
+    widget = app / WIDGET_EXTENSION
+    plugins = contents / "PlugIns"
+    if not widget.is_dir() or not plugins.is_dir() or [p.name for p in plugins.iterdir()] != [widget.name]:
+        raise VerificationError("Nested code must be exactly the reviewed BeaconWidgets.appex")
     for entry in contents.rglob("*"):
-        if entry.suffix.lower() in nested_suffixes or entry.name in {"Helpers", "LoginItems", "PlugIns"}:
-            raise VerificationError("Nested code requires an explicit inside-out signing policy before distribution")
         if entry.is_symlink() and not entry.resolve().is_relative_to(app.resolve()):
             raise VerificationError("App contains an external symlink")
-    executables = list((contents / "MacOS").iterdir()) if (contents / "MacOS").is_dir() else []
-    if len(executables) != 1 or not executables[0].is_file():
-        raise VerificationError("Unexpected executable layout requires explicit signing review")
+        if entry == widget or entry == plugins:
+            continue
+        if entry.suffix.lower() in NESTED_SUFFIXES or entry.name in {"Helpers", "LoginItems", "PlugIns"}:
+            raise VerificationError("Nested code requires an explicit inside-out signing policy before distribution")
+    _single_executable(app, "app")
+    _single_executable(widget, "widget")
+
+
+def widget_extension(app: Path) -> Path:
+    return app / WIDGET_EXTENSION
 
 
 def run(command: list[str]) -> subprocess.CompletedProcess[bytes]:
@@ -124,11 +148,32 @@ def check_signature(path: Path, team: str, *, app: bool = True) -> dict:
         executable = path / "Contents/MacOS" / info["CFBundleExecutable"]
         if not executable.is_file() or not executable.resolve().is_relative_to(path.resolve()):
             raise VerificationError("Bundle executable is missing or outside the app")
+        check_widget_signature(path, team)
         return {"team_id": team, "bundle_id": info["CFBundleIdentifier"],
                 "version": info["CFBundleShortVersionString"], "build": info["CFBundleVersion"],
                 "source_commit": info["BeaconSourceCommit"]}
     except (OSError, ValueError, plistlib.InvalidFileException, TypeError) as exc:
         raise VerificationError("Unable to verify signed bundle metadata/entitlements") from exc
+
+
+def check_widget_signature(app: Path, team: str) -> None:
+    """The nested widget must be independently Developer ID signed, sandboxed and in the app's group."""
+    widget = widget_extension(app)
+    if not widget.is_dir() or not widget.resolve().is_relative_to(app.resolve()):
+        raise VerificationError("Signed app is missing the reviewed widget extension")
+    result = run(["/usr/bin/codesign", "--display", "--verbose=4", str(widget)])
+    signature_details((result.stdout + result.stderr).decode("utf-8", "replace"), team, app=True)
+    entitlements = plistlib.loads(run(["/usr/bin/codesign", "--display", "--entitlements", ":-", str(widget)]).stdout)
+    if not isinstance(entitlements, dict) or entitlements.get("com.apple.security.get-task-allow", False):
+        raise VerificationError("Widget entitlements allow debugging or are invalid")
+    if entitlements.get("com.apple.security.app-sandbox") is not True:
+        raise VerificationError("Widget extension must be sandboxed")
+    groups = entitlements.get("com.apple.security.application-groups")
+    if groups != [f"{team}.com.isaacyslin.Beacon"]:
+        raise VerificationError("Widget app group does not match the signing team")
+    info = plistlib.loads((widget / "Contents/Info.plist").read_bytes())
+    if not isinstance(info, dict) or info.get("CFBundleIdentifier") != WIDGET_BUNDLE_ID:
+        raise VerificationError("Unexpected widget bundle identifier")
 
 
 def sha256(path: Path) -> str:

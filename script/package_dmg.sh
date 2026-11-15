@@ -15,6 +15,8 @@ APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME"
 DMG_PATH="$DIST_DIR/$DMG_NAME"
 ENTITLEMENTS="$ROOT_DIR/Beacon/Mac/BeaconMac.entitlements"
 RESOLVED_ENTITLEMENTS="$ROOT_DIR/build/BeaconMac.resolved.entitlements"
+WIDGET_ENTITLEMENTS="$ROOT_DIR/Beacon/Widget/BeaconWidgets.entitlements"
+RESOLVED_WIDGET_ENTITLEMENTS="$ROOT_DIR/build/BeaconWidgets.resolved.entitlements"
 CHECKS="$ROOT_DIR/script/release_checks.py"
 EXPECTED_TEAM_ID="${EXPECTED_TEAM_ID:-${TEAM_ID:-}}"
 export CONFIGURATION EXPECTED_TEAM_ID
@@ -26,19 +28,29 @@ require_tool() {
   fi
 }
 
+resolve_entitlements() {
+  # Expand $(TeamIdentifierPrefix) the way Xcode would, for the identity actually used.
+  local source="$1" output="$2" prefix="$3"
+  /usr/bin/sed "s/\$(TeamIdentifierPrefix)/${prefix}/g" "$source" > "$output"
+}
+
 sign_app() {
   local app="$1"
   local entitlements="$2"
+  local widget="$app/Contents/PlugIns/BeaconWidgets.appex"
+  # The only reviewed nested code is the sandboxed widget. Refuse any other layout
+  # rather than recursively applying the unsandboxed app entitlements to helpers.
+  python3 "$CHECKS" signing-layout "$app"
   if [[ -n "${DEVELOPER_ID_IDENTITY:-}" ]]; then
-    echo "Signing the app with the requested Developer ID identity..."
-    # Beacon currently has no nested executable bundles. Refuse a changed bundle
-    # layout rather than recursively applying the app's entitlements to helpers.
-    python3 "$CHECKS" signing-layout "$app"
+    echo "Signing inside-out with the requested Developer ID identity..."
+    /usr/bin/codesign --force --options runtime --timestamp \
+      --sign "$DEVELOPER_ID_IDENTITY" --entitlements "$RESOLVED_WIDGET_ENTITLEMENTS" "$widget"
     /usr/bin/codesign --force --options runtime --timestamp \
       --sign "$DEVELOPER_ID_IDENTITY" --entitlements "$entitlements" "$app"
   else
     echo "Ad-hoc signing for local development only; this is not a distribution-verified app."
-    /usr/bin/codesign --force --deep --sign - --entitlements "$entitlements" "$app"
+    /usr/bin/codesign --force --sign - --entitlements "$RESOLVED_WIDGET_ENTITLEMENTS" "$widget"
+    /usr/bin/codesign --force --sign - --entitlements "$entitlements" "$app"
   fi
 }
 
@@ -108,7 +120,19 @@ path = Path(sys.argv[1]); info = plistlib.loads(path.read_bytes())
 info['BeaconSourceCommit'] = sys.argv[2]
 path.write_bytes(plistlib.dumps(info))
 PY
-/bin/cp "$ENTITLEMENTS" "$RESOLVED_ENTITLEMENTS"
+# Ad-hoc signatures have no team; the app group then only resolves for Developer ID builds.
+TEAM_PREFIX=""
+[[ -n "${DEVELOPER_ID_IDENTITY:-}" && -n "$EXPECTED_TEAM_ID" ]] && TEAM_PREFIX="$EXPECTED_TEAM_ID."
+if [[ -n "${DEVELOPER_ID_IDENTITY:-}" && -z "$TEAM_PREFIX" ]]; then
+  echo "Developer ID signing requires EXPECTED_TEAM_ID (or TEAM_ID) to resolve the widget app group." >&2
+  exit 1
+fi
+resolve_entitlements "$ENTITLEMENTS" "$RESOLVED_ENTITLEMENTS" "$TEAM_PREFIX"
+resolve_entitlements "$WIDGET_ENTITLEMENTS" "$RESOLVED_WIDGET_ENTITLEMENTS" "$TEAM_PREFIX"
+for plist in "$STAGING_DIR/$APP_NAME/Contents/Info.plist" \
+  "$STAGING_DIR/$APP_NAME/Contents/PlugIns/BeaconWidgets.appex/Contents/Info.plist"; do
+  /usr/libexec/PlistBuddy -c "Set :BeaconAppGroup ${TEAM_PREFIX}com.isaacyslin.Beacon" "$plist"
+done
 sign_app "$STAGING_DIR/$APP_NAME" "$RESOLVED_ENTITLEMENTS"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$STAGING_DIR/$APP_NAME"
 if [[ "${NOTARIZE:-0}" == "1" ]]; then
