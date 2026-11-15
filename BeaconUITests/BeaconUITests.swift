@@ -39,7 +39,7 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let settingsWindow = app.windows["Beacon Settings"]
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 10))
-        XCTAssertTrue(settingsWindow.staticTexts["Preview data is active"].waitForExistence(timeout: 5))
+        XCTAssertTrue(settingsWindow.staticTexts["settings.preview-badge"].waitForExistence(timeout: 5))
         let refreshButton = settingsWindow.buttons["settings.refresh"]
         XCTAssertTrue(refreshButton.waitForExistence(timeout: 5))
         XCTAssertTrue(refreshButton.isEnabled)
@@ -259,7 +259,7 @@ final class BeaconUITests: XCTestCase {
                 XCTAssertTrue(window.buttons["general.launch-at-login.refresh"].exists)
             case "devices":
                 XCTAssertTrue(window.buttons["settings.refresh"].waitForExistence(timeout: 5))
-                XCTAssertTrue(window.buttons["settings.iphone-setup"].exists)
+                XCTAssertTrue(window.buttons["settings.add-device"].exists)
             case "audio":
                 let lock = window.descendants(matching: .any).matching(identifier: "audio.lock").firstMatch
                 XCTAssertTrue(lock.waitForExistence(timeout: 5))
@@ -380,7 +380,8 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let window = app.windows["Beacon Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["settings.iphone-setup"].click()
+        window.buttons["settings.add-device"].click()
+        app.buttons["setup.iphone"].click()
         XCTAssertTrue(app.staticTexts["iphone.setup.state.toolsMissing"].waitForExistence(timeout: 5))
         let missingTools = app.staticTexts["iphone.setup.missing-tools"]
         XCTAssertTrue(missingTools.waitForExistence(timeout: 5))
@@ -404,7 +405,8 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let window = app.windows["Beacon Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["settings.iphone-setup"].click()
+        window.buttons["settings.add-device"].click()
+        app.buttons["setup.iphone"].click()
         let check = app.buttons["iphone.setup.check"]
         XCTAssertTrue(check.waitForExistence(timeout: 5))
         check.click()
@@ -428,7 +430,8 @@ final class BeaconUITests: XCTestCase {
         defer { app.terminate() }
         let window = app.windows["Beacon Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        window.buttons["settings.iphone-setup"].click()
+        window.buttons["settings.add-device"].click()
+        app.buttons["setup.iphone"].click()
         let check = app.buttons["iphone.setup.check"]
         XCTAssertTrue(check.waitForExistence(timeout: 5))
         check.click()
@@ -519,6 +522,7 @@ final class BeaconUITests: XCTestCase {
         XCTAssertTrue(failedState.waitForExistence(timeout: 5))
         let failedSnapshot = try recordIPhoneSetupEvidence(app, text: failedState, name: "report-known-impact")
         XCTAssertEqual(failedSnapshot.value as? String, "Read failed")
+        settings.buttons["settings.device.done"].click()
         settings.buttons["settings.device.report-test"].click()
         XCTAssertEqual(try settings.staticTexts["device.report.state"].snapshot().value as? String, "Latest report")
     }

@@ -284,12 +284,8 @@ struct DeviceIconPlate: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(theme.active.opacity(0.54))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(theme.hairlineSubtle, lineWidth: 0.6)
-                )
+            Circle()
+                .fill(theme.active)
 
             Image(systemName: symbolName)
                 .font(.system(size: max(12, size * 0.54), weight: .medium))
@@ -478,15 +474,10 @@ struct DashboardBatteryProgressBar: View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Capsule(style: .continuous)
-                    .fill(theme.active.opacity(0.78))
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(theme.hairlineSubtle, lineWidth: 0.6)
-                    )
+                    .fill(theme.active)
                 Capsule(style: .continuous)
                     .fill(color)
                     .frame(width: max(height, proxy.size.width * ratio))
-                    .shadow(color: color.opacity(0.42), radius: 8, x: 0, y: 0)
             }
         }
         .frame(height: height)
@@ -496,34 +487,6 @@ struct DashboardBatteryProgressBar: View {
     private var theme: BeaconThemePalette {
         BeaconAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
             .palette(resolvedSystemScheme: colorScheme)
-    }
-}
-
-private struct BeaconStatusDot: View {
-    let color: Color
-    var isCharging: Bool = false
-    @State private var pulsing = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 7, height: 7)
-            .shadow(color: color.opacity(pulsing ? 0.72 : 0.36), radius: pulsing ? 9 : 5, x: 0, y: 0)
-            .animation(
-                reduceMotion
-                    ? nil
-                    : (isCharging ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true) : .default),
-                value: pulsing
-            )
-            .onAppear { pulsing = isCharging && !reduceMotion }
-            .onChange(of: isCharging) { _, value in
-                pulsing = value && !reduceMotion
-            }
-            .onChange(of: reduceMotion) { _, value in
-                pulsing = isCharging && !value
-            }
-            .accessibilityHidden(true)
     }
 }
 
@@ -548,8 +511,6 @@ struct DashboardBatteryDeviceRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
-                    BeaconStatusDot(color: statusColor, isCharging: device.reportState == .current && device.chargeState == .charging)
-
                     Text(device.displayName)
                         .font(DesignTokens.Typography.controlLabelEmphasis)
                         .foregroundStyle(theme.textPrimary)
@@ -585,29 +546,24 @@ struct DashboardBatteryDeviceRow: View {
                         DashboardBatteryProgressBar(percent: percent, color: statusColor)
                     } else {
                         Capsule(style: .continuous)
-                            .fill(theme.active.opacity(0.58))
+                            .fill(theme.active)
                             .frame(height: 5)
                     }
 
-                    Text(statusText)
-                        .font(DesignTokens.Typography.caption2)
-                        .foregroundStyle(statusTextColor)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(width: statusWidth, alignment: .trailing)
+                    // A current report needs no label; only exceptions are spelled out.
+                    if device.reportState != .current {
+                        Text(statusText)
+                            .font(DesignTokens.Typography.caption2)
+                            .foregroundStyle(statusTextColor)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(width: statusWidth, alignment: .trailing)
+                    }
                 }
             }
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
-        .background(
-            RoundedRectangle(cornerRadius: NativeMacStyle.dashboardRowCornerRadius, style: .continuous)
-                .fill(theme.raised.opacity(0.58))
-                .overlay(
-                    RoundedRectangle(cornerRadius: NativeMacStyle.dashboardRowCornerRadius, style: .continuous)
-                        .stroke(theme.hairlineSubtle, lineWidth: 0.7)
-                )
-        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(device.displayName)
         .accessibilityValue(accessibilityValue)
@@ -773,11 +729,7 @@ private struct AirPodsDashboardComponentChip: View {
         .frame(height: 19)
         .background(
             Capsule(style: .continuous)
-                .fill(theme.hover.opacity(0.66))
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(theme.hairlineSubtle, lineWidth: 0.6)
-                )
+                .fill(theme.hover)
         )
         .accessibilityLabel(accessibilityLabel)
         .help(airPodsComponentAccessibilityDescription(component))

@@ -24,20 +24,13 @@ struct GeneralSettingsPane: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            HStack(alignment: .top, spacing: 18) {
-                VStack(alignment: .leading, spacing: 14) {
-                    launchAtLoginCard
-                    dataCard
-                }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                aboutCard
-                    .frame(width: 278, alignment: .topLeading)
-            }
-            .padding(1)
+        Form {
+            launchAtLoginSection
+            historySection
+            resetSection
+            aboutSection
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .formStyle(.grouped)
         .confirmationDialog(
             "Clear all battery history?",
             isPresented: $isShowingClearHistoryConfirmation,
@@ -75,218 +68,121 @@ struct GeneralSettingsPane: View {
         }
     }
 
-    private var launchAtLoginCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "power.circle.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(DesignTokens.Palette.accent)
-                    .frame(width: 34, height: 34)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(DesignTokens.Palette.controlPill)
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Launch at Login")
-                        .font(DesignTokens.Typography.sectionTitle)
-                    Text("Uses the macOS login item service.")
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                }
-
-                Spacer()
-
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { launchAtLoginModel.isRequested },
-                        set: { launchAtLoginModel.setEnabled($0) }
-                    )
+    private var launchAtLoginSection: some View {
+        Section {
+            Toggle(
+                "Launch at Login",
+                isOn: Binding(
+                    get: { launchAtLoginModel.isRequested },
+                    set: { launchAtLoginModel.setEnabled($0) }
                 )
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .accessibilityLabel("Launch Beacon at login")
-                .accessibilityIdentifier("general.launch-at-login.toggle")
+            )
+            .accessibilityLabel("Launch Beacon at login")
+            .accessibilityIdentifier("general.launch-at-login.toggle")
+
+            LabeledContent("Status") {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(launchAtLoginStatusColor)
+                        .frame(width: 7, height: 7)
+                        .accessibilityHidden(true)
+                    Text(launchAtLoginModel.title)
+                        .accessibilityIdentifier("general.launch-at-login.status")
+                }
             }
 
-            Divider()
-
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Circle()
-                    .fill(launchAtLoginStatusColor)
-                    .frame(width: 7, height: 7)
-                    .accessibilityHidden(true)
-                Text(launchAtLoginModel.title)
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .foregroundStyle(DesignTokens.Palette.text)
-                    .accessibilityIdentifier("general.launch-at-login.status")
-                Text(launchAtLoginModel.subtitle)
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Button("Open Login Items Settings") {
+                    BeaconGeneralSystemActions.openLoginItemsSettings()
+                }
+                .accessibilityIdentifier("general.launch-at-login.settings")
                 Spacer(minLength: 0)
-            }
-
-            ViewThatFits(in: .horizontal) {
-                HStack {
-                    loginRecoveryButtons
+                Button {
+                    launchAtLoginModel.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
                 }
-                VStack(alignment: .leading) {
-                    loginRecoveryButtons
-                }
-            }
-            .controlSize(.small)
-
-            DisclosureGroup("Report") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(versionInfo.displayText)
-                    Text(Bundle.main.bundleIdentifier ?? "Unknown")
-                    Text(Bundle.main.bundleURL.path)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .font(DesignTokens.Typography.caption2)
-                .textSelection(.enabled)
-                .accessibilityIdentifier("general.launch-at-login.diagnostics")
+                .buttonStyle(.borderless)
+                .help("Refresh")
+                .accessibilityLabel("Refresh")
+                .accessibilityIdentifier("general.launch-at-login.refresh")
             }
 
             if let errorMessage = launchAtLoginModel.errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Palette.critical)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("general.launch-at-login.error")
             }
+        } footer: {
+            Text(launchAtLoginModel.subtitle)
         }
-        .padding(14)
-        .beaconSettingsCardSurface()
     }
 
-    @ViewBuilder
-    private var loginRecoveryButtons: some View {
-        Button("Refresh") { launchAtLoginModel.refresh() }
-            .accessibilityIdentifier("general.launch-at-login.refresh")
-        Button("Open Login Items Settings") {
-            BeaconGeneralSystemActions.openLoginItemsSettings()
-        }
-        .accessibilityIdentifier("general.launch-at-login.settings")
-    }
-
-    private var dataCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Data and Preferences", systemImage: "externaldrive.fill")
-                .font(DesignTokens.Typography.sectionTitle)
-
-            Text("Beacon stores up to seven days of battery samples locally on this Mac.")
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-
+    private var historySection: some View {
+        Section {
+            LabeledContent("Battery History") {
+                Text("\(BatteryHistoryStore.sampleCount()) samples")
+            }
             HStack(spacing: 8) {
                 Button("Export History…") {
                     exportHistory()
                 }
-                .disabled(BatteryHistoryStore.sampleCount() == 0)
                 .accessibilityIdentifier("general.history.export")
 
                 Button("Clear History…", role: .destructive) {
                     isShowingClearHistoryConfirmation = true
                 }
-                .disabled(BatteryHistoryStore.sampleCount() == 0)
                 .accessibilityIdentifier("general.history.clear")
-
-                Spacer(minLength: 0)
-
-                Text("\(BatteryHistoryStore.sampleCount()) samples")
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
             }
+            .disabled(BatteryHistoryStore.sampleCount() == 0)
 
-            Divider()
+            if let operationMessage {
+                Label(operationMessage, systemImage: operationIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                    .foregroundStyle(operationIsError ? DesignTokens.Palette.critical : DesignTokens.Palette.charging)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("general.operation-result")
+            }
+        } header: {
+            Text("Data")
+        } footer: {
+            Text("Beacon stores up to seven days of battery samples locally on this Mac.")
+        }
+    }
 
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Reset App Preferences")
-                        .font(DesignTokens.Typography.captionEmphasis)
-                    Text("Keeps battery history and Launch at Login unchanged.")
-                        .font(DesignTokens.Typography.caption2)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                }
-                Spacer()
+    private var resetSection: some View {
+        Section {
+            LabeledContent("Reset App Preferences") {
                 Button("Reset…", role: .destructive) {
                     isShowingResetConfirmation = true
                 }
                 .accessibilityIdentifier("general.preferences.reset")
             }
-
-            if let operationMessage {
-                Label(operationMessage, systemImage: operationIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(operationIsError ? DesignTokens.Palette.critical : DesignTokens.Palette.charging)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("general.operation-result")
-            }
+        } footer: {
+            Text("Keeps battery history and Launch at Login unchanged.")
         }
-        .padding(14)
-        .beaconSettingsCardSurface()
     }
 
-    private var aboutCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Image("BeaconAppIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 48, height: 48)
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Beacon")
-                        .font(DesignTokens.Typography.windowTitle)
-                    Text(versionInfo.displayText)
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                }
-            }
-
-            Divider()
-
+    private var aboutSection: some View {
+        Section {
+            LabeledContent("Version", value: "\(versionInfo.version) (\(versionInfo.build))")
             Link(destination: BeaconGeneralSystemActions.releasesURL) {
-                Label("Direct Download", systemImage: "shippingbox.fill")
+                Text("Direct Download")
             }
             .accessibilityIdentifier("general.releases")
-
             Link(destination: BeaconGeneralSystemActions.supportURL) {
-                Label("Report", systemImage: "questionmark.circle")
+                Text("Report")
             }
             .accessibilityIdentifier("general.support")
-
-            Text("This build is distributed outside the Mac App Store.")
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-
-            Text("Beacon does not contact an update service or download updates in the background. Install a newer signed build manually when one is provided.")
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-
-            Label("Local by Design", systemImage: "lock.shield.fill")
-                .font(DesignTokens.Typography.captionEmphasis)
-
-            Text("Battery reports and history stay on this Mac. Beacon has no account or cloud sync in this build.")
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
             Link(destination: BeaconGeneralSystemActions.localDataURL) {
-                Label("Data and Preferences", systemImage: "info.circle")
+                Text("Data and Preferences")
             }
             .accessibilityIdentifier("general.local-data")
+        } header: {
+            Text("About")
+        } footer: {
+            Text("Distributed outside the Mac App Store. Beacon never downloads updates in the background, and battery reports stay on this Mac.")
         }
-        .padding(16)
-        .beaconSettingsCardSurface()
-        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("general.about")
     }
 

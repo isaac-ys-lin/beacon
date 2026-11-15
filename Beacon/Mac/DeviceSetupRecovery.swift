@@ -44,6 +44,8 @@ struct DeviceSetupRecoveryCard: View {
     let isRefreshing: Bool
     let onSetUp: () -> Void
     let onRefresh: () -> Void
+    /// Off inside a grouped Form, which already draws the row surface.
+    var surfaced = true
 
     var body: some View {
         if state != .ready {
@@ -66,9 +68,13 @@ struct DeviceSetupRecoveryCard: View {
                 }
                 .controlSize(.small)
             }
-            .padding(12)
+            .padding(surfaced ? 12 : 0)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .beaconSettingsCardSurface()
+            .background {
+                if surfaced {
+                    Color.clear.beaconSettingsCardSurface()
+                }
+            }
         }
     }
 

@@ -355,43 +355,6 @@ private struct RefreshHealthAttemptRow: View {
     }
 }
 
-struct SettingsEmptyStateCard: View {
-    let title: LocalizedStringKey
-    let subtitle: LocalizedStringKey
-    let systemImage: String
-    var tint = DesignTokens.Palette.accent
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: resolveSymbol(systemImage, fallback: "info.circle"))
-                .font(.system(size: 16, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(tint)
-                .frame(width: 36, height: 36)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
-                )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(DesignTokens.Typography.sectionTitle)
-                    .foregroundStyle(DesignTokens.Palette.text)
-                Text(subtitle)
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(14)
-        .frame(maxWidth: 520, alignment: .leading)
-        .beaconSettingsCardSurface()
-    }
-}
-
-/// A System Settings–style sidebar icon: a white glyph on a tinted rounded square.
 struct SettingsPaneIcon: View {
     let pane: SettingsPane
 
@@ -533,61 +496,30 @@ struct AutomationShortcutsBanner: View {
     }
 }
 
-struct AirPodsAudioControlsCard: View {
-    let deviceID: String
+/// AirPods audio routing lives in macOS; this section only points there.
+struct AirPodsAudioControlsSection: View {
     let onOpenSoundSettings: () -> Void
     let onOpenBluetoothSettings: () -> Void
 
-    init(
-        deviceID: String,
-        onOpenSoundSettings: @escaping () -> Void,
-        onOpenBluetoothSettings: @escaping () -> Void
-    ) {
-        self.deviceID = deviceID
-        self.onOpenSoundSettings = onOpenSoundSettings
-        self.onOpenBluetoothSettings = onOpenBluetoothSettings
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Audio Controls", systemImage: "waveform")
-                    .font(DesignTokens.Typography.captionEmphasis)
-                Spacer()
-            }
-
-            Text(BeaconL10n.string("Choose audio output and input in Sound Settings. Change AirPods listening modes in Control Center or Bluetooth Settings."))
-                .font(DesignTokens.Typography.caption2)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
+        Section {
             HStack(spacing: 8) {
-                Button {
-                    onOpenSoundSettings()
-                } label: {
-                    Label("Sound Settings", systemImage: "speaker.wave.2")
-                }
-                .accessibilityIdentifier("airpods.audio-controls.sound-settings")
-
-                Button {
-                    onOpenBluetoothSettings()
-                } label: {
-                    Label("Bluetooth", systemImage: BeaconSymbols.bluetooth)
-                }
-                .accessibilityIdentifier("airpods.audio-controls.bluetooth-settings")
-
-                Spacer()
+                Button("Sound Settings…", action: onOpenSoundSettings)
+                    .accessibilityIdentifier("airpods.audio-controls.sound-settings")
+                Button("Bluetooth Settings…", action: onOpenBluetoothSettings)
+                    .accessibilityIdentifier("airpods.audio-controls.bluetooth-settings")
             }
-            .font(DesignTokens.Typography.captionEmphasis)
+        } header: {
+            Text("Audio")
+        } footer: {
+            Text(BeaconL10n.string("Choose audio output and input in Sound Settings. Change AirPods listening modes in Control Center or Bluetooth Settings."))
         }
-        .padding(12)
-        .beaconSettingsCardSurface()
-        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("airpods.audio-controls")
     }
 }
 
-struct DeviceCurrentStatsCard: View {
+/// The device's latest report and history, as grouped Form sections.
+struct DeviceStatsSections: View {
     let item: DeviceListItem
     let historySamples: [BatteryHistorySample]
     @ObservedObject private var deviceDetails = BluetoothDeviceDetailsStore.shared
@@ -603,150 +535,37 @@ struct DeviceCurrentStatsCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Current Stats", systemImage: "chart.bar.xaxis")
-                    .font(DesignTokens.Typography.captionEmphasis)
-                Spacer()
+        Section {
+            LabeledContent("Battery", value: presentation.valueText)
+            LabeledContent("Report") {
                 Text(presentation.state.title)
                     .accessibilityIdentifier("device.report.state")
-                    .font(DesignTokens.Typography.caption2Emphasis)
-                    .foregroundStyle(DesignTokens.Palette.text)
-                    .overlay(alignment: .leading) {
-                        Circle().fill(reportColor).frame(width: 6, height: 6).offset(x: -10)
-                            .accessibilityHidden(true)
-                    }
-                    .padding(.leading, 8)
-                    .padding(.horizontal, 7)
-                    .frame(height: 20)
-                    .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
             }
-
-            VStack(spacing: 0) {
-                SettingsInfoRow(
-                    title: "Battery",
-                    value: batteryText,
-                    systemImage: batteryIcon,
-                    color: batteryColor
-                )
-
-                Divider().padding(.leading, 40)
-
-                SettingsInfoRow(
-                    title: "Report",
-                    value: reportText,
-                    systemImage: reportIcon,
-                    color: reportColor
-                )
-
-                Divider().padding(.leading, 40)
-
-                SettingsInfoRow(
-                    title: "Connection",
-                    value: connectionText,
-                    systemImage: connectionIcon,
-                    color: connectionColor
-                )
-
-                Divider().padding(.leading, 40)
-
-                SettingsInfoRow(
-                    title: "Updated",
-                    value: updatedText,
-                    systemImage: "clock",
-                    color: updatedColor
-                )
-
-                if let firmwareVersion {
-                    Divider().padding(.leading, 40)
-
-                    SettingsInfoRow(
-                        title: "Firmware",
-                        value: firmwareVersion,
-                        systemImage: "cpu",
-                        color: .secondary
-                    )
+            LabeledContent("Connection", value: connectionText)
+            LabeledContent("Updated", value: updatedText)
+            if let firmwareVersion {
+                LabeledContent("Firmware", value: firmwareVersion)
                     .accessibilityIdentifier("device.report.firmware")
-                }
             }
-            .background(settingsGroupBackground)
-
             DisclosureGroup("Technical Details") {
-                Text(sourceText).font(.caption)
-                Text(item.id).font(.caption.monospaced()).textSelection(.enabled)
+                LabeledContent("Source", value: sourceText)
+                LabeledContent("Identifier") {
+                    Text(item.id).font(.body.monospaced()).textSelection(.enabled)
+                }
             }
-            .font(.caption)
             .accessibilityIdentifier("device.report.diagnostics")
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Battery Trend")
-                        .font(DesignTokens.Typography.caption2Emphasis)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    Spacer()
-                    Text(trendText)
-                        .font(DesignTokens.Typography.caption2Emphasis)
-                        .foregroundStyle(trendColor)
-                }
-
-                if (historySummary?.samples.count ?? 0) >= 2 {
-                    BatteryHistorySparkline(samples: historySummary?.samples ?? [])
-                        .frame(height: 96)
-                }
-
-                Text(rangeText)
-                    .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.tertiaryText)
-                    .lineLimit(1)
-            }
-            .padding(12)
-            .background(settingsGroupBackground)
         }
-        .padding(12)
-        .beaconSettingsCardSurface()
-    }
 
-    private var settingsGroupBackground: some View {
-        RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-            .fill(DesignTokens.Palette.controlPill.opacity(0.62))
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-                    .stroke(NativeMacStyle.subtleStroke, lineWidth: 0.7)
-            )
-    }
-
-    private var batteryText: String { presentation.valueText }
-
-    private var batteryIcon: String {
-        guard presentation.state == .current else { return "battery.100" }
-        switch item {
-        case .device(let decorated):
-            if decorated.snapshot.chargeState == .charging { return "battery.100.bolt" }
-            return "battery.100"
-        case .airPods:
-            return "battery.100"
-        }
-    }
-
-    private var batteryColor: Color {
-        guard presentation.state == .current else { return DesignTokens.Palette.secondaryText }
-        switch item {
-        case .device(let decorated):
-            guard let percent = decorated.snapshot.percent else { return DesignTokens.Palette.secondaryText }
-            if percent <= LowBatteryNotifier.threshold { return DesignTokens.Palette.critical }
-            if decorated.snapshot.chargeState == .charging || decorated.snapshot.chargeState == .full {
-                return DesignTokens.Palette.charging
+        Section {
+            LabeledContent("Trend", value: trendText)
+            if (historySummary?.samples.count ?? 0) >= 2 {
+                BatteryHistorySparkline(samples: historySummary?.samples ?? [])
+                    .frame(height: 88)
             }
-            return DesignTokens.Palette.accent
-        case .airPods(_, _, let components):
-            let percents = components.compactMap(\.percent)
-            if let lowest = percents.min(), lowest <= LowBatteryNotifier.threshold {
-                return DesignTokens.Palette.critical
-            }
-            if components.contains(where: { $0.chargeState == .charging || $0.chargeState == .full }) {
-                return DesignTokens.Palette.charging
-            }
-            return DesignTokens.Palette.accent
+        } header: {
+            Text("Battery History")
+        } footer: {
+            Text(rangeText)
         }
     }
 
@@ -762,22 +581,6 @@ struct DeviceCurrentStatsCard: View {
         }
     }
 
-    private var reportText: String { presentation.state.title }
-    private var reportKey: String { presentation.state == .current ? "Reporting" : presentation.state.title }
-
-    private var reportIcon: String {
-        switch presentation.state {
-        case .current: return "checkmark.circle.fill"
-        case .permission, .unavailable: return "exclamationmark.triangle"
-        case .noReport: return "minus.circle"
-        default: return "clock.badge.exclamationmark"
-        }
-    }
-
-    private var reportColor: Color {
-        presentation.state == .current ? DesignTokens.Palette.charging : DesignTokens.Palette.secondaryText
-    }
-
     private var connectionText: String {
         switch item.connectionState {
         case .connected: return BeaconL10n.string("Connected")
@@ -786,38 +589,14 @@ struct DeviceCurrentStatsCard: View {
         }
     }
 
-    private var connectionColor: Color {
-        item.connectionState == .connected ? DesignTokens.Palette.charging : DesignTokens.Palette.secondaryText
-    }
-
-    private var connectionIcon: String {
-        item.connectionState == .connected ? "link.circle.fill" : "questionmark.circle"
-    }
-
     private var updatedText: String {
         guard presentation.updatedAt != .distantPast else { return BeaconL10n.string("No report") }
         return batteryRelativeAgeText(updatedAt: presentation.updatedAt)
     }
 
-    private var updatedColor: Color {
-        switch item {
-        case .device(let decorated):
-            return decorated.freshness == .fresh ? DesignTokens.Palette.accent : DesignTokens.Palette.stale
-        case .airPods(_, _, let components):
-            return components.contains { $0.freshness != .fresh } ? DesignTokens.Palette.stale : DesignTokens.Palette.accent
-        }
-    }
-
     private var trendText: String {
         guard let historySummary else { return BeaconL10n.string("Collecting") }
         return historySummary.trendDescription
-    }
-
-    private var trendColor: Color {
-        guard let historySummary else { return DesignTokens.Palette.secondaryText }
-        if historySummary.delta > 0 { return DesignTokens.Palette.charging }
-        if historySummary.delta < 0 { return DesignTokens.Palette.warning }
-        return DesignTokens.Palette.secondaryText
     }
 
     private var rangeText: String {
@@ -831,7 +610,6 @@ struct DeviceCurrentStatsCard: View {
             historySummary.samples.count
         )
     }
-
 }
 
 /// Battery level over time, drawn with Swift Charts on a real time axis and a
@@ -882,160 +660,5 @@ struct BatteryHistorySparkline: View {
 
     private var sortedSamples: [BatteryHistorySample] {
         samples.sorted { $0.recordedAt < $1.recordedAt }
-    }
-}
-
-struct SettingsInfoRow: View {
-    let title: LocalizedStringKey
-    let value: String
-    let systemImage: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: resolveSymbol(systemImage, fallback: "circle"))
-                .font(.system(size: 13, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(color)
-                .frame(width: 22)
-                .accessibilityHidden(true)
-
-            Text(title)
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Palette.text)
-
-            Spacer(minLength: 12)
-
-            // Status colour stays on the icon; text keeps system contrast.
-            Text(value)
-                .font(DesignTokens.Typography.captionEmphasis)
-                .foregroundStyle(DesignTokens.Palette.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.horizontal, 12)
-        .frame(minHeight: 38)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-struct SettingsDeviceSidebarRow: View {
-    let item: DeviceInspectorItem
-    let isSelected: Bool
-    let symbolName: String
-    let iconColor: Color
-    let iconBadge: DeviceIconBadge?
-    let alertSummary: String
-    let action: () -> Void
-    @AppStorage(BeaconAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: symbolName)
-                    .font(.system(size: 16, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(iconColor)
-                    .frame(width: 22)
-                    .overlay(alignment: .bottomTrailing) {
-                        if let iconBadge {
-                            Image(systemName: iconBadge.symbolName)
-                                .font(.system(size: 7, weight: .bold))
-                                .foregroundStyle(iconBadge.color(in: theme))
-                                .offset(x: 5, y: 4)
-                                .accessibilityHidden(true)
-                        }
-                    }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.displayName)
-                        .font(DesignTokens.Typography.captionEmphasis)
-                        .foregroundStyle(item.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.text)
-                        .lineLimit(1)
-                    Text(rowSubtitle)
-                        .font(DesignTokens.Typography.caption2)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: NativeMacStyle.rowCornerRadius, style: .continuous)
-                    .fill(isSelected ? NativeMacStyle.rowSelection : Color.clear)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(item.displayName)
-        .accessibilityValue(rowSubtitle)
-        .accessibilityHint("Selects this device")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        // Keep the row's position in the VoiceOver traversal stable while the
-        // selected trait changes after a click.
-        .accessibilitySortPriority(0)
-    }
-
-    private var theme: BeaconThemePalette {
-        BeaconAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
-            .palette(resolvedSystemScheme: colorScheme)
-    }
-
-    private var rowSubtitle: String {
-        let visibility: String
-        if item.isUserHidden {
-            visibility = BeaconL10n.string("Hidden")
-        } else if item.isUnavailable {
-            visibility = BeaconL10n.string("Hidden until connected")
-        } else if item.isPinned {
-            visibility = BeaconL10n.string("Pinned")
-        } else {
-            visibility = BeaconL10n.string("Visible")
-        }
-        return BeaconL10n.format("%1$@ · %2$@", visibility, alertSummary)
-    }
-}
-
-struct SettingsAlertPreview: View {
-    let title: LocalizedStringKey
-    let subtitle: String
-    let systemImage: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(color)
-                .frame(width: 30, height: 30)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
-                )
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(DesignTokens.Typography.captionEmphasis)
-                Text(subtitle)
-                    .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-                .fill(DesignTokens.Palette.controlPill.opacity(0.62))
-        )
     }
 }

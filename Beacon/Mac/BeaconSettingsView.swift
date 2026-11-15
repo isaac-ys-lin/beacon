@@ -34,12 +34,6 @@ enum NotificationPermissionRequestPolicy {
     }
 }
 
-private enum SettingsDetailLayout {
-    static let paneSpacing: CGFloat = 18
-    static let selectorWidth: CGFloat = 278
-    static let selectorPadding: CGFloat = 12
-}
-
 struct BeaconSettingsView: View {
     @ObservedObject var connections: BluetoothConnectionController
     let snapshots: [DecoratedBatterySnapshot]
@@ -77,7 +71,7 @@ struct BeaconSettingsView: View {
 
     @State private var displayPreferences = DeviceDisplayPreferences.load()
     @State private var quickActionPreferences = BeaconQuickActionPreferences.load()
-    @State private var selectedDeviceID: String?
+    @State private var inspectedDeviceID: String?
     @State private var selectedPane: SettingsPane = .devices
     @State private var isShowingAddDeviceGuide = false
     @State private var isShowingIPhoneSetup = false
@@ -128,8 +122,10 @@ struct BeaconSettingsView: View {
         self.iPhonePreviewTools = iPhonePreviewTools
         self.onForgetTrustedIPhone = onForgetTrustedIPhone
         self.onQuit = onQuit
-        _selectedPane = State(initialValue: initialPane)
-        _selectedDeviceID = State(initialValue: initialSelectedDeviceID)
+        // Per-device alert settings now live in the device's detail sheet.
+        let routesToDevice = initialSelectedDeviceID != nil && initialPane == .alerts
+        _selectedPane = State(initialValue: routesToDevice ? .devices : initialPane)
+        _inspectedDeviceID = State(initialValue: initialSelectedDeviceID)
         _isShowingAddDeviceGuide = State(initialValue: initiallyShowingAddDeviceGuide)
     }
 
@@ -164,10 +160,9 @@ struct BeaconSettingsView: View {
             idealHeight: 620,
             alignment: .topLeading
         )
-        .background(.regularMaterial)
+        .background(Color(nsColor: .windowBackgroundColor))
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
         .onAppear {
-            reconcileSelectedDeviceSelection()
             onRefreshNotificationAuthorization()
         }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
@@ -245,14 +240,20 @@ struct BeaconSettingsView: View {
                 .font(DesignTokens.Typography.windowTitle)
                 .lineLimit(1)
 
+            if isPreviewingData {
+                Text("Preview Data")
+                    .font(DesignTokens.Typography.caption2Emphasis)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Capsule(style: .continuous).fill(.quaternary))
+                    .help("Sample devices are shown for UI QA, not live Bluetooth.")
+                    .accessibilityIdentifier("settings.preview-badge")
+            }
+
             Spacer()
 
             if selectedPane == .devices {
-                Button("iPhone Setup") {
-                    isShowingIPhoneSetup = true
-                    isShowingAddDeviceGuide = true
-                }
-                .accessibilityIdentifier("settings.iphone-setup")
                 Button {
                     isShowingIPhoneSetup = false
                     isShowingAddDeviceGuide = true
@@ -261,9 +262,10 @@ struct BeaconSettingsView: View {
                 }
                 .help("Set Up Device")
                 .accessibilityLabel("Set Up Device")
+                .accessibilityIdentifier("settings.add-device")
             }
 
-            if selectedPane != .general {
+            if selectedPane == .devices || selectedPane == .dashboard {
                 Button(action: onRefresh) {
                     if isRefreshing {
                         ProgressView()
@@ -285,171 +287,297 @@ struct BeaconSettingsView: View {
     }
 
     private var settingsDetail: some View {
-        VStack(spacing: 0) {
-            if isPreviewingData {
-                previewDataBanner
-                    .padding(.horizontal, 18)
-                    .padding(.top, 12)
-                    .padding(.bottom, 4)
-            }
-
-            Group {
-                switch selectedPane {
-                case .general: generalTab
-                case .devices: devicesTab
-                case .alerts: alertsTab
-                case .actionHUD: actionHUDTab
-                case .quickActions: quickActionsTab
-                case .audio: AudioInputSettingsPane()
-                case .dashboard: dashboardTab
-                }
-            }
-            .padding(18)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-    }
-
-    private var devicesTab: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            DeviceSetupRecoveryCard(
-                state: .resolve(visibleCount: displayedDeviceRows.count, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics),
-                isRefreshing: isRefreshing,
-                onSetUp: { isShowingIPhoneSetup = false; isShowingAddDeviceGuide = true },
-                onRefresh: onRefresh
-            )
-            RefreshRecoveryView(diagnostics: refreshDiagnostics, snapshots: snapshots,
-                isRefreshing: isRefreshing,
-                onInspect: { selectedDeviceID = $0; showUnavailableDevices = true }, onRefresh: onRefresh)
-
-            HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
-                deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let selectedDevice {
-                            deviceDetail(for: selectedDevice)
-                        } else if DeviceSetupRecoveryState.resolve(
-                            visibleCount: 0, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
-                        ) == .empty {
-                            emptyDeviceDetail
-                        }
-                    }
-                    .padding(1)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        Group {
+            switch selectedPane {
+            case .general: generalTab
+            case .devices: devicesTab
+            case .alerts: alertsTab
+            case .actionHUD: actionHUDTab
+            case .quickActions: quickActionsTab.padding(18)
+            case .audio: AudioInputSettingsPane().padding(18)
+            case .dashboard: dashboardTab.padding(18)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    // MARK: - Devices
+
+    private var devicesTab: some View {
+        Form {
+            let recovery = DeviceSetupRecoveryState.resolve(
+                visibleCount: displayedDeviceRows.count, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
+            )
+            if recovery != .ready {
+                Section {
+                    DeviceSetupRecoveryCard(
+                        state: recovery,
+                        isRefreshing: isRefreshing,
+                        onSetUp: { isShowingIPhoneSetup = false; isShowingAddDeviceGuide = true },
+                        onRefresh: onRefresh,
+                        surfaced: false
+                    )
+                }
+            }
+            if hasRefreshProblems {
+                Section {
+                    RefreshRecoveryView(diagnostics: refreshDiagnostics, snapshots: snapshots,
+                        isRefreshing: isRefreshing,
+                        onInspect: { showUnavailableDevices = true; inspectedDeviceID = $0 }, onRefresh: onRefresh)
+                }
+            }
+
+            if !shownDeviceRows.isEmpty {
+                Section {
+                    ForEach(shownDeviceRows) { row in
+                        deviceListRow(row)
+                    }
+                } header: {
+                    Text("My Devices")
+                }
+            }
+
+            if hiddenDeviceCount > 0 {
+                Section {
+                    if showUnavailableDevices {
+                        ForEach(hiddenDeviceRows) { row in
+                            deviceListRow(row)
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text("Hidden Devices")
+                        Spacer()
+                        Button(showUnavailableDevices ? BeaconL10n.string("Hide") : BeaconL10n.format("Show %d", hiddenDeviceCount)) {
+                            showUnavailableDevices.toggle()
+                        }
+                        .buttonStyle(.link)
+                        .font(DesignTokens.Typography.caption)
+                        .accessibilityIdentifier("settings.hidden-devices.toggle")
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .overlay {
+            if deviceRows.isEmpty && recoveryIsEmpty {
+                ContentUnavailableView(
+                    "No Devices",
+                    systemImage: "battery.0",
+                    description: Text("Connected devices will appear here after the next refresh.")
+                )
+            }
+        }
+        .sheet(isPresented: isInspectingDevice) {
+            if let row = inspectedDevice {
+                DeviceDetailSheet(
+                    connections: connections,
+                    row: row,
+                    refreshDiagnostics: refreshDiagnostics,
+                    defaultThreshold: clampedLowBatteryThreshold,
+                    lowBatteryAlertsEnabled: lowBatteryAlertsEnabled,
+                    chargedBatteryAlertsEnabled: chargedBatteryAlertsEnabled,
+                    onSetPinned: { setDisplayPreferences(displayPreferences.settingPinned($0, for: row.item)) },
+                    onHide: { setDisplayPreferences(displayPreferences.hiding(row.item)) },
+                    onRestore: { setDisplayPreferences(displayPreferences.restoring(row.item)) },
+                    onAlertPreferenceEnabled: handleNotificationAlertPreferenceActivation,
+                    onOpenSoundSettings: onOpenSoundSettings,
+                    onOpenBluetoothSettings: onOpenBluetoothSettings,
+                    onDone: { inspectedDeviceID = nil }
+                )
+            }
+        }
+    }
+
+    private func deviceListRow(_ row: DeviceInspectorItem) -> some View {
+        let presentation = DeviceBatteryPresentation(item: row.item)
+        let subtitle = deviceRowSubtitle(row, presentation: presentation)
+        return Button {
+            inspectedDeviceID = row.id
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: deviceSymbolName(for: row.kind, displayName: row.displayName))
+                    .font(.system(size: 15))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(row.displayName)
+                        .foregroundStyle(row.isHidden ? .secondary : .primary)
+                        .lineLimit(1)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(DesignTokens.Typography.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                if row.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Text(presentation.valueText)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Image(systemName: "info.circle")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(row.displayName)
+        .accessibilityValue([presentation.valueText, subtitle].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityHint("Shows device details")
+        .accessibilityIdentifier("settings.device.\(row.id)")
+    }
+
+    private func deviceRowSubtitle(_ row: DeviceInspectorItem, presentation: DeviceBatteryPresentation) -> String? {
+        if row.isUserHidden { return BeaconL10n.string("Hidden") }
+        if row.isUnavailable { return BeaconL10n.string("Hidden until connected") }
+        return presentation.state == .current ? nil : presentation.state.title
+    }
+
+    private var isInspectingDevice: Binding<Bool> {
+        Binding(
+            get: { inspectedDevice != nil },
+            set: { if !$0 { inspectedDeviceID = nil } }
+        )
+    }
+
+    private var inspectedDevice: DeviceInspectorItem? {
+        guard let inspectedDeviceID else { return nil }
+        return deviceRows.first { $0.id == inspectedDeviceID }
+    }
+
+    private var shownDeviceRows: [DeviceInspectorItem] {
+        deviceRows.filter { !$0.isHidden }
+    }
+
+    private var hiddenDeviceRows: [DeviceInspectorItem] {
+        deviceRows.filter(\.isHidden)
+    }
+
+    private var hasRefreshProblems: Bool {
+        refreshDiagnostics.attempts.contains {
+            $0.status != .reported && ($0.status != .noReport || $0.affectedDeviceIDs != nil)
+        }
+    }
+
+    private var recoveryIsEmpty: Bool {
+        DeviceSetupRecoveryState.resolve(
+            visibleCount: 0, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
+        ) == .empty
     }
 
     private var generalTab: some View {
         GeneralSettingsPane(onPreferencesReset: applyResetPreferenceState)
     }
 
+    // MARK: - Alerts
+
     private var alertsTab: some View {
-        HStack(alignment: .top, spacing: SettingsDetailLayout.paneSpacing) {
-            deviceSelectionPane(title: "Devices", subtitle: devicesSubtitle)
-
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 10) {
-                    notificationCenterSettingsCard
-                    compactGlobalAlertCard
-
-                    if let selectedDevice {
-                        alertDetail(for: selectedDevice)
-                    } else {
-                        emptyAlertDetail
+        Form {
+            Section {
+                LabeledContent("Notifications") {
+                    HStack(spacing: 6) {
+                        // Status color rides on a dot; the words stay at full text contrast.
+                        Circle()
+                            .fill(notificationAuthorizationColor)
+                            .frame(width: 7, height: 7)
+                            .accessibilityHidden(true)
+                        Text(notificationAuthorizationState.title)
+                        if notificationAuthorizationState == .unknown {
+                            ProgressView().controlSize(.small)
+                        }
                     }
                 }
-                .padding(.top, 6)
-                .padding(1)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var notificationCenterSettingsCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            compactAlertTitleRow(
-                title: "Notification Center",
-                subtitle: notificationAuthorizationState.subtitle,
-                systemImage: notificationAuthorizationState == .denied ? "bell.slash.fill" : "bell.badge.fill",
-                color: notificationAuthorizationColor
-            )
-            .padding(.horizontal, 12)
-            .frame(height: 48)
-
-            Divider()
-                .padding(.leading, 50)
-
-            HStack(spacing: 8) {
-                // Status color rides on a dot; the words stay at full text contrast.
-                Circle()
-                    .fill(notificationAuthorizationColor)
-                    .frame(width: 7, height: 7)
-                    .accessibilityHidden(true)
-                Text(notificationAuthorizationState.title)
-                    .font(DesignTokens.Typography.captionEmphasis)
-
-                if notificationAuthorizationState == .unknown {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
-                Spacer(minLength: 8)
-
-                if notificationAuthorizationState.canRequestPermission {
-                    Button("Allow Notifications", action: onRequestNotificationPermission)
-                        .accessibilityIdentifier("alerts.notification.allow")
-                }
-
-                if notificationAuthorizationState.canSendTestNotification {
-                    Button("Send Test", action: onSendTestNotification)
-                        .accessibilityIdentifier("alerts.notification.test")
-                }
-
-                if notificationAuthorizationState.canOpenSystemSettings {
-                    Button("Open Settings", action: onOpenNotificationSettings)
-                        .accessibilityIdentifier("alerts.notification.settings")
-                }
-
-                Button(action: onRefreshNotificationAuthorization) {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .help("Refresh notification status")
-                .accessibilityLabel("Refresh notification status")
-                .accessibilityIdentifier("alerts.notification.refresh")
-            }
-            .controlSize(.small)
-            .buttonStyle(.bordered)
-            .padding(.horizontal, 12)
-            .frame(height: 42)
-
-            if let latestNotificationDeliveryResult {
-                Divider()
-                    .padding(.leading, 50)
+                .accessibilityIdentifier("alerts.notification-center")
 
                 HStack(spacing: 8) {
-                    Image(systemName: latestNotificationDeliveryResult.state == .queued ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundStyle(latestNotificationDeliveryResult.state == .queued ? DesignTokens.Palette.charging : DesignTokens.Palette.critical)
-                    Text(latestNotificationDeliveryResult.title)
-                        .font(DesignTokens.Typography.captionEmphasis)
-                    Text(latestNotificationDeliveryResult.subtitle)
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                        .lineLimit(1)
+                    if notificationAuthorizationState.canRequestPermission {
+                        Button("Allow Notifications", action: onRequestNotificationPermission)
+                            .accessibilityIdentifier("alerts.notification.allow")
+                    }
+                    if notificationAuthorizationState.canOpenSystemSettings {
+                        Button("Open Settings", action: onOpenNotificationSettings)
+                            .accessibilityIdentifier("alerts.notification.settings")
+                    }
+                    if notificationAuthorizationState.canSendTestNotification {
+                        Button("Send Test", action: onSendTestNotification)
+                            .accessibilityIdentifier("alerts.notification.test")
+                    }
                     Spacer(minLength: 0)
+                    Button(action: onRefreshNotificationAuthorization) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Refresh notification status")
+                    .accessibilityLabel("Refresh notification status")
+                    .accessibilityIdentifier("alerts.notification.refresh")
                 }
-                .padding(.horizontal, 12)
-                .frame(height: 38)
-                .accessibilityIdentifier("alerts.notification.result")
+
+                if let latestNotificationDeliveryResult {
+                    Label {
+                        Text(latestNotificationDeliveryResult.title + " · " + latestNotificationDeliveryResult.subtitle)
+                    } icon: {
+                        Image(systemName: latestNotificationDeliveryResult.state == .queued ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(latestNotificationDeliveryResult.state == .queued ? DesignTokens.Palette.charging : DesignTokens.Palette.critical)
+                    }
+                    .accessibilityIdentifier("alerts.notification.result")
+                }
+            } footer: {
+                Text(notificationAuthorizationState.subtitle)
+            }
+
+            Section {
+                Toggle("Low battery alerts", isOn: $lowBatteryAlertsEnabled)
+                    .accessibilityIdentifier("alerts.global.low")
+                    .onChange(of: lowBatteryAlertsEnabled) { _, isEnabled in
+                        handleNotificationAlertPreferenceActivation(isEnabled)
+                    }
+                LabeledContent("Default threshold") {
+                    HStack(spacing: 10) {
+                        Slider(value: lowBatteryThresholdBinding, in: 5...50, step: 5)
+                            .labelsHidden()
+                            .frame(maxWidth: 220)
+                            .accessibilityLabel("Default threshold")
+                            .accessibilityValue("\(clampedLowBatteryThreshold)%")
+                            .accessibilityIdentifier("alerts.global.threshold")
+                        Text("\(clampedLowBatteryThreshold)%")
+                            .monospacedDigit()
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                }
+                .disabled(!lowBatteryAlertsEnabled)
+            } header: {
+                Text("Low Battery")
+            } footer: {
+                Text("Devices without their own threshold use this value. Set a device's threshold in Devices.")
+            }
+
+            Section {
+                Toggle("Charged alerts", isOn: $chargedBatteryAlertsEnabled)
+                    .accessibilityIdentifier("alerts.global.charged")
+                    .onChange(of: chargedBatteryAlertsEnabled) { _, isEnabled in
+                        handleNotificationAlertPreferenceActivation(isEnabled)
+                    }
+            } header: {
+                Text("Full Charge")
+            } footer: {
+                Text("Also turn on Notify when charged for each device in Devices.")
             }
         }
-        .frame(maxWidth: 560, alignment: .topLeading)
-        .beaconSettingsCardSurface()
-        .accessibilityIdentifier("alerts.notification-center")
+        .formStyle(.grouped)
     }
 
     private var notificationAuthorizationColor: Color {
@@ -463,344 +591,16 @@ struct BeaconSettingsView: View {
         }
     }
 
-    private func deviceSelectionPane(
-        title: LocalizedStringKey,
-        subtitle: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(DesignTokens.Typography.sectionTitle)
-                    Text(subtitle)
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                }
-
-                Spacer(minLength: 0)
-
-                if hiddenDeviceCount > 0 {
-                    Button {
-                        showUnavailableDevices.toggle()
-                        reconcileSelectedDeviceSelection()
-                    } label: {
-                        Label(
-                            showUnavailableDevices ? "Hide Unavailable" : "Show Hidden",
-                            systemImage: showUnavailableDevices ? "eye.slash" : "eye"
-                        )
-                    }
-                    .controlSize(.small)
-                    .buttonStyle(.borderless)
-                    .help(showUnavailableDevices ? "Hide disconnected devices" : "Show hidden devices")
-                }
-            }
-
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    ForEach(displayedDeviceRows) { row in
-                        SettingsDeviceSidebarRow(
-                            item: row,
-                            isSelected: selectedDevice?.id == row.id,
-                            symbolName: deviceSymbolName(for: row.kind, displayName: row.displayName),
-                            iconColor: detailIconColor(for: row),
-                            iconBadge: detailIconBadge(for: row),
-                            alertSummary: alertSummary(for: row.item)
-                        ) {
-                            selectedDeviceID = row.id
-                        }
-                        .accessibilityIdentifier("settings.device.\(row.id)")
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-        }
-        .padding(SettingsDetailLayout.selectorPadding)
-        .frame(width: SettingsDetailLayout.selectorWidth, alignment: .topLeading)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
-        .beaconSettingsCardSurface()
-    }
-
-    private func alertDetail(for row: DeviceInspectorItem) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            compactAlertHeader(for: row)
-            compactDeviceAlertCard(for: row)
-            compactAlertPreviewCard
-        }
-        .frame(maxWidth: 560, alignment: .topLeading)
-    }
-
-    private func compactAlertHeader(for row: DeviceInspectorItem) -> some View {
-        HStack(spacing: 12) {
-            DeviceIconPlate(
-                symbolName: deviceSymbolName(for: row.kind, displayName: row.displayName),
-                color: detailIconColor(for: row),
-                size: 34,
-                badge: detailIconBadge(for: row)
-            )
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.displayName)
-                    .font(DesignTokens.Typography.rowTitleEmphasis)
-                    .lineLimit(1)
-                Text(deviceAlertSubtitle(for: row))
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 8)
-
-            compactAlertSummaryBadge(for: row)
-        }
-        .padding(.bottom, 2)
-    }
-
-    private func compactAlertSummaryBadge(for row: DeviceInspectorItem) -> some View {
-        Text(row.isHidden ? BeaconL10n.string("Hidden") : alertSummary(for: row.item))
-            .font(DesignTokens.Typography.captionEmphasis)
-            .monospacedDigit()
-            .foregroundStyle(DesignTokens.Palette.text)
-            .padding(.horizontal, 9)
-            .frame(height: 24)
-            .background(Capsule(style: .continuous).fill(DesignTokens.Palette.controlPill))
-    }
-
-    private func compactDeviceAlertCard(for row: DeviceInspectorItem) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            compactAlertTitleRow(
-                title: "Selected Device",
-                subtitle: BeaconL10n.string(
-                    row.isHidden
-                        ? "Hidden until it reconnects and reports battery."
-                        : "Overrides only this device."
-                ),
-                systemImage: "bell.badge",
-                color: row.isHidden ? DesignTokens.Palette.secondaryText : DesignTokens.Palette.accent
-            )
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(minHeight: 44)
-
-            Divider()
-                .padding(.leading, 50)
-
-            HStack(spacing: 10) {
-                Text("Low threshold")
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .frame(width: 94, alignment: .leading)
-
-                Slider(value: deviceThresholdBinding(for: row.id), in: 5...50, step: 5)
-                    .controlSize(.small)
-                    .disabled(row.isHidden || !lowBatteryAlertsEnabled)
-                    .accessibilityLabel("Low-battery threshold")
-                    .accessibilityValue("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
-                    .accessibilityIdentifier("alerts.device.threshold")
-
-                Text("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
-                    .font(DesignTokens.Typography.percentSmall)
-                    .monospacedDigit()
-                    .foregroundStyle(DesignTokens.Palette.text)
-                    .frame(width: 40, alignment: .trailing)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 42)
-            .opacity(row.isHidden || !lowBatteryAlertsEnabled ? 0.5 : 1)
-
-            Divider()
-                .padding(.leading, 50)
-
-            HStack(spacing: 12) {
-                Toggle("Notify when charged", isOn: deviceChargedAlertBinding(for: row))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
-                    .accessibilityIdentifier("alerts.device.charged")
-
-                Spacer(minLength: 8)
-
-                Button("Use Default Threshold") {
-                    LowBatteryNotifier.resetThreshold(forDeviceID: row.id)
-                }
-                .controlSize(.small)
-                .help("Resets only the low-battery threshold. The charged-alert choice is kept.")
-                .accessibilityIdentifier("alerts.device.use-default")
-                .disabled(row.isHidden || !LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id))
-            }
-            .font(DesignTokens.Typography.controlLabel)
-            .padding(.horizontal, 12)
-            .frame(height: 42)
-            .opacity(row.isHidden ? 0.5 : 1)
-        }
-        .beaconSettingsCardSurface()
-    }
-
-    private var compactGlobalAlertCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            compactAlertTitleRow(
-                title: "All Devices",
-                subtitle: BeaconL10n.string("These switches apply to every device. The default threshold is used only when a device has no custom threshold."),
-                systemImage: "slider.horizontal.3",
-                color: DesignTokens.Palette.secondaryText
-            )
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(minHeight: 44)
-
-            Divider()
-                .padding(.leading, 50)
-
-            HStack(spacing: 10) {
-                Toggle("Low battery alerts", isOn: $lowBatteryAlertsEnabled)
-                    .accessibilityIdentifier("alerts.global.low")
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .onChange(of: lowBatteryAlertsEnabled) { _, isEnabled in
-                        handleNotificationAlertPreferenceActivation(isEnabled)
-                    }
-
-                Spacer(minLength: 8)
-
-                Text("\(clampedLowBatteryThreshold)%")
-                    .font(DesignTokens.Typography.percentSmall)
-                    .monospacedDigit()
-                    .foregroundStyle(DesignTokens.Palette.text)
-                    .frame(width: 40, alignment: .trailing)
-            }
-            .font(DesignTokens.Typography.controlLabel)
-            .padding(.horizontal, 12)
-            .frame(height: 40)
-
-            HStack(spacing: 10) {
-                Text("Default threshold")
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .frame(width: 104, alignment: .leading)
-
-                Slider(value: lowBatteryThresholdBinding, in: 5...50, step: 5)
-                    .accessibilityLabel("Default threshold")
-                    .accessibilityValue("\(clampedLowBatteryThreshold)%")
-                    .accessibilityIdentifier("alerts.global.threshold")
-                    .controlSize(.small)
-                    .disabled(!lowBatteryAlertsEnabled)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 36)
-            .opacity(lowBatteryAlertsEnabled ? 1 : 0.5)
-
-            Divider()
-                .padding(.leading, 50)
-
-            Toggle("Charged alerts", isOn: $chargedBatteryAlertsEnabled)
-                .accessibilityIdentifier("alerts.global.charged")
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .onChange(of: chargedBatteryAlertsEnabled) { _, isEnabled in
-                    handleNotificationAlertPreferenceActivation(isEnabled)
-                }
-                .font(DesignTokens.Typography.controlLabel)
-                .padding(.horizontal, 12)
-                .frame(height: 40, alignment: .leading)
-
-            Text("Charged alerts also require Notify when charged to be enabled for the device.")
-                .font(DesignTokens.Typography.caption2)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
-        }
-        .beaconSettingsCardSurface()
-    }
-
-    private var compactAlertPreviewCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Preview")
-                .font(DesignTokens.Typography.captionEmphasis)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-            Text("Illustration only. This does not send a notification.")
-                .font(DesignTokens.Typography.caption2)
-                .foregroundStyle(DesignTokens.Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 10) {
-                SettingsAlertPreview(
-                    title: "Low Battery",
-                    subtitle: lowBatteryAlertsEnabled
-                        ? BeaconL10n.format("At %d%%", selectedDevice.map { LowBatteryNotifier.threshold(forDeviceID: $0.id) } ?? clampedLowBatteryThreshold)
-                        : BeaconL10n.string("Disabled"),
-                    systemImage: "battery.25",
-                    color: DesignTokens.Palette.critical
-                )
-                SettingsAlertPreview(
-                    title: "Fully Charged",
-                    subtitle: chargedBatteryAlertsEnabled
-                        && (selectedDevice.map { LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: $0.id, displayName: $0.displayName) } ?? false)
-                        ? BeaconL10n.format("At %d%%", 100)
-                        : BeaconL10n.string("Disabled"),
-                    systemImage: "battery.100",
-                    color: DesignTokens.Palette.charging
-                )
-            }
-        }
-        .padding(10)
-        .beaconSettingsCardSurface()
-    }
-
-    private func compactAlertTitleRow(
-        title: LocalizedStringKey,
-        subtitle: String,
-        systemImage: String,
-        color: Color
-    ) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: resolveSymbol(systemImage, fallback: "bell"))
-                .font(.system(size: 13, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(color)
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(DesignTokens.Palette.controlPill)
-                )
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(DesignTokens.Typography.captionEmphasis)
-                Text(subtitle)
-                    .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 0)
-        }
-    }
-
-    private var emptyAlertDetail: some View {
-        SettingsEmptyStateCard(
-            title: "No selectable devices",
-            subtitle: "Show hidden devices or connect a reporting device to edit per-device alerts.",
-            systemImage: "bell.slash"
-        )
-        .padding(.top, 12)
-    }
-
     private var actionHUDTab: some View {
-        GeometryReader { proxy in
-            ActionHUDSettingsPane(
-                showActionHUD: $showActionHUD,
-                showLowBatteryHUD: $showLowBatteryHUD,
-                showChargedHUD: $showChargedHUD,
-                autoDismissEnabled: $autoDismissHUD,
-                dismissDelaySeconds: $hudDismissDelaySeconds,
-                showDismissButton: $showHUDDismissButton,
-                lowBatteryThreshold: clampedLowBatteryThreshold
-            )
-            .frame(
-                width: proxy.size.width,
-                height: proxy.size.height,
-                alignment: .top
-            )
-        }
+        ActionHUDSettingsPane(
+            showActionHUD: $showActionHUD,
+            showLowBatteryHUD: $showLowBatteryHUD,
+            showChargedHUD: $showChargedHUD,
+            autoDismissEnabled: $autoDismissHUD,
+            dismissDelaySeconds: $hudDismissDelaySeconds,
+            showDismissButton: $showHUDDismissButton,
+            lowBatteryThreshold: clampedLowBatteryThreshold
+        )
     }
 
     private var dashboardTab: some View {
@@ -831,166 +631,6 @@ struct BeaconSettingsView: View {
         displayPreferences = DeviceDisplayPreferences()
         quickActionPreferences = BeaconQuickActionPreferences()
         StatusWindowPreferences.notifyChanged()
-        reconcileSelectedDeviceSelection()
-    }
-
-    private func deviceDetail(for row: DeviceInspectorItem) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                DeviceIconPlate(
-                    symbolName: deviceSymbolName(for: row.kind, displayName: row.displayName),
-                    color: detailIconColor(for: row),
-                    size: 36,
-                    badge: detailIconBadge(for: row)
-                )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(row.displayName)
-                        .font(DesignTokens.Typography.sectionTitle)
-                        .lineLimit(1)
-                    Text(detailSubtitle(for: row))
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                }
-
-                Spacer()
-            }
-
-            if BluetoothDeviceControlSupport.normalizedAddress(from: row.id) != nil {
-                BluetoothConnectionControls(item: row.item, controller: connections)
-                    .beaconSettingsCardSurface()
-            }
-
-            DeviceCurrentStatsCard(
-                item: row.item,
-                historySamples: BatteryHistoryStore.samples(for: row.id)
-            )
-
-            VStack(alignment: .leading, spacing: 0) {
-                Toggle(isOn: Binding(
-                    get: { row.isPinned },
-                    set: { setDisplayPreferences(displayPreferences.settingPinned($0, for: row.item)) }
-                )) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Label("Pin to Top", systemImage: "pin.fill")
-                        Text("Pinned devices appear first when connected. Disconnected devices stay in Other devices.")
-                            .font(DesignTokens.Typography.caption2)
-                            .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    }
-                }
-                .toggleStyle(.switch)
-                .accessibilityLabel("Pin to Top")
-                .accessibilityIdentifier("settings.device.pin")
-                .padding(12)
-                .disabled(row.isHidden)
-                .opacity(row.isHidden ? 0.45 : 1)
-
-                Divider()
-                    .padding(.leading, 50)
-
-                Toggle(isOn: deviceChargedAlertBinding(for: row)) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Label("Notify when charged", systemImage: "battery.100")
-                        Text("Best for devices that keep reporting while charging.")
-                            .font(DesignTokens.Typography.caption2)
-                            .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    }
-                }
-                .toggleStyle(.switch)
-                .accessibilityLabel("Notify when charged")
-                .accessibilityIdentifier("settings.device.charged")
-                .padding(12)
-                .disabled(row.isHidden || !chargedBatteryAlertsEnabled)
-                .opacity(row.isHidden || !chargedBatteryAlertsEnabled ? 0.45 : 1)
-            }
-            .beaconSettingsCardSurface()
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Low-battery threshold")
-                        .font(DesignTokens.Typography.captionEmphasis)
-                    Spacer()
-                    Text("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
-                        .font(DesignTokens.Typography.percentSmall)
-                        .monospacedDigit()
-                        .foregroundStyle(DesignTokens.Palette.text)
-                }
-
-                Slider(
-                    value: Binding(
-                        get: { Double(LowBatteryNotifier.threshold(forDeviceID: row.id)) },
-                        set: { LowBatteryNotifier.setThreshold(Int($0.rounded()), forDeviceID: row.id) }
-                    ),
-                    in: 5...50,
-                    step: 5
-                )
-                .disabled(row.isHidden || !lowBatteryAlertsEnabled)
-                .accessibilityLabel("Low-battery threshold")
-                .accessibilityValue("\(LowBatteryNotifier.threshold(forDeviceID: row.id))%")
-
-                HStack {
-                    Button("Use Default Threshold") {
-                        LowBatteryNotifier.resetThreshold(forDeviceID: row.id)
-                    }
-                    .help("Resets only the low-battery threshold. The charged-alert choice is kept.")
-                    .disabled(!LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id))
-
-                    Spacer()
-
-                    Text(alertSummary(for: row.item))
-                        .font(DesignTokens.Typography.captionEmphasis)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                }
-            }
-            .padding(12)
-            .beaconSettingsCardSurface()
-
-            if row.kind == .airPods {
-                AirPodsAudioControlsCard(
-                    deviceID: row.id,
-                    onOpenSoundSettings: onOpenSoundSettings,
-                    onOpenBluetoothSettings: onOpenBluetoothSettings
-                )
-            }
-
-            DisclosureGroup("Refresh Diagnostics") {
-                RefreshHealthDisclosureView(diagnostics: refreshDiagnostics)
-            }
-            .font(.caption)
-
-            HStack {
-                if row.isUserHidden {
-                    Button {
-                        setDisplayPreferences(displayPreferences.restoring(row.item))
-                    } label: {
-                        Label("Restore Device", systemImage: "arrow.uturn.backward")
-                    }
-                } else if row.isUnavailable {
-                    Label("Hidden until connected", systemImage: "eye.slash")
-                        .font(DesignTokens.Typography.caption)
-                        .foregroundStyle(DesignTokens.Palette.secondaryText)
-                } else {
-                    Button(role: .destructive) {
-                        setDisplayPreferences(displayPreferences.hiding(row.item))
-                    } label: {
-                        Label("Hide Device", systemImage: "eye.slash")
-                    }
-                }
-
-                Spacer()
-            }
-            .padding(.top, 2)
-        }
-        .padding(.top, 6)
-    }
-
-    private var emptyDeviceDetail: some View {
-        SettingsEmptyStateCard(
-            title: "No devices",
-            subtitle: "Connected devices will appear here after the next refresh.",
-            systemImage: "battery.0"
-        )
-        .padding(.top, 12)
     }
 
     private var deviceRows: [DeviceInspectorItem] {
@@ -1006,66 +646,8 @@ struct BeaconSettingsView: View {
         )
     }
 
-    private var selectedDevice: DeviceInspectorItem? {
-        if let selectedDeviceID,
-           let row = displayedDeviceRows.first(where: { $0.id == selectedDeviceID }) {
-            return row
-        }
-        return displayedDeviceRows.first
-    }
-
-    private var visibleDeviceCount: Int {
-        deviceRows.filter { !$0.isHidden }.count
-    }
-
     private var hiddenDeviceCount: Int {
         deviceRows.filter(\.isHidden).count
-    }
-
-    private var devicesSubtitle: String {
-        if isRefreshing {
-            return BeaconL10n.format("Refreshing... · %d visible", visibleDeviceCount)
-        }
-        if !showUnavailableDevices, hiddenDeviceCount > 0 {
-            return BeaconL10n.format(
-                "%1$d visible · %2$d hidden collapsed",
-                visibleDeviceCount,
-                hiddenDeviceCount
-            )
-        }
-        return BeaconL10n.format("%1$d visible · %2$d hidden", visibleDeviceCount, hiddenDeviceCount)
-    }
-
-    private var previewDataBanner: some View {
-        HStack(spacing: 9) {
-            Image(systemName: resolveSymbol("eye", fallback: "info.circle"))
-                .font(.system(size: 12, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DesignTokens.Palette.warning)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Preview data is active")
-                    .font(DesignTokens.Typography.captionEmphasis)
-                    .foregroundStyle(DesignTokens.Palette.text)
-                Text("Sample devices are shown for UI QA, not live Bluetooth.")
-                    .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 11)
-        .frame(height: 42)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(DesignTokens.Palette.warning.opacity(0.11))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(DesignTokens.Palette.warning.opacity(0.22), lineWidth: 0.7)
-                )
-        )
     }
 
     private var clampedLowBatteryThreshold: Int {
@@ -1076,32 +658,6 @@ struct BeaconSettingsView: View {
         Binding(
             get: { Double(clampedLowBatteryThreshold) },
             set: { lowBatteryThreshold = Int($0.rounded()) }
-        )
-    }
-
-    private func deviceThresholdBinding(for deviceID: String) -> Binding<Double> {
-        Binding(
-            get: { Double(LowBatteryNotifier.threshold(forDeviceID: deviceID)) },
-            set: { LowBatteryNotifier.setThreshold(Int($0.rounded()), forDeviceID: deviceID) }
-        )
-    }
-
-    private func deviceChargedAlertBinding(for row: DeviceInspectorItem) -> Binding<Bool> {
-        Binding(
-            get: {
-                LowBatteryNotifier.isChargedAlertEnabled(
-                    forDeviceID: row.id,
-                    displayName: row.displayName
-                )
-            },
-            set: {
-                LowBatteryNotifier.setChargedAlertEnabled(
-                    $0,
-                    forDeviceID: row.id,
-                    displayName: row.displayName
-                )
-                handleNotificationAlertPreferenceActivation($0)
-            }
         )
     }
 
@@ -1123,62 +679,172 @@ struct BeaconSettingsView: View {
         displayPreferences = preferences
         preferences.save()
     }
+}
 
-    private func reconcileSelectedDeviceSelection() {
-        let rowIDs = Set(displayedDeviceRows.map(\.id))
-        if let selectedDeviceID, rowIDs.contains(selectedDeviceID) {
-            return
+/// A device's details and its own alert overrides, presented like the ⓘ sheet
+/// in System Settings > Bluetooth.
+struct DeviceDetailSheet: View {
+    @ObservedObject var connections: BluetoothConnectionController
+    let row: DeviceInspectorItem
+    let refreshDiagnostics: BatteryRefreshDiagnostics
+    let defaultThreshold: Int
+    let lowBatteryAlertsEnabled: Bool
+    let chargedBatteryAlertsEnabled: Bool
+    let onSetPinned: (Bool) -> Void
+    let onHide: () -> Void
+    let onRestore: () -> Void
+    let onAlertPreferenceEnabled: (Bool) -> Void
+    let onOpenSoundSettings: () -> Void
+    let onOpenBluetoothSettings: () -> Void
+    let onDone: () -> Void
+
+    @State private var preferencesRevision = 0
+
+    var body: some View {
+        let _ = preferencesRevision
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: deviceSymbolName(for: row.kind, displayName: row.displayName))
+                            .font(.system(size: 26))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 40, height: 40)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.displayName)
+                                .font(.headline)
+                                .lineLimit(1)
+                            Text(DeviceBatteryPresentation(item: row.item).valueText)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
+                    if BluetoothDeviceControlSupport.normalizedAddress(from: row.id) != nil {
+                        BluetoothConnectionControls(item: row.item, controller: connections)
+                    }
+                }
+
+                DeviceStatsSections(
+                    item: row.item,
+                    historySamples: BatteryHistoryStore.samples(for: row.id)
+                )
+
+                Section {
+                    LabeledContent("Low-battery alert") {
+                        HStack(spacing: 10) {
+                            Slider(value: thresholdBinding, in: 5...50, step: 5)
+                                .labelsHidden()
+                                .frame(maxWidth: 180)
+                                .accessibilityLabel("Low-battery threshold")
+                                .accessibilityValue("\(threshold)%")
+                                .accessibilityIdentifier("settings.device.threshold")
+                            Text("\(threshold)%")
+                                .monospacedDigit()
+                                .frame(width: 40, alignment: .trailing)
+                        }
+                    }
+                    .disabled(!lowBatteryAlertsEnabled)
+                    Toggle("Notify when charged", isOn: chargedBinding)
+                        .disabled(!chargedBatteryAlertsEnabled)
+                        .accessibilityIdentifier("settings.device.charged")
+                    if hasCustomThreshold {
+                        Button("Use Default Threshold") {
+                            LowBatteryNotifier.resetThreshold(forDeviceID: row.id)
+                        }
+                        .accessibilityIdentifier("settings.device.use-default")
+                    }
+                } header: {
+                    Text("Alerts")
+                } footer: {
+                    Text(alertFooter)
+                }
+                .disabled(row.isHidden)
+
+                Section {
+                    Toggle("Pin to Top", isOn: Binding(get: { row.isPinned }, set: onSetPinned))
+                        .accessibilityIdentifier("settings.device.pin")
+                } footer: {
+                    Text("Pinned devices appear first in the menu bar while connected.")
+                }
+                .disabled(row.isHidden)
+
+                if row.kind == .airPods {
+                    AirPodsAudioControlsSection(
+                        onOpenSoundSettings: onOpenSoundSettings,
+                        onOpenBluetoothSettings: onOpenBluetoothSettings
+                    )
+                }
+
+                Section {
+                    DisclosureGroup("Refresh Diagnostics") {
+                        RefreshHealthDisclosureView(diagnostics: refreshDiagnostics)
+                    }
+                    if row.isUserHidden {
+                        Button("Restore Device", action: onRestore)
+                    } else if row.isUnavailable {
+                        LabeledContent("Visibility", value: BeaconL10n.string("Hidden until connected"))
+                    } else {
+                        Button("Hide Device", role: .destructive, action: onHide)
+                    }
+                }
+            }
+            .formStyle(.grouped)
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Done", action: onDone)
+                    .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("settings.device.done")
+            }
+            .padding(12)
         }
-        selectedDeviceID = displayedDeviceRows.first?.id
-    }
-
-    private func detailSubtitle(for row: DeviceInspectorItem) -> String {
-        DeviceBatteryPresentation(item: row.item).state.title
-    }
-
-    private func detailIconBadge(for row: DeviceInspectorItem) -> DeviceIconBadge? {
-        let state = DeviceBatteryPresentation(item: row.item).state
-        if state == .disconnected { return .disconnected }
-        return state == .current ? nil : .stale
-    }
-
-    private func detailIconColor(for row: DeviceInspectorItem) -> Color {
-        DeviceBatteryPresentation(item: row.item).state == .current
-            ? DesignTokens.Palette.accent : DesignTokens.Palette.secondaryText
-    }
-
-    private func hasBatteryReport(_ item: DeviceListItem) -> Bool {
-        switch item {
-        case .device(let decorated):
-            return decorated.snapshot.percent != nil
-        case .airPods(_, _, let components):
-            return components.contains { $0.percent != nil }
+        .frame(width: 480, height: 600)
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
+            preferencesRevision &+= 1
         }
     }
 
-    private func alertSummary(for item: DeviceListItem) -> String {
-        batteryAlertSummary(
-            threshold: LowBatteryNotifier.threshold(forDeviceID: item.id),
-            lowEnabled: lowBatteryAlertsEnabled,
-            chargedEnabled: chargedBatteryAlertsEnabled && LowBatteryNotifier.isChargedAlertEnabled(
-                forDeviceID: item.id, displayName: item.displayName
-            )
+    private var threshold: Int {
+        LowBatteryNotifier.threshold(forDeviceID: row.id)
+    }
+
+    private var hasCustomThreshold: Bool {
+        LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id)
+    }
+
+    private var thresholdBinding: Binding<Double> {
+        Binding(
+            get: { Double(threshold) },
+            set: { LowBatteryNotifier.setThreshold(Int($0.rounded()), forDeviceID: row.id) }
         )
     }
 
-    private func deviceAlertSubtitle(for row: DeviceInspectorItem) -> String {
-        guard lowBatteryAlertsEnabled else {
-            return BeaconL10n.string("Low-battery alerts are off for all devices.")
-        }
-        if LowBatteryNotifier.hasCustomThreshold(forDeviceID: row.id) {
-            return BeaconL10n.format(
-                "Custom low-battery alert at %d%%.",
-                LowBatteryNotifier.threshold(forDeviceID: row.id)
-            )
-        }
-        return BeaconL10n.format("Using the default low-battery threshold of %d%%.", clampedLowBatteryThreshold)
+    private var chargedBinding: Binding<Bool> {
+        Binding(
+            get: { LowBatteryNotifier.isChargedAlertEnabled(forDeviceID: row.id, displayName: row.displayName) },
+            set: {
+                LowBatteryNotifier.setChargedAlertEnabled($0, forDeviceID: row.id, displayName: row.displayName)
+                onAlertPreferenceEnabled($0)
+            }
+        )
     }
 
+    private var alertFooter: String {
+        if row.isHidden {
+            return BeaconL10n.string("Hidden until it reconnects and reports battery.")
+        }
+        if !lowBatteryAlertsEnabled {
+            return BeaconL10n.string("Low-battery alerts are off for all devices.")
+        }
+        if hasCustomThreshold {
+            return BeaconL10n.format("Custom low-battery alert at %d%%.", threshold)
+        }
+        return BeaconL10n.format("Using the default low-battery threshold of %d%%.", defaultThreshold)
+    }
 }
 
 func batteryAlertSummary(threshold: Int, lowEnabled: Bool, chargedEnabled: Bool) -> String {

@@ -169,6 +169,31 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
+    private func deviceDetailSheet(
+        for deviceID: String,
+        in snapshots: [DecoratedBatterySnapshot]
+    ) throws -> DeviceDetailSheet {
+        let row = try XCTUnwrap(
+            deviceInspectorItems(snapshots, preferences: DeviceDisplayPreferences()).first { $0.id == deviceID }
+        )
+        return DeviceDetailSheet(
+            connections: BluetoothConnectionController(),
+            row: row,
+            refreshDiagnostics: BatteryRefreshDiagnostics(),
+            defaultThreshold: 20,
+            lowBatteryAlertsEnabled: true,
+            chargedBatteryAlertsEnabled: true,
+            onSetPinned: { _ in },
+            onHide: {},
+            onRestore: {},
+            onAlertPreferenceEnabled: { _ in },
+            onOpenSoundSettings: {},
+            onOpenBluetoothSettings: {},
+            onDone: {}
+        )
+    }
+
+    @MainActor
     private func renderedBitmap<V: View>(
         for view: V,
         width: CGFloat,
@@ -970,7 +995,7 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(oneDevice.width, 386)
-        XCTAssertEqual(oneDevice.height, 162, "One row should not reserve empty space for extra devices")
+        XCTAssertEqual(oneDevice.height, 148, "One row should not reserve empty space for extra devices")
         XCTAssertGreaterThan(fiveDevices.height, oneDevice.height)
         XCTAssertLessThan(fiveDevices.height, 560)
     }
@@ -982,10 +1007,9 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(size.width, 386)
-        // Native widget-led chrome: 28 vertical padding + 58 header
-        // + (18 list padding + 5 * 58 rows + 4 * 8 row gaps),
-        // with settings moved into the header.
-        XCTAssertEqual(size.height, 426)
+        // 28 vertical padding + 44 header
+        // + (18 list padding + 5 * 58 rows + 4 * 8 row gaps).
+        XCTAssertEqual(size.height, 412)
     }
 
     func testStatusMenuSizingUsesHeaderOnlyHeightWhenEmpty() {
@@ -995,7 +1019,7 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(size.width, 386)
-        XCTAssertEqual(size.height, 86)
+        XCTAssertEqual(size.height, 72)
     }
 
     func testStatusWindowConfigurationLoadsDashboardPreferences() {
@@ -2819,7 +2843,7 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testBeaconSettingsWindowCanRenderAirPodsAudioControls() throws {
+    func testDeviceDetailSheetCanRenderAirPodsAudioControls() throws {
         let addr = "AA-BB-CC-DD-EE-FF"
         let now = Date()
         let snapshots: [DecoratedBatterySnapshot] = [
@@ -2838,14 +2862,9 @@ final class DeviceListPresentationTests: XCTestCase {
             AirPodsAudioPreferences.reset(for: addr)
         }
 
-        let view = BeaconSettingsView(
-            snapshots: snapshots,
-            onRefresh: {},
-            initialPane: .devices,
-            initialSelectedDeviceID: addr
-        )
+        let view = try deviceDetailSheet(for: addr, in: snapshots)
         let hostingView = NSHostingView(rootView: view)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 480, height: 600)
         hostingView.layoutSubtreeIfNeeded()
 
         let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
@@ -2859,11 +2878,11 @@ final class DeviceListPresentationTests: XCTestCase {
         XCTAssertNotNil(pngData)
 
         try pngData?.write(to: outputURL, options: .atomic)
-        XCTAssertGreaterThan((pngData ?? Data()).count, 30_000)
+        XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
     }
 
     @MainActor
-    func testBeaconSettingsWindowCanRenderInitialSelectedDevice() throws {
+    func testDeviceDetailSheetRendersDisconnectedDevice() throws {
         let snapshots: [DecoratedBatterySnapshot] = [
             makeDecorated(
                 deviceID: "bluetooth-20-C1-9B-AA-BB-CC",
@@ -2875,14 +2894,9 @@ final class DeviceListPresentationTests: XCTestCase {
             makeDecorated(deviceID: "watch", displayName: "Apple Watch", kind: .appleWatch, percent: 18),
         ]
 
-        let view = BeaconSettingsView(
-            snapshots: snapshots,
-            onRefresh: {},
-            initialPane: .devices,
-            initialSelectedDeviceID: "bluetooth-20-C1-9B-AA-BB-CC"
-        )
+        let view = try deviceDetailSheet(for: "bluetooth-20-C1-9B-AA-BB-CC", in: snapshots)
         let hostingView = NSHostingView(rootView: view)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 480, height: 600)
         hostingView.layoutSubtreeIfNeeded()
 
         let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
@@ -2975,8 +2989,8 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testDevicesAndAlertsSettingsSelectorColumnUsesSurfacedPanel() throws {
-        withAppearanceTheme(.light) {
+    func testDevicesAndAlertsPanesRenderGroupedFormContent() throws {
+        try withAppearanceTheme(.light) {
             let snapshots: [DecoratedBatterySnapshot] = [
                 makeDecorated(deviceID: "keyboard", displayName: "Magic Keyboard", kind: .keyboard, percent: 82),
                 makeDecorated(deviceID: "mouse", displayName: "Magic Mouse", kind: .mouse, percent: 31),
@@ -2984,58 +2998,26 @@ final class DeviceListPresentationTests: XCTestCase {
             ]
 
             for pane in [SettingsPane.devices, .alerts] {
-                let view = BeaconSettingsView(
-                    snapshots: snapshots,
-                    notificationAuthorizationState: .authorized,
-                    onRefresh: {},
-                    initialPane: pane,
-                    initialSelectedDeviceID: "keyboard"
+                let (hostingView, bitmap) = try renderedBitmap(
+                    for: BeaconSettingsView(
+                        snapshots: snapshots,
+                        notificationAuthorizationState: .authorized,
+                        onRefresh: {},
+                        initialPane: pane
+                    ),
+                    width: 900,
+                    height: 620
                 )
-                let hostingView = NSHostingView(rootView: view)
-                hostingView.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
-                hostingView.layoutSubtreeIfNeeded()
-
-                let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
-                XCTAssertNotNil(bitmap)
-
-                guard let bitmap else { return }
-                hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
                 let scale = backingScale(for: bitmap, in: hostingView)
-
-                // Golden-layout guard for the 900x620 Settings render: these point ranges cover
-                // the Devices/Alerts selector card, its former Divider strip, and the detail pane.
-                let selectorColors = stride(from: 215, to: 485, by: 12).flatMap { x in
-                    stride(from: 94, to: 530, by: 12).compactMap { y in
-                        bitmap.colorAt(
-                            x: pixelCoordinate(x, backingScale: scale),
-                            y: pixelCoordinate(y, backingScale: scale)
-                        )?.usingColorSpace(.deviceRGB)
-                    }
-                }
-                let selectorEdgeColors = stride(from: 468, to: 486, by: 3).flatMap { x in
-                    stride(from: 94, to: 530, by: 12).compactMap { y in
-                        bitmap.colorAt(
-                            x: pixelCoordinate(x, backingScale: scale),
-                            y: pixelCoordinate(y, backingScale: scale)
-                        )?.usingColorSpace(.deviceRGB)
-                    }
-                }
-                let detailColors = stride(from: 510, to: 870, by: 16).flatMap { x in
-                    stride(from: 94, to: 530, by: 16).compactMap { y in
-                        bitmap.colorAt(
-                            x: pixelCoordinate(x, backingScale: scale),
-                            y: pixelCoordinate(y, backingScale: scale)
-                        )?.usingColorSpace(.deviceRGB)
-                    }
-                }
-
-                let visibleSelectorColors = selectorColors.filter { $0.alphaComponent > 0.05 }
-                let uniqueSelectorEdgeColors = Set(selectorEdgeColors.map(roundedRGBAComponents))
-                let uniqueDetailColors = Set(detailColors.map(roundedRGBAComponents))
-
-                XCTAssertGreaterThan(visibleSelectorColors.count, 120)
-                XCTAssertGreaterThan(uniqueSelectorEdgeColors.count, 1)
-                XCTAssertGreaterThan(uniqueDetailColors.count, 12)
+                // The first grouped section sits just under the 52 pt header.
+                let sectionColors = sampledColors(
+                    in: bitmap,
+                    xValues: stride(from: 230, to: 880, by: 6),
+                    yValues: stride(from: 70, to: 200, by: 4),
+                    backingScale: scale
+                )
+                let unique = Set(sectionColors.filter { $0.alphaComponent > 0.05 }.map(roundedRGBAComponents))
+                XCTAssertGreaterThan(unique.count, 12, "Expected rendered rows in the \(pane.title) form.")
             }
         }
     }

@@ -35,6 +35,7 @@ struct StatusWindowConfiguration: Equatable {
 
 enum StatusMenuSizing {
     static let width: CGFloat = 386
+    static let headerHeight: CGFloat = 44
     static let contentMaxHeight: CGFloat = 620
 
     static func preferredContentSize(
@@ -43,7 +44,6 @@ enum StatusMenuSizing {
         supplementalHeight: CGFloat = 0
     ) -> CGSize {
         let panelVerticalPadding: CGFloat = 28
-        let headerHeight: CGFloat = 58
         let rowHeight: CGFloat = 58
         let rowSpacing: CGFloat = dashboardItemCount > 1 ? CGFloat(dashboardItemCount - 1) * 8 : 0
         let listVerticalPadding: CGFloat = dashboardItemCount == 0 ? 0 : 18
@@ -116,10 +116,6 @@ struct StatusMenuView: View {
         VStack(spacing: 0) {
             nativeHeader
 
-            if isPreviewingData {
-                nativePreviewNotice
-            }
-
             let recovery = DeviceSetupRecoveryState.resolve(
                 visibleCount: visibleItemCount, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
             )
@@ -151,25 +147,28 @@ struct StatusMenuView: View {
         .frame(width: statusWindowWidth)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("status.menu")
-        .beaconPopoverSurface(cornerRadius: NativeMacStyle.popoverCornerRadius, theme: theme)
+        .beaconPopoverSurface(cornerRadius: NativeMacStyle.popoverCornerRadius)
         .preferredColorScheme(appearanceTheme.colorSchemeOverride)
     }
 
     private var nativeHeader: some View {
-        HStack(alignment: .center, spacing: 12) {
-            BeaconLogoMark(size: 34)
+        HStack(alignment: .center, spacing: 8) {
+            Text("Beacon")
+                .font(.headline)
+                .foregroundStyle(theme.textPrimary)
+                .lineLimit(1)
+                .help(nativeHeaderSubtitle)
+                .accessibilityValue(Text(nativeHeaderSubtitle))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Beacon")
-                    .font(DesignTokens.Typography.nativePopoverTitle)
-                    .foregroundStyle(theme.textPrimary)
-                    .lineLimit(1)
-
-                Text(nativeHeaderSubtitle)
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(theme.textTertiary)
-                    .lineLimit(1)
-                    .monospacedDigit()
+            if isPreviewingData {
+                Text("Preview")
+                    .font(DesignTokens.Typography.caption2Emphasis)
+                    .foregroundStyle(theme.textSecondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule(style: .continuous).fill(theme.hover))
+                    .help("Sample devices, not live Bluetooth.")
+                    .accessibilityIdentifier("status.preview-badge")
             }
 
             Spacer()
@@ -178,12 +177,11 @@ struct StatusMenuView: View {
                 theme: theme,
                 onOpenSettings: { onOpenSettings(.devices, nil) },
                 onRefresh: onRefresh,
-                onQuit: { NSApp.terminate(nil) },
                 isRefreshing: isRefreshing
             )
         }
         .padding(.horizontal, 16)
-        .frame(height: 58)
+        .frame(height: StatusMenuSizing.headerHeight)
     }
 
     private var nativeHeaderSubtitle: String {
@@ -201,26 +199,6 @@ struct StatusMenuView: View {
 
     private var theme: BeaconThemePalette {
         appearanceTheme.palette(resolvedSystemScheme: colorScheme)
-    }
-
-    private var nativePreviewNotice: some View {
-        HStack(spacing: 8) {
-            Image(systemName: resolveSymbol("eye", fallback: "info.circle"))
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(theme.statusLow)
-
-            Text("Preview data")
-                .font(DesignTokens.Typography.captionEmphasis)
-                .foregroundStyle(theme.textPrimary)
-
-            Text("Sample devices, not live Bluetooth.")
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(theme.textMuted)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 34)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var nativeDeviceList: some View {
@@ -323,11 +301,7 @@ struct StatusMenuView: View {
 
     private func handleDeviceContextAction(_ action: DeviceContextMenuAction, item: DeviceListItem) {
         switch action {
-        case .batteryAlerts:
-            onOpenSettings(.alerts, item.id)
-        case .audioControls:
-            onOpenSettings(.devices, item.id)
-        case .options:
+        case .batteryAlerts, .audioControls, .options:
             onOpenSettings(.devices, item.id)
         case .refresh:
             onRefresh()
