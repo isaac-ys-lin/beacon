@@ -1002,7 +1002,7 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(oneDevice.width, 386)
-        XCTAssertEqual(oneDevice.height, 142, "One row should not reserve empty space for extra devices")
+        XCTAssertEqual(oneDevice.height, 128, "One row should not reserve empty space for extra devices")
         XCTAssertGreaterThan(fiveDevices.height, oneDevice.height)
         XCTAssertLessThan(fiveDevices.height, 560)
     }
@@ -1014,9 +1014,9 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(size.width, 386)
-        // 28 vertical padding + 44 header
-        // + (18 list padding + 5 * 52 rows + 4 * 8 row gaps).
-        XCTAssertEqual(size.height, 382)
+        // 42 header + 1 separator + 34 settings row + 6 bottom inset
+        // + (1 separator + 12 list padding + 5 * 32 rows), as in the system menu.
+        XCTAssertEqual(size.height, 256)
     }
 
     func testStatusMenuSizingUsesHeaderOnlyHeightWhenEmpty() {
@@ -1026,7 +1026,7 @@ final class DeviceListPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(size.width, 386)
-        XCTAssertEqual(size.height, 72)
+        XCTAssertEqual(size.height, 83)
     }
 
     func testStatusWindowConfigurationLoadsDashboardPreferences() {
@@ -1262,7 +1262,8 @@ final class DeviceListPresentationTests: XCTestCase {
 
     func testStatusMenuSizingCapsToVisibleScreenHeight() {
         let size = StatusMenuSizing.preferredContentSize(
-            dashboardItemCount: 12,
+            // 32pt rows: 25 devices (896pt) overflow a 720pt screen.
+            dashboardItemCount: 25,
             visibleScreenHeight: 720
         )
 
@@ -2785,7 +2786,11 @@ final class DeviceListPresentationTests: XCTestCase {
             onRefresh: {}
         )
         let hostingView = NSHostingView(rootView: view)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 386, height: 370)
+        let size = StatusMenuSizing.preferredContentSize(
+            dashboardItemCount: snapshots.count,
+            visibleScreenHeight: 1_000
+        )
+        hostingView.frame = NSRect(origin: .zero, size: size)
         hostingView.layoutSubtreeIfNeeded()
 
         let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)

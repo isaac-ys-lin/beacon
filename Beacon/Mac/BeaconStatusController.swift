@@ -351,9 +351,12 @@ final class BeaconStatusController: NSObject {
             visibleScreenHeight: screenHeight,
             supplementalHeight: (DeviceSetupRecoveryState.resolve(
                 visibleCount: allItems.count, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
-            ) == .ready ? 0 : 230) + (model.isUsingPreviewData ? 34 : 0)
+            ) == .ready ? 0 : 230)
                 + (refreshDiagnostics.attempts.contains { $0.status != .reported && $0.status != .noReport } ? 38 : 0)
-                + (primaryItems.count < allItems.count ? (visibleItems.isEmpty ? 62 : 42) : 0)
+                + (primaryItems.count < allItems.count
+                    ? StatusMenuSizing.rowHeight + (visibleItems.isEmpty
+                        ? StatusMenuSizing.separatorHeight + StatusMenuSizing.listVerticalPadding * 2 : 0)
+                    : 0)
                 + visibleItems.reduce(CGFloat.zero) { height, item in
                     let operation = model.connections.operation(for: item.id)
                     guard model.connections.device(for: item.id) != nil || operation != nil else { return height }

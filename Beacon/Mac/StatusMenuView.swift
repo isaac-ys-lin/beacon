@@ -33,9 +33,16 @@ struct StatusWindowConfiguration: Equatable {
     }
 }
 
+/// Metrics of the system Bluetooth menu (measured from a macOS 26 capture):
+/// 32pt rows, a bold title row, inset separators and a "… Settings" footer row.
 enum StatusMenuSizing {
     static let width: CGFloat = 386
-    static let headerHeight: CGFloat = 44
+    static let headerHeight: CGFloat = 42
+    static let rowHeight: CGFloat = 32
+    static let listVerticalPadding: CGFloat = 6
+    static let footerHeight: CGFloat = 34
+    static let bottomPadding: CGFloat = 6
+    static let separatorHeight: CGFloat = 1
     static let contentMaxHeight: CGFloat = 620
 
     static func preferredContentSize(
@@ -43,20 +50,15 @@ enum StatusMenuSizing {
         visibleScreenHeight: CGFloat,
         supplementalHeight: CGFloat = 0
     ) -> CGSize {
-        let panelVerticalPadding: CGFloat = 28
-        let rowHeight: CGFloat = 52
-        let rowSpacing: CGFloat = dashboardItemCount > 1 ? CGFloat(dashboardItemCount - 1) * 8 : 0
-        let listVerticalPadding: CGFloat = dashboardItemCount == 0 ? 0 : 18
-        let emptyHeight: CGFloat = 0
-        let contentHeight = dashboardItemCount == 0
-            ? emptyHeight
-            : listVerticalPadding + CGFloat(dashboardItemCount) * rowHeight + rowSpacing
-        let desiredHeight = panelVerticalPadding
-            + headerHeight
-            + contentHeight + supplementalHeight
-        let minimumHeight = panelVerticalPadding + headerHeight
+        // Header, separator, footer row and bottom inset are always present;
+        // the device list adds its own separator, padding and rows.
+        let chrome = headerHeight + separatorHeight + footerHeight + bottomPadding
+        let list = dashboardItemCount == 0
+            ? 0
+            : separatorHeight + listVerticalPadding * 2 + CGFloat(dashboardItemCount) * rowHeight
+        let desiredHeight = chrome + list + supplementalHeight
         let screenCappedHeight = max(240, visibleScreenHeight - 46)
-        return CGSize(width: width, height: min(max(desiredHeight, minimumHeight), screenCappedHeight))
+        return CGSize(width: width, height: min(desiredHeight, screenCappedHeight))
     }
 }
 
@@ -138,12 +140,14 @@ struct StatusMenuView: View {
                 .padding(.horizontal, 14).padding(.vertical, 8)
             }
             if !sections.isEmpty {
+                menuSeparator
                 nativeDeviceList
             }
 
+            menuSeparator
+            settingsFooter
         }
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .padding(.bottom, StatusMenuSizing.bottomPadding)
         .frame(width: statusWindowWidth)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("status.menu")
@@ -178,13 +182,40 @@ struct StatusMenuView: View {
 
             BeaconHeaderControls(
                 theme: theme,
-                onOpenSettings: { onOpenSettings(.devices, nil) },
+                onOpenSettings: nil,
                 onRefresh: onRefresh,
                 isRefreshing: isRefreshing
             )
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
         .frame(height: StatusMenuSizing.headerHeight)
+    }
+
+    /// Inset hairline between menu groups, as in the system menus.
+    private var menuSeparator: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor))
+            .frame(height: StatusMenuSizing.separatorHeight)
+            .padding(.horizontal, 14)
+    }
+
+    /// "Bluetooth Settings…" in the system menu; here it opens Beacon's settings.
+    private var settingsFooter: some View {
+        Button { onOpenSettings(.devices, nil) } label: {
+            Text("Beacon Settings…")
+                .font(.body)
+                .foregroundStyle(theme.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 9)
+                .frame(height: StatusMenuSizing.footerHeight - 6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(MenuItemButtonStyle(theme: theme))
+        .padding(.horizontal, 5)
+        .padding(.top, 6)
+        .accessibilityLabel("Open Beacon Settings")
+        .help("Open Beacon Settings")
     }
 
     private var nativeHeaderSubtitle: String {
@@ -206,29 +237,34 @@ struct StatusMenuView: View {
 
     private var nativeDeviceList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
                 deviceRows(primaryItems)
                 if !otherItems.isEmpty {
                     Button(action: onToggleOtherDevices) {
-                        HStack {
-                            Image(systemName: otherDevicesExpanded ? "chevron.down" : "chevron.right")
-                                .accessibilityHidden(true)
+                        HStack(spacing: 6) {
                             Text("Other devices")
+                                .foregroundStyle(theme.textPrimary)
                             Spacer()
-                            Text("\(otherItems.count)").foregroundStyle(.secondary)
+                            Text("\(otherItems.count)").foregroundStyle(theme.textMuted)
+                            Image(systemName: otherDevicesExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(theme.textMuted)
+                                .accessibilityHidden(true)
                         }
+                        .font(.body)
+                        .padding(.horizontal, 9)
+                        .frame(height: StatusMenuSizing.rowHeight)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(MenuItemButtonStyle(theme: theme))
                     .accessibilityIdentifier("status.other-devices")
                     .accessibilityLabel(Text(BeaconL10n.format("Other devices, %d", otherItems.count)))
                     .accessibilityValue(Text(otherDevicesExpanded ? "Expanded" : "Collapsed"))
-                    .padding(10)
+                    .padding(.horizontal, 5)
                     if otherDevicesExpanded { deviceRows(otherItems) }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.vertical, StatusMenuSizing.listVerticalPadding)
         }
         .frame(maxHeight: contentMaxHeight)
     }
@@ -240,11 +276,7 @@ struct StatusMenuView: View {
                     item: item,
                     isPinned: displayPreferences.isPinned(item)
                 ),
-                lowBatteryThreshold: clampedLowBatteryThreshold,
-                iconSize: 30,
-                horizontalPadding: 10,
-                verticalPadding: 10,
-                statusWidth: 68
+                lowBatteryThreshold: clampedLowBatteryThreshold
             )
             .contextMenu {
                 deviceContextMenu(for: item, displayName: item.displayName)
@@ -259,7 +291,7 @@ struct StatusMenuView: View {
             .help(item.displayName)
             if connections.device(for: item.id) != nil || connections.operation(for: item.id) != nil {
                 BluetoothConnectionControls(item: item, controller: connections, compact: true)
-                    .padding(.horizontal, 10).padding(.bottom, 8)
+                    .padding(.leading, 50).padding(.trailing, 14).padding(.bottom, 8)
             }
         }
     }
@@ -428,12 +460,15 @@ struct StatusWindowPreview: View {
                 }
             }
 
-            VStack(spacing: 4) {
+            VStack(spacing: 0) {
                 previewHeader
-
+                previewSeparator
                 ForEach(0..<rowCount, id: \.self) { index in
                     previewRow(previewDevice(for: index))
                 }
+                .padding(.vertical, 3)
+                previewSeparator
+                previewFooter
             }
         }
         .padding(10)
@@ -466,34 +501,42 @@ struct StatusWindowPreview: View {
         )
     }
 
+    /// The panel's own anatomy: title row, separator, device rows, separator,
+    /// settings row.
     private var previewHeader: some View {
         HStack(spacing: 8) {
-            BeaconLogoMark(size: 24)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Batteries")
-                    .font(DesignTokens.Typography.nativePopoverRowTitle)
-                    .foregroundStyle(DesignTokens.Palette.text)
-                Text("Updated now")
-                    .font(DesignTokens.Typography.caption2)
-                    .foregroundStyle(DesignTokens.Palette.secondaryText)
-            }
-
+            Text("Beacon")
+                .font(.headline)
+                .foregroundStyle(previewTheme.textPrimary)
             Spacer(minLength: 0)
-
             BeaconHeaderControls(
                 theme: previewTheme,
-                onOpenSettings: {},
+                onOpenSettings: nil,
                 onRefresh: {},
-                onQuit: {},
-                frameSize: 20,
-                settingsGlyphSize: 11,
-                refreshGlyphSize: 11,
-                spacing: 4
+                frameSize: 22,
+                refreshGlyphSize: 11
             )
             .allowsHitTesting(false)
         }
-        .frame(height: 38)
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .frame(height: 36)
+    }
+
+    private var previewSeparator: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor))
+            .frame(height: 1)
+            .padding(.horizontal, 14)
+    }
+
+    private var previewFooter: some View {
+        Text("Beacon Settings…")
+            .font(.body)
+            .foregroundStyle(previewTheme.textPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .frame(height: 30)
     }
 
     private var previewTheme: BeaconThemePalette {
@@ -502,14 +545,7 @@ struct StatusWindowPreview: View {
     }
 
     private func previewRow(_ device: DashboardBatteryDevice) -> some View {
-        DashboardBatteryDeviceRow(
-            device: device,
-            lowBatteryThreshold: 20,
-            iconSize: 22,
-            horizontalPadding: 8,
-            verticalPadding: 7,
-            statusWidth: 48
-        )
+        DashboardBatteryDeviceRow(device: device, lowBatteryThreshold: 20)
     }
 
     private func previewDevice(for index: Int) -> DashboardBatteryDevice {

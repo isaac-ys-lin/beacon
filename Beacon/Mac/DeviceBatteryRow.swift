@@ -120,7 +120,8 @@ struct BeaconUtilityIconButtonStyle: ButtonStyle {
 
 struct BeaconHeaderControls: View {
     let theme: BeaconThemePalette
-    let onOpenSettings: () -> Void
+    /// Nil hides the gear: the menu panel opens settings from its footer row.
+    let onOpenSettings: (() -> Void)?
     var onRefresh: (() -> Void)?
     var onQuit: (() -> Void)?
     var isRefreshing = false
@@ -146,6 +147,7 @@ struct BeaconHeaderControls: View {
                 .help(isRefreshing ? "Refreshing Batteries" : "Refresh Batteries")
             }
 
+            if let onOpenSettings {
             Button(action: onOpenSettings) {
                 BeaconHeaderSettingsIcon(
                     color: theme.textPrimary,
@@ -156,6 +158,7 @@ struct BeaconHeaderControls: View {
             .buttonStyle(BeaconUtilityIconButtonStyle(theme: theme))
             .accessibilityLabel("Open Beacon Settings")
             .help("Open Beacon Settings")
+            }
 
             if let onQuit {
                 Button(action: onQuit) {
@@ -234,75 +237,51 @@ private func airPodsDeviceSymbolName(for name: String) -> String {
     return "airpods"
 }
 
-enum DeviceIconBadge: Equatable {
-    case connected
-    case charging
-    case low
-    case stale
-    case disconnected
+/// The battery glyph the system Bluetooth menu shows beside a percentage.
+struct BatteryLevelGlyph: View {
+    let percent: Int
+    var isCharging = false
+    let color: Color
 
-    var symbolName: String {
-        switch self {
-        case .connected: return "checkmark.circle.fill"
-        case .charging: return "bolt.circle.fill"
-        case .low: return "exclamationmark.circle.fill"
-        case .stale: return "clock.badge.exclamationmark"
-        case .disconnected: return "xmark.circle.fill"
-        }
+    var body: some View {
+        Image(systemName: resolveSymbol(symbolName, fallback: "battery.100"))
+            .font(.system(size: 15, weight: .regular))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(color)
+            .accessibilityHidden(true)
     }
 
-    func color(in theme: BeaconThemePalette) -> Color {
-        switch self {
-        case .connected: return theme.statusOK
-        case .charging: return theme.statusOK
-        case .low: return theme.statusLow
-        case .stale: return DesignTokens.Palette.stale
-        case .disconnected: return theme.statusOffline
+    private var symbolName: String {
+        if isCharging { return "battery.100percent.bolt" }
+        switch percent {
+        case ..<13: return "battery.0percent"
+        case ..<38: return "battery.25percent"
+        case ..<63: return "battery.50percent"
+        case ..<88: return "battery.75percent"
+        default: return "battery.100percent"
         }
     }
 }
 
+/// The round device icon of the system Bluetooth menu: a white disc with an
+/// accent glyph while the device reports, a faint gray disc otherwise.
 struct DeviceIconPlate: View {
     let symbolName: String
-    let color: Color
-    var size: CGFloat = 34
-    var badge: DeviceIconBadge?
+    var isActive = true
+    var size: CGFloat = 26
     @AppStorage(BeaconAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
-
-    init(
-        symbolName: String,
-        color: Color,
-        size: CGFloat = 34,
-        badge: DeviceIconBadge? = nil
-    ) {
-        self.symbolName = symbolName
-        self.color = color
-        self.size = size
-        self.badge = badge
-    }
 
     var body: some View {
         ZStack {
             Circle()
-                .fill(theme.active)
+                .fill(isActive ? Color.white : theme.active)
 
             Image(systemName: symbolName)
-                .font(.system(size: max(12, size * 0.54), weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(color)
+                .font(.system(size: max(11, size * 0.46), weight: .medium))
+                .foregroundStyle(isActive ? Color.accentColor : theme.textMuted)
                 .frame(width: size * 0.72, height: size * 0.72)
                 .accessibilityHidden(true)
-
-            if let badge {
-                Image(systemName: resolveSymbol(badge.symbolName, fallback: "circle.fill"))
-                    .font(.system(size: max(9, size * 0.27), weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(badge.color(in: theme))
-                    .frame(width: max(13, size * 0.36), height: max(13, size * 0.36))
-                    .offset(x: size * 0.31, y: -size * 0.31)
-                    .accessibilityHidden(true)
-            }
         }
         .frame(width: size, height: size)
     }
@@ -459,118 +438,84 @@ func dashboardBatteryStatusText(
     return BeaconL10n.string("Battery")
 }
 
-struct DashboardBatteryProgressBar: View {
-    let percent: Int
-    let color: Color
-    var height: CGFloat = 5
-    @AppStorage(BeaconAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var ratio: CGFloat {
-        CGFloat(max(0, min(100, percent))) / 100
-    }
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule(style: .continuous)
-                    .fill(theme.active)
-                Capsule(style: .continuous)
-                    .fill(color)
-                    .frame(width: max(height, proxy.size.width * ratio))
-            }
-        }
-        .frame(height: height)
-        .accessibilityLabel("\(percent)%")
-    }
-
-    private var theme: BeaconThemePalette {
-        BeaconAppearanceTheme.resolved(rawValue: appearanceThemeRawValue)
-            .palette(resolvedSystemScheme: colorScheme)
-    }
-}
-
 struct DashboardBatteryDeviceRow: View {
     let device: DashboardBatteryDevice
     var lowBatteryThreshold = LowBatteryNotifier.threshold
-    var iconSize: CGFloat = 30
-    var horizontalPadding: CGFloat = 9
-    var verticalPadding: CGFloat = 9
-    var statusWidth: CGFloat = 58
+    var iconSize: CGFloat = 26
+    var horizontalPadding: CGFloat = 14
+    var verticalPadding: CGFloat = 3
     @AppStorage(BeaconAppearanceTheme.defaultsKey) private var appearanceThemeRawValue = BeaconAppearanceTheme.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        // Same anatomy as a row in the system Bluetooth menu: icon, name,
+        // then the battery on the trailing edge. The name may truncate; the
+        // battery never does.
         HStack(spacing: 10) {
             DeviceIconPlate(
                 symbolName: deviceSymbolName(for: device.kind, displayName: device.displayName),
-                color: iconColor,
-                size: iconSize,
-                badge: iconBadge
+                isActive: device.reportState == .current,
+                size: iconSize
             )
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 8) {
-                    Text(device.displayName)
-                        .font(.callout)
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+            HStack(spacing: 4) {
+                Text(device.displayName)
+                    .font(.body)
+                    .foregroundStyle(device.reportState == .current ? theme.textPrimary : theme.textMuted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
-                    if device.isPinned {
-                        Image(systemName: resolveSymbol("pin.fill", fallback: "pin"))
-                            .font(.system(size: 8, weight: .bold))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(theme.textMuted)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    if let percent = device.percent {
-                        Text("\(percent)%")
-                            .font(.callout)
-                            .monospacedDigit()
-                            .foregroundStyle(statusColor)
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    if showsAirPodsComponents {
-                        HStack(spacing: 6) {
-                            ForEach(device.airPodsComponents, id: \.slot.rawValue) { component in
-                                AirPodsDashboardComponentChip(component: component)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    } else if let percent = device.percent {
-                        DashboardBatteryProgressBar(percent: percent, color: statusColor)
-                    } else {
-                        Capsule(style: .continuous)
-                            .fill(theme.active)
-                            .frame(height: 5)
-                    }
-
-                    // A current report needs no label; only exceptions are spelled out.
-                    if device.reportState != .current {
-                        Text(statusText)
-                            .font(DesignTokens.Typography.caption2)
-                            .foregroundStyle(statusTextColor)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(width: statusWidth, alignment: .trailing)
-                    }
+                if device.isPinned {
+                    Image(systemName: resolveSymbol("pin.fill", fallback: "pin"))
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(theme.textTertiary)
                 }
             }
+
+            Spacer(minLength: 8)
+
+            trailingBattery
+                .fixedSize()
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
-        // No row background any more, so the whole row must stay hit-testable
+        // The row has no background, so the whole row must stay hit-testable
         // for the context menu.
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(device.displayName)
         .accessibilityValue(accessibilityValue)
         .accessibilityIdentifier("device.row.\(device.id)")
+    }
+
+    @ViewBuilder
+    private var trailingBattery: some View {
+        if showsAirPodsComponents {
+            HStack(spacing: 10) {
+                ForEach(device.airPodsComponents, id: \.slot.rawValue) { component in
+                    AirPodsDashboardComponentChip(component: component)
+                }
+            }
+        } else if device.reportState == .current, let percent = device.percent {
+            HStack(spacing: 5) {
+                Text("\(percent)%")
+                    .font(.body)
+                    .monospacedDigit()
+                    .foregroundStyle(isLow ? statusColor : theme.textMuted)
+                BatteryLevelGlyph(
+                    percent: percent,
+                    isCharging: device.chargeState == .charging || device.chargeState == .full,
+                    color: statusColor
+                )
+            }
+        } else {
+            // Only exceptions are spelled out, as the system menu greys a
+            // device that is not connected.
+            Text(device.percent.map { "\($0)% · \(statusText)" } ?? statusText)
+                .font(.callout)
+                .monospacedDigit()
+                .foregroundStyle(theme.textTertiary)
+        }
     }
 
     private var isLow: Bool {
@@ -584,8 +529,10 @@ struct DashboardBatteryDeviceRow: View {
         device.kind == .airPods && device.airPodsComponents.count > 1
     }
 
+    /// Neutral unless the battery says something: green charging, orange low,
+    /// red critical.
     private var statusColor: Color {
-        guard device.reportState == .current else { return DesignTokens.Palette.secondaryText }
+        guard device.reportState == .current else { return theme.textTertiary }
         if isLow {
             guard let percent = device.percent else { return theme.statusLow }
             return percent <= 10 ? theme.statusCritical : theme.statusLow
@@ -593,46 +540,7 @@ struct DashboardBatteryDeviceRow: View {
         if device.chargeState == .charging || device.chargeState == .full {
             return theme.statusOK
         }
-        if device.freshness != .fresh { return DesignTokens.Palette.stale }
-        // Like the system Bluetooth menu: a healthy battery is not news, so it
-        // stays neutral. Color is kept for charging, low and critical.
         return theme.textMuted
-    }
-
-    /// A current, fresh, not-low, not-charging report: nothing to call out.
-    private var isUnremarkable: Bool {
-        device.reportState == .current && !isLow
-            && device.chargeState != .charging && device.chargeState != .full
-            && device.freshness == .fresh
-    }
-
-    private var statusTextColor: Color {
-        guard device.reportState == .current else { return DesignTokens.Palette.secondaryText }
-        switch (isLow, device.chargeState, device.freshness) {
-        case (true, _, _):
-            return statusColor
-        case (_, .charging, _), (_, .full, _):
-            return theme.statusOK
-        case (_, _, .stale), (_, _, .expired):
-            return DesignTokens.Palette.stale
-        default:
-            return theme.textMuted
-        }
-    }
-
-    private var iconColor: Color {
-        isUnremarkable ? theme.textPrimary : statusColor
-    }
-
-    private var iconBadge: DeviceIconBadge? {
-        if device.reportState == .disconnected { return .disconnected }
-        if device.reportState != .current { return .stale }
-        if isLow { return .low }
-        if device.chargeState == .charging || device.chargeState == .full {
-            return .charging
-        }
-        if device.freshness != .fresh { return .stale }
-        return nil
     }
 
     private var statusText: String {
@@ -724,22 +632,16 @@ private struct AirPodsDashboardComponentChip: View {
     var body: some View {
         HStack(spacing: 3) {
             Text(slotLabel)
-                .font(DesignTokens.Typography.caption2)
+                .font(.callout)
                 .foregroundStyle(theme.textTertiary)
                 .lineLimit(1)
 
             Text(percentText)
-                .font(DesignTokens.Typography.caption2)
+                .font(.callout)
                 .monospacedDigit()
                 .foregroundStyle(chipColor)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 5)
-        .frame(height: 19)
-        .background(
-            Capsule(style: .continuous)
-                .fill(theme.hover)
-        )
         .accessibilityLabel(accessibilityLabel)
         .help(airPodsComponentAccessibilityDescription(component))
     }
@@ -786,6 +688,31 @@ private struct AirPodsDashboardComponentChip: View {
             return BeaconL10n.format("Left AirPod %@", percentText)
         case .right:
             return BeaconL10n.format("Right AirPod %@", percentText)
+        }
+    }
+}
+
+/// A menu item's hover highlight: a rounded fill the width of the menu, as in
+/// the system menus. Only for rows that act on click.
+struct MenuItemButtonStyle: ButtonStyle {
+    let theme: BeaconThemePalette
+
+    func makeBody(configuration: Configuration) -> some View {
+        MenuItemBody(configuration: configuration, theme: theme)
+    }
+
+    private struct MenuItemBody: View {
+        let configuration: ButtonStyle.Configuration
+        let theme: BeaconThemePalette
+        @State private var isHovering = false
+
+        var body: some View {
+            configuration.label
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(configuration.isPressed ? theme.active : (isHovering ? theme.hover : Color.clear))
+                )
+                .onHover { isHovering = $0 }
         }
     }
 }
