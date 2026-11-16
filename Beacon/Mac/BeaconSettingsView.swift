@@ -298,6 +298,9 @@ struct BeaconSettingsView: View {
             case .dashboard: dashboardTab.padding(18)
             }
         }
+        // Forms show the window background, so the title strip and content
+        // read as one surface in both appearances.
+        .scrollContentBackground(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
