@@ -1236,6 +1236,40 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testStatusMenuPanelHugsContentInsteadOfEstimatedHeight() {
+        let now = Date()
+        let timedOut = BatteryProviderAttempt(
+            provider: .coreBluetoothBatteryService, status: .timedOut,
+            candidateCount: 0, message: "", attemptedAt: now
+        )
+        let devices = (0..<5).map {
+            makeDecorated(deviceID: "d\($0)", displayName: "Device \($0)", kind: .keyboard, percent: 50, updatedAt: now)
+        }
+        let cases: [(String, StatusMenuView)] = [
+            ("checking", StatusMenuView(snapshots: [], isRefreshing: true, onRefresh: {})),
+            ("failed", StatusMenuView(
+                snapshots: [], refreshDiagnostics: BatteryRefreshDiagnostics(attempts: [timedOut]), onRefresh: {}
+            )),
+            ("problems", StatusMenuView(
+                snapshots: devices, refreshDiagnostics: BatteryRefreshDiagnostics(attempts: [timedOut]), onRefresh: {}
+            )),
+        ]
+        for (name, view) in cases {
+            let size = StatusMenuPanelController.fittedContentSize(
+                for: view, proposed: NSSize(width: 386, height: 600), visibleScreenHeight: 1_000
+            )
+            XCTAssertEqual(size.height, ceil(NSHostingView(rootView: view).fittingSize.height), name)
+            XCTAssertLessThan(size.height, 600, name)
+        }
+
+        let capped = StatusMenuPanelController.fittedContentSize(
+            for: StatusMenuView(snapshots: devices, onRefresh: {}),
+            proposed: NSSize(width: 386, height: 600), visibleScreenHeight: 200
+        )
+        XCTAssertEqual(capped.height, 240)
+    }
+
+    @MainActor
     func testStatusMenuPanelUsesRoundedContentMaskInsteadOfRectangularShadow() {
         let coordinator = StatusMenuPanelController()
         coordinator.install(
@@ -2692,6 +2726,45 @@ final class DeviceListPresentationTests: XCTestCase {
 
         try pngData?.write(to: outputURL, options: .atomic)
         XCTAssertGreaterThan((pngData ?? Data()).count, 20_000)
+    }
+
+    @MainActor
+    func testStatusMenuViewRowStatesRenderInLightDarkAndChinese() throws {
+        let addr = "11-22-33-44-55-66"
+        let now = Date()
+        let longName = "Yi-Ting's AirPods Pro - Find My Edition"
+        let snapshots: [DecoratedBatterySnapshot] = [
+            makeDecorated(deviceID: "keyboard", displayName: "Keychron K3 Max", kind: .keyboard, percent: 74, updatedAt: now),
+            makeDecorated(deviceID: "mouse", displayName: "MX Master 3S B", kind: .mouse, percent: 8, updatedAt: now),
+            makeDecorated(deviceID: "trackpad", displayName: "Magic Trackpad", kind: .trackpad, percent: 100, chargeState: .full, updatedAt: now),
+            makeDecorated(deviceID: "stale", displayName: "Keychron BM24", kind: .mouse, percent: 55, freshness: .stale, updatedAt: now.addingTimeInterval(-7_200)),
+            makeDecorated(deviceID: "away", displayName: "Keychron J9", kind: .keyboard, percent: 40, connectionState: .disconnected, updatedAt: now.addingTimeInterval(-86_400)),
+            makeDecorated(deviceID: "\(addr)-case", displayName: "\(longName) Case", kind: .airPods, percent: 100, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-left", displayName: "\(longName) Left", kind: .airPods, percent: 9, updatedAt: now),
+            makeDecorated(deviceID: "\(addr)-right", displayName: "\(longName) Right", kind: .airPods, percent: 61, updatedAt: now),
+        ]
+        let renders: [(String, BeaconAppearanceTheme, Locale)] = [
+            ("light", .light, Locale(identifier: "en_US")),
+            ("dark", .dark, Locale(identifier: "en_US")),
+            ("zh", .light, Locale(identifier: "zh-Hant-TW")),
+        ]
+        for (suffix, theme, locale) in renders {
+            try withAppearanceTheme(theme) {
+                let view = StatusMenuView(
+                    snapshots: snapshots,
+                    onRefresh: {},
+                    initialDisplayPreferences: DeviceDisplayPreferences(pinnedDeviceIDs: ["keyboard"])
+                )
+                let hostingView = NSHostingView(rootView: view.environment(\.locale, locale))
+                hostingView.frame = NSRect(origin: .zero, size: hostingView.fittingSize)
+                hostingView.layoutSubtreeIfNeeded()
+                let bitmap = try XCTUnwrap(hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds))
+                hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+                let pngData = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+                try pngData.write(to: URL(fileURLWithPath: "/tmp/batteryhub-status-menu-states-\(suffix).png"), options: .atomic)
+                XCTAssertGreaterThan(pngData.count, 20_000, suffix)
+            }
+        }
     }
 
     @MainActor

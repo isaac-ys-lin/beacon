@@ -23,7 +23,8 @@ final class StatusMenuPanelController {
         return panel?.isVisible == true
     }
 
-    func install(rootView: StatusMenuView, contentSize: NSSize) {
+    func install(rootView: StatusMenuView, contentSize proposedSize: NSSize) {
+        let contentSize = Self.fittedContentSize(for: rootView, proposed: proposedSize)
         self.contentSize = contentSize
         if let hostingController {
             hostingController.rootView = rootView
@@ -62,6 +63,20 @@ final class StatusMenuPanelController {
         }
         applyRoundedMask(to: panel.contentView)
         self.panel = panel
+    }
+
+    /// The sizing formula estimates state-dependent rows (setup card, refresh
+    /// problems, connection results) whose height varies with copy and
+    /// language; the panel hugs the SwiftUI layout instead, capped to the screen.
+    static func fittedContentSize(
+        for rootView: StatusMenuView,
+        proposed: NSSize,
+        visibleScreenHeight: CGFloat = NSScreen.main?.visibleFrame.height ?? 900
+    ) -> NSSize {
+        let ideal = NSHostingView(rootView: rootView).fittingSize.height
+        guard ideal > 0 else { return proposed }
+        let screenCap = max(240, visibleScreenHeight - 46)
+        return NSSize(width: proposed.width, height: min(ceil(ideal), screenCap))
     }
 
     func show(relativeTo sender: NSStatusBarButton) {
