@@ -132,26 +132,16 @@ struct BeaconSettingsView: View {
     var body: some View {
         let _ = alertPreferencesRevision
         let _ = isShowingIPhoneSetup
-        GeometryReader { proxy in
-            HStack(alignment: .top, spacing: 0) {
-                settingsSidebar
-
-                Divider()
-
-                VStack(spacing: 0) {
-                    settingsHeader
-
-                    Divider()
-
-                    settingsDetail
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-            .frame(
-                width: proxy.size.width,
-                height: proxy.size.height,
-                alignment: .topLeading
-            )
+        // Same structure as System Settings: the sidebar runs under the traffic
+        // lights and the pane title and actions sit in the toolbar.
+        NavigationSplitView {
+            settingsSidebar
+                .frame(minWidth: 220)
+                .navigationSplitViewColumnWidth(220)
+                .toolbar(removing: .sidebarToggle)
+        } detail: {
+            settingsDetail
+                .toolbar { settingsToolbar }
         }
         .frame(
             minWidth: 900,
@@ -195,64 +185,73 @@ struct BeaconSettingsView: View {
     }
 
     private var settingsSidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            List(selection: Binding<SettingsPane?>(
-                get: { selectedPane },
-                set: { if let pane = $0 { selectedPane = pane } }
-            )) {
-                Section {
-                    ForEach(SettingsPane.allCases) { pane in
-                        Label {
-                            Text(pane.title)
-                        } icon: {
-                            SettingsPaneIcon(pane: pane)
-                        }
-                        .tag(pane)
-                        .accessibilityIdentifier("settings.pane.\(pane.id)")
+        List(selection: Binding<SettingsPane?>(
+            get: { selectedPane },
+            set: { if let pane = $0 { selectedPane = pane } }
+        )) {
+            Section {
+                ForEach(SettingsPane.allCases) { pane in
+                    Label {
+                        Text(pane.title)
+                    } icon: {
+                        SettingsPaneIcon(pane: pane)
                     }
-                } header: {
-                    Text("Beacon")
+                    .tag(pane)
+                    .accessibilityIdentifier("settings.pane.\(pane.id)")
                 }
+            } header: {
+                Text("Beacon")
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-
-            Divider()
-
-            Button(action: onQuit) {
-                Label("Quit Beacon", systemImage: "power")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .help("Quit Beacon")
         }
-        .frame(width: 200)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(.regularMaterial)
+        .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Divider()
+                Button(action: onQuit) {
+                    Label("Quit Beacon", systemImage: "power")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .help("Quit Beacon")
+                .accessibilityIdentifier("settings.quit")
+            }
+        }
     }
 
-    private var settingsHeader: some View {
-        HStack(spacing: 10) {
-            Text(selectedPane.title)
-                .font(DesignTokens.Typography.windowTitle)
-                .lineLimit(1)
+    @ToolbarContentBuilder
+    private var settingsToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            HStack(spacing: 8) {
+                Text(selectedPane.title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("settings.title")
 
-            if isPreviewingData {
-                Text("Preview Data")
-                    .font(DesignTokens.Typography.caption2Emphasis)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(Capsule(style: .continuous).fill(.quaternary))
-                    .help("Sample devices are shown for UI QA, not live Bluetooth.")
-                    .accessibilityIdentifier("settings.preview-badge")
+                if isPreviewingData {
+                    Text("Preview Data")
+                        .font(DesignTokens.Typography.caption2Emphasis)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule(style: .continuous).fill(.quaternary))
+                        .help("Sample devices are shown for UI QA, not live Bluetooth.")
+                        .accessibilityIdentifier("settings.preview-badge")
+                }
             }
+            .fixedSize()
+            .padding(.leading, 8)
+        }
+        .titleBackgroundHidden()
 
-            Spacer()
+        if #available(macOS 26.0, *) {
+            ToolbarSpacer(.flexible)
+        }
 
+        ToolbarItemGroup(placement: .primaryAction) {
             if selectedPane == .devices {
                 Button {
                     isShowingIPhoneSetup = false
@@ -281,9 +280,6 @@ struct BeaconSettingsView: View {
                 .accessibilityLabel(isRefreshing ? "Refreshing" : "Refresh")
             }
         }
-        .buttonStyle(.borderless)
-        .padding(.horizontal, 18)
-        .frame(height: 52)
     }
 
     private var settingsDetail: some View {
@@ -860,5 +856,17 @@ func batteryAlertSummary(threshold: Int, lowEnabled: Bool, chargedEnabled: Bool)
     case (true, false): return BeaconL10n.format("Low at %d%%", threshold)
     case (false, true): return BeaconL10n.string("Full charge")
     case (false, false): return BeaconL10n.string("Alerts off")
+    }
+}
+
+private extension ToolbarContent {
+    /// System Settings shows the pane title as plain text, not in a glass capsule.
+    @ToolbarContentBuilder
+    func titleBackgroundHidden() -> some ToolbarContent {
+        if #available(macOS 26.0, *) {
+            sharedBackgroundVisibility(.hidden)
+        } else {
+            self
+        }
     }
 }

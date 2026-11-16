@@ -104,6 +104,7 @@ final class BeaconSettingsWindowController {
             hostingController.rootView = rootView
         } else {
             let hostingController = NSHostingController(rootView: rootView)
+            hostingController.sceneBridgingOptions = [.toolbars]
             self.hostingController = hostingController
             window.contentViewController = hostingController
         }
@@ -131,7 +132,7 @@ final class BeaconSettingsWindowController {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -139,8 +140,11 @@ final class BeaconSettingsWindowController {
         // This requirement is expressed in SwiftUI content coordinates. Using
         // `minSize` would include the title bar and leave only 588pt of content.
         window.contentMinSize = Self.minimumContentSize
+        // The split view's sidebar runs under the traffic lights and SwiftUI
+        // supplies the toolbar (pane title and actions). The window title stays
+        // for the Window menu and accessibility.
         window.toolbarStyle = .unified
-        window.titlebarAppearsTransparent = false
+        window.titleVisibility = .hidden
         window.backgroundColor = .controlBackgroundColor
         window.isReleasedWhenClosed = false
         var autosaveName = "Beacon.SettingsWindow"

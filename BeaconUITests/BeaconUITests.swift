@@ -143,8 +143,15 @@ final class BeaconUITests: XCTestCase {
             button.click()
             // Audit what a person can see at the minimum window size: the top of
             // the pane, then the bottom after scrolling. Elements outside the
-            // window (or under the scroll-edge fade) are covered by the other pass.
-            let visible = window.frame.insetBy(dx: 0, dy: 28)
+            // window (or under the toolbar's scroll-edge fade) are covered by the
+            // other pass. Top: the 52pt toolbar band, plus once scrolled the
+            // system's soft scroll edge below it (text there is dimmed on
+            // purpose); bottom: 28pt.
+            let frame = window.frame
+            func visibleRect(scrolled: Bool) -> CGRect {
+                let top: CGFloat = scrolled ? 88 : 52
+                return CGRect(x: frame.minX, y: frame.minY + top, width: frame.width, height: frame.height - top - 28)
+            }
             var offscreen: [String: Set<String>] = [:]
             for pass in ["top", "bottom"] {
                 if pass == "bottom" {
@@ -164,7 +171,7 @@ final class BeaconUITests: XCTestCase {
                            .contains(element.elementType) {
                         return true
                     }
-                    if let element = issue.element, !visible.contains(element.frame) {
+                    if let element = issue.element, !visibleRect(scrolled: pass == "bottom").contains(element.frame) {
                         offscreen[pass, default: []].insert("\(issue.auditType.rawValue) \(element.label) \(String(describing: element.value ?? ""))")
                         return true
                     }
@@ -245,6 +252,8 @@ final class BeaconUITests: XCTestCase {
             let button = window.descendants(matching: .any)["settings.pane.\(pane)"]
             XCTAssertTrue(button.waitForExistence(timeout: 5))
             button.click()
+            // A tall pane must never push the sidebar's Quit button off the window.
+            XCTAssertTrue(window.buttons["settings.quit"].isHittable, "Quit is hidden on \(pane)")
             switch pane {
             case "general":
                 XCTAssertTrue(window.buttons["general.history.export"].waitForExistence(timeout: 5))
