@@ -184,7 +184,7 @@ struct StatusMenuView: View {
 
             BeaconHeaderControls(
                 theme: theme,
-                onOpenSettings: nil,
+                onOpenSettings: { onOpenSettings(.devices, nil) },
                 onRefresh: onRefresh,
                 isRefreshing: isRefreshing
             )
@@ -216,8 +216,6 @@ struct StatusMenuView: View {
         .buttonStyle(MenuItemButtonStyle(theme: theme))
         .padding(.horizontal, 5)
         .padding(.top, 6)
-        .accessibilityLabel("Open Beacon Settings")
-        .help("Open Beacon Settings")
     }
 
     private var nativeHeaderSubtitle: String {
@@ -513,7 +511,7 @@ struct StatusWindowPreview: View {
             Spacer(minLength: 0)
             BeaconHeaderControls(
                 theme: previewTheme,
-                onOpenSettings: nil,
+                onOpenSettings: {},
                 onRefresh: {},
                 frameSize: 22,
                 refreshGlyphSize: 11

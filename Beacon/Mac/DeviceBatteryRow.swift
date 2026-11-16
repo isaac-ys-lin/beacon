@@ -120,7 +120,7 @@ struct BeaconUtilityIconButtonStyle: ButtonStyle {
 
 struct BeaconHeaderControls: View {
     let theme: BeaconThemePalette
-    /// Nil hides the gear: the menu panel opens settings from its footer row.
+    /// Nil hides the gear.
     let onOpenSettings: (() -> Void)?
     var onRefresh: (() -> Void)?
     var onQuit: (() -> Void)?
