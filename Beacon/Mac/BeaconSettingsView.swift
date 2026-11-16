@@ -293,9 +293,9 @@ struct BeaconSettingsView: View {
             case .devices: devicesTab
             case .alerts: alertsTab
             case .actionHUD: actionHUDTab
-            case .quickActions: quickActionsTab.padding(18)
-            case .audio: AudioInputSettingsPane().padding(18)
-            case .dashboard: dashboardTab.padding(18)
+            case .quickActions: quickActionsTab
+            case .audio: AudioInputSettingsPane()
+            case .dashboard: dashboardTab
             }
         }
         // Forms show the window background, so the title strip and content
