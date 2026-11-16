@@ -564,6 +564,9 @@ struct DashboardBatteryDeviceRow: View {
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
+        // No row background any more, so the whole row must stay hit-testable
+        // for the context menu.
+        .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(device.displayName)
         .accessibilityValue(accessibilityValue)

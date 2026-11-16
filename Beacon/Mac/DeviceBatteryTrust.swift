@@ -151,10 +151,36 @@ struct RefreshRecoveryView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                .contentShape(Rectangle())
-                .onTapGesture { isExpanded.toggle() }
             }
-            .padding(10).beaconSettingsCardSurface()
+            .disclosureGroupStyle(RowDisclosureStyle())
+        }
+    }
+}
+
+/// Inside a grouped Form only the triangle toggles a DisclosureGroup; this
+/// makes the whole title row a button, as in System Settings.
+private struct RowDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                configuration.isExpanded.toggle()
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
+                        .accessibilityHidden(true)
+                    configuration.label
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(Text(configuration.isExpanded ? "Expanded" : "Collapsed"))
+            if configuration.isExpanded {
+                configuration.content
+            }
         }
     }
 }

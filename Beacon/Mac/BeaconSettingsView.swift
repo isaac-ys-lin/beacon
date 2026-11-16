@@ -541,6 +541,7 @@ struct BeaconSettingsView: View {
 
             Section {
                 Toggle("Low battery alerts", isOn: $lowBatteryAlertsEnabled)
+                    .accessibilityLabel(Text("Low battery alerts"))
                     .accessibilityIdentifier("alerts.global.low")
                     .onChange(of: lowBatteryAlertsEnabled) { _, isEnabled in
                         handleNotificationAlertPreferenceActivation(isEnabled)
@@ -567,6 +568,7 @@ struct BeaconSettingsView: View {
 
             Section {
                 Toggle("Charged alerts", isOn: $chargedBatteryAlertsEnabled)
+                    .accessibilityLabel(Text("Charged alerts"))
                     .accessibilityIdentifier("alerts.global.charged")
                     .onChange(of: chargedBatteryAlertsEnabled) { _, isEnabled in
                         handleNotificationAlertPreferenceActivation(isEnabled)
@@ -747,6 +749,7 @@ struct DeviceDetailSheet: View {
                     }
                     .disabled(!lowBatteryAlertsEnabled)
                     Toggle("Notify when charged", isOn: chargedBinding)
+                        .accessibilityLabel(Text("Notify when charged"))
                         .disabled(!chargedBatteryAlertsEnabled)
                         .accessibilityIdentifier("settings.device.charged")
                     if hasCustomThreshold {
@@ -764,6 +767,7 @@ struct DeviceDetailSheet: View {
 
                 Section {
                     Toggle("Pin to Top", isOn: Binding(get: { row.isPinned }, set: onSetPinned))
+                        .accessibilityLabel(Text("Pin to Top"))
                         .accessibilityIdentifier("settings.device.pin")
                 } footer: {
                     Text("Pinned devices appear first in the menu bar while connected.")

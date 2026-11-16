@@ -263,7 +263,7 @@ final class BeaconUITests: XCTestCase {
                 XCTAssertFalse(window.staticTexts[isChinese ? "傳送到另一台 Mac" : "Transfer to Another Mac"].exists)
             case "alerts":
                 XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "alerts.global.low").firstMatch.waitForExistence(timeout: 5))
-                XCTAssertTrue(window.staticTexts[isChinese ? "所有裝置" : "All Devices"].exists)
+                XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "alerts.global.charged").firstMatch.exists)
             case "actionHUD":
                 let toggle = window.descendants(matching: .any).matching(identifier: "hud.settings.low-battery").firstMatch
                 XCTAssertTrue(toggle.waitForExistence(timeout: 5))

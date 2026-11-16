@@ -14,14 +14,17 @@ struct ActionHUDSettingsPane: View {
             Section {
                 preview
                 Toggle("Show Action HUD", isOn: $showActionHUD)
+                    .accessibilityLabel(Text("Show Action HUD"))
             } footer: {
                 Text("Show device connection progress, results, and battery alerts.")
             }
 
             Section {
                 Toggle("Low battery", isOn: $showLowBatteryHUD)
+                    .accessibilityLabel(Text("Low battery"))
                     .accessibilityIdentifier("hud.settings.low-battery")
                 Toggle("Finished charging", isOn: $showChargedHUD)
+                    .accessibilityLabel(Text("Finished charging"))
                     .accessibilityIdentifier("hud.settings.charged")
             } header: {
                 Text("Events")
@@ -30,6 +33,7 @@ struct ActionHUDSettingsPane: View {
 
             Section {
                 Toggle("Dismiss automatically", isOn: $autoDismissEnabled)
+                    .accessibilityLabel(Text("Dismiss automatically"))
                     .disabled(!showDismissButton)
                     .help(BeaconL10n.string(
                         showDismissButton
@@ -54,6 +58,7 @@ struct ActionHUDSettingsPane: View {
                 .accessibilityIdentifier("hud.settings.dismiss-delay")
 
                 Toggle("Show dismiss button", isOn: $showDismissButton)
+                    .accessibilityLabel(Text("Show dismiss button"))
                     .disabled(!autoDismissEnabled)
                     .help(BeaconL10n.string(
                         autoDismissEnabled

@@ -536,8 +536,13 @@ struct DeviceStatsSections: View {
     var body: some View {
         Section {
             LabeledContent("Battery", value: presentation.valueText)
-            LabeledContent("Report") {
+            // LabeledContent merges its children into one AX element, which
+            // would drop this identifier; tests read the state text itself.
+            HStack {
+                Text("Report")
+                Spacer()
                 Text(presentation.state.title)
+                    .foregroundStyle(.secondary)
                     .accessibilityIdentifier("device.report.state")
             }
             LabeledContent("Connection", value: connectionText)
