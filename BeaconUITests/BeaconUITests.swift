@@ -128,6 +128,36 @@ final class BeaconUITests: XCTestCase {
         return app
     }
 
+    /// The sidebar toggle is removed, so dragging the divider must never hide the
+    /// pane list or Quit, now or after a relaunch.
+    @MainActor
+    func testSidebarSurvivesDividerDrag() {
+        let app = dailySettingsApp(language: "en", theme: "light")
+        app.launch()
+        defer { app.terminate() }
+        var window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        let general = window.descendants(matching: .any)["settings.pane.general"]
+        XCTAssertTrue(general.waitForExistence(timeout: 5))
+        let edgeX = (general.frame.maxX - window.frame.minX + 12) / window.frame.width
+        window.coordinate(withNormalizedOffset: CGVector(dx: edgeX, dy: 0.5))
+            .press(forDuration: 0.2, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5)))
+        let dragged = XCTAttachment(screenshot: window.screenshot())
+        dragged.name = "sidebar-after-divider-drag"
+        dragged.lifetime = .keepAlways
+        add(dragged)
+        XCTAssertTrue(window.descendants(matching: .any)["settings.pane.general"].isHittable)
+        XCTAssertTrue(window.buttons["settings.quit"].isHittable)
+
+        app.terminate()
+        app.launch()
+        window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        XCTAssertTrue(window.descendants(matching: .any)["settings.pane.general"].waitForExistence(timeout: 5))
+        XCTAssertTrue(window.descendants(matching: .any)["settings.pane.general"].isHittable)
+        XCTAssertTrue(window.buttons["settings.quit"].isHittable)
+    }
+
     /// Apple's automated accessibility audit (labels, contrast, hit regions,
     /// clipped text, Dynamic Type) on every settings pane.
     @MainActor
