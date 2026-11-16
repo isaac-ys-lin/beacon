@@ -224,10 +224,12 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
-    private func visualEffectViews(in view: NSView) -> [NSVisualEffectView] {
-        let current = view as? NSVisualEffectView
-        return view.subviews.reduce(current.map { [$0] } ?? []) { partial, subview in
-            partial + visualEffectViews(in: subview)
+    /// The panel surface: Liquid Glass on macOS 26, the popover material before.
+    private func panelMaterialViews(in view: NSView) -> [NSView] {
+        var isMaterial = view is NSVisualEffectView
+        if #available(macOS 26.0, *) { isMaterial = isMaterial || view is NSGlassEffectView }
+        return view.subviews.reduce(isMaterial ? [view] : []) { partial, subview in
+            partial + panelMaterialViews(in: subview)
         }
     }
 
@@ -1228,9 +1230,15 @@ final class DeviceListPresentationTests: XCTestCase {
                 let hostingView = NSHostingView(rootView: StatusMenuView(snapshots: [], onRefresh: {}))
                 hostingView.frame = NSRect(x: 0, y: 0, width: 386, height: 120)
                 hostingView.layoutSubtreeIfNeeded()
-                let materials = visualEffectViews(in: hostingView)
-                XCTAssertFalse(materials.isEmpty)
+                let materials = panelMaterialViews(in: hostingView)
+                XCTAssertEqual(materials.count, 1, "\(theme.rawValue)")
                 XCTAssertEqual(materials.first?.appearance?.name, expected, "\(theme.rawValue)")
+                if #available(macOS 26.0, *) {
+                    let glass = try? XCTUnwrap(materials.first as? NSGlassEffectView)
+                    XCTAssertEqual(glass?.cornerRadius, NativeMacStyle.popoverCornerRadius)
+                } else {
+                    XCTAssertTrue(materials.first is NSVisualEffectView)
+                }
             }
         }
     }
@@ -2752,6 +2760,7 @@ final class DeviceListPresentationTests: XCTestCase {
             try withAppearanceTheme(theme) {
                 let view = StatusMenuView(
                     snapshots: snapshots,
+                    otherDevicesExpanded: true,
                     onRefresh: {},
                     initialDisplayPreferences: DeviceDisplayPreferences(pinnedDeviceIDs: ["keyboard"])
                 )

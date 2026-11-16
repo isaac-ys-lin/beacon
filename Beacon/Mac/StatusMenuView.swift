@@ -122,11 +122,13 @@ struct StatusMenuView: View {
                 visibleCount: visibleItemCount, isRefreshing: isRefreshing, diagnostics: refreshDiagnostics
             )
             if recovery != .ready {
+                menuSeparator
                 DeviceSetupRecoveryCard(
                     state: recovery, isRefreshing: isRefreshing,
                     onSetUp: { if let onSetUpDevice { onSetUpDevice() } else { onOpenSettings(.devices, nil) } },
-                    onRefresh: onRefresh
-                ).padding(.horizontal, 14).padding(.vertical, 8)
+                    onRefresh: onRefresh,
+                    surfaced: false
+                ).padding(.horizontal, 14).padding(.vertical, 10)
             }
             if refreshDiagnostics.attempts.contains(where: { $0.status != .reported && $0.status != .noReport }) {
                 Button {

@@ -234,12 +234,17 @@ extension View {
         return self
             .background {
                 #if os(macOS)
-                PopoverMaterialBackground(colorScheme: colorScheme)
+                PopoverMaterialBackground(colorScheme: colorScheme, cornerRadius: cornerRadius)
                 #else
                 Rectangle().fill(.regularMaterial)
                 #endif
             }
-            .overlay { shape.strokeBorder(NativeMacStyle.subtleStroke, lineWidth: 0.5) }
+            .overlay {
+                // Liquid Glass draws its own rim; the hairline is for the older material.
+                if !PopoverMaterialBackground.usesGlass {
+                    shape.strokeBorder(NativeMacStyle.subtleStroke, lineWidth: 0.5)
+                }
+            }
             .clipShape(shape)
     }
 
@@ -290,11 +295,25 @@ extension View {
 }
 
 #if os(macOS)
-private struct PopoverMaterialBackground: NSViewRepresentable {
+/// macOS 26 menus and Control Center modules sit on Liquid Glass; earlier
+/// systems keep the behind-window popover material.
+struct PopoverMaterialBackground: NSViewRepresentable {
     /// Beacon's resolved theme, which can differ from the window's appearance.
     let colorScheme: ColorScheme
+    var cornerRadius: CGFloat = NativeMacStyle.popoverCornerRadius
 
-    func makeNSView(context: Context) -> NSVisualEffectView {
+    static var usesGlass: Bool {
+        if #available(macOS 26.0, *) { return true }
+        return false
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView()
+            glass.style = .regular
+            glass.cornerRadius = cornerRadius
+            return glass
+        }
         let view = NSVisualEffectView()
         view.material = .popover
         view.blendingMode = .behindWindow
@@ -302,8 +321,11 @@ private struct PopoverMaterialBackground: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+    func updateNSView(_ nsView: NSView, context: Context) {
         nsView.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+        if #available(macOS 26.0, *), let glass = nsView as? NSGlassEffectView {
+            glass.cornerRadius = cornerRadius
+        }
     }
 }
 #endif
