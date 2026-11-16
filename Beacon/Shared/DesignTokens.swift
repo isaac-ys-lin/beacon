@@ -295,6 +295,13 @@ extension View {
 }
 
 #if os(macOS)
+/// A backdrop only: NSGlassEffectView's content holder otherwise takes every
+/// click over it, so the SwiftUI controls drawn on top never receive one.
+@available(macOS 26.0, *)
+final class PassthroughGlassEffectView: NSGlassEffectView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
 /// macOS 26 menus and Control Center modules sit on Liquid Glass; earlier
 /// systems keep the behind-window popover material.
 struct PopoverMaterialBackground: NSViewRepresentable {
@@ -309,7 +316,7 @@ struct PopoverMaterialBackground: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView()
+            let glass = PassthroughGlassEffectView()
             glass.style = .regular
             glass.cornerRadius = cornerRadius
             return glass

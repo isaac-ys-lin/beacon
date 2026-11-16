@@ -1244,6 +1244,27 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testStatusMenuSurfaceNeverTakesClicksFromItsControls() {
+        let hosting = NSHostingView(rootView: StatusMenuView(snapshots: [], isRefreshing: true, onRefresh: {}))
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 386, height: 300),
+            styleMask: [.borderless], backing: .buffered, defer: false
+        )
+        window.contentView = hosting
+        hosting.frame = NSRect(x: 0, y: 0, width: 386, height: 300)
+        hosting.layoutSubtreeIfNeeded()
+        let surfaces = panelMaterialViews(in: hosting)
+        XCTAssertEqual(surfaces.count, 1)
+        for y in stride(from: 2, to: 300, by: 8) {
+            for x in [20, 193, 370] {
+                let hit = hosting.hitTest(NSPoint(x: x, y: y))
+                let swallowed = surfaces.contains { surface in hit.map { $0 === surface || $0.isDescendant(of: surface) } ?? false }
+                XCTAssertFalse(swallowed, "panel surface took the click at (\(x), \(y))")
+            }
+        }
+    }
+
+    @MainActor
     func testStatusMenuPanelHugsContentInsteadOfEstimatedHeight() {
         let now = Date()
         let timedOut = BatteryProviderAttempt(
