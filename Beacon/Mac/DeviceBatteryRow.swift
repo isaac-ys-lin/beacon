@@ -512,7 +512,7 @@ struct DashboardBatteryDeviceRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text(device.displayName)
-                        .font(DesignTokens.Typography.controlLabelEmphasis)
+                        .font(.callout)
                         .foregroundStyle(theme.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -521,14 +521,14 @@ struct DashboardBatteryDeviceRow: View {
                         Image(systemName: resolveSymbol("pin.fill", fallback: "pin"))
                             .font(.system(size: 8, weight: .bold))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(theme.statusOK)
+                            .foregroundStyle(theme.textMuted)
                     }
 
                     Spacer(minLength: 0)
 
                     if let percent = device.percent {
                         Text("\(percent)%")
-                            .font(DesignTokens.Typography.percentSmall)
+                            .font(.callout)
                             .monospacedDigit()
                             .foregroundStyle(statusColor)
                     }
@@ -594,7 +594,16 @@ struct DashboardBatteryDeviceRow: View {
             return theme.statusOK
         }
         if device.freshness != .fresh { return DesignTokens.Palette.stale }
-        return theme.statusOK
+        // Like the system Bluetooth menu: a healthy battery is not news, so it
+        // stays neutral. Color is kept for charging, low and critical.
+        return theme.textMuted
+    }
+
+    /// A current, fresh, not-low, not-charging report: nothing to call out.
+    private var isUnremarkable: Bool {
+        device.reportState == .current && !isLow
+            && device.chargeState != .charging && device.chargeState != .full
+            && device.freshness == .fresh
     }
 
     private var statusTextColor: Color {
@@ -612,10 +621,7 @@ struct DashboardBatteryDeviceRow: View {
     }
 
     private var iconColor: Color {
-        if device.kind == .keyboard {
-            return theme.textMuted
-        }
-        return statusColor
+        isUnremarkable ? theme.textPrimary : statusColor
     }
 
     private var iconBadge: DeviceIconBadge? {
