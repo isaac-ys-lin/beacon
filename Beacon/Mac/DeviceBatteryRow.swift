@@ -508,9 +508,18 @@ struct DashboardBatteryDeviceRow: View {
                     color: statusColor
                 )
             }
+        } else if device.reportState == .disconnected || device.reportState == .noReport {
+            // The system menu leaves the trailing edge empty for a device
+            // that is away or has no battery; the dimmed row already says so.
+            // A last-known level stays, quietly.
+            if let percent = device.percent {
+                Text("\(percent)%")
+                    .font(.body)
+                    .monospacedDigit()
+                    .foregroundStyle(theme.textTertiary)
+            }
         } else {
-            // Only exceptions are spelled out, as the system menu greys a
-            // device that is not connected.
+            // Only exceptions that need attention are spelled out.
             Text(device.percent.map { "\($0)% · \(statusText)" } ?? statusText)
                 .font(.callout)
                 .monospacedDigit()

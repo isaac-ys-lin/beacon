@@ -2777,6 +2777,37 @@ final class DeviceListPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testStatusMenuRowsWithoutBatteryRenderInLightAndDark() throws {
+        let old = Date().addingTimeInterval(-86_400)
+        let items: [DeviceListItem] = [
+            .device(makeDecorated(deviceID: "speaker", displayName: "Bose Smart Soundbar 900", kind: .bluetoothPeripheral, percent: nil, connectionState: .disconnected, updatedAt: old)),
+            .device(makeDecorated(deviceID: "headphones", displayName: "KEF EGG", kind: .bluetoothPeripheral, percent: nil, connectionState: .connected)),
+            .device(makeDecorated(deviceID: "away", displayName: "Keychron J9", kind: .keyboard, percent: 40, freshness: .expired, connectionState: .disconnected, updatedAt: old)),
+        ]
+        for theme in [BeaconAppearanceTheme.light, .dark] {
+            try withAppearanceTheme(theme) {
+                let rows = VStack(spacing: 0) {
+                    ForEach(items, id: \.id) { item in
+                        DashboardBatteryDeviceRow(device: DashboardBatteryDevice(item: item), lowBatteryThreshold: 20)
+                    }
+                }
+                .frame(width: StatusMenuSizing.width)
+                .padding(.vertical, 6)
+                .background(theme == .dark ? Color(white: 0.2) : Color(white: 0.85))
+                .preferredColorScheme(theme == .dark ? .dark : .light)
+                let hostingView = NSHostingView(rootView: rows)
+                hostingView.frame = NSRect(origin: .zero, size: hostingView.fittingSize)
+                hostingView.layoutSubtreeIfNeeded()
+                let bitmap = try XCTUnwrap(hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds))
+                hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+                let pngData = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+                try pngData.write(to: URL(fileURLWithPath: "/tmp/batteryhub-status-menu-no-battery-\(theme.rawValue).png"), options: .atomic)
+                XCTAssertGreaterThan(pngData.count, 10_000)
+            }
+        }
+    }
+
+    @MainActor
     func testStatusMenuViewDarkThemeRenderProducesNonBlankImage() throws {
         let previousTheme = UserDefaults.standard.string(forKey: BeaconAppearanceTheme.defaultsKey)
         UserDefaults.standard.set(BeaconAppearanceTheme.dark.rawValue, forKey: BeaconAppearanceTheme.defaultsKey)
